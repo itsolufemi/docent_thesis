@@ -1,0 +1,46 @@
+{
+  "name": "app--expo",
+  "license": "0BSD",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@react-navigation/bottom-tabs": "^7.2.0",
+    "@react-navigation/native": "^7.0.14",
+    "@react-navigation/stack": "^7.1.1",
+    "audio-decode": "^2.2.2",
+    "axios": "^1.7.9",
+    "expo": "^53.0.7",
+    "expo-audio": "~0.4.4",
+    "expo-av": "~15.1.4",
+    "expo-dev-client": "~5.1.8",
+    "expo-network": "~7.1.5",
+    "expo-status-bar": "~2.2.3",
+    "metro-config": "^0.81.0",
+    "network": "^0.7.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.2",
+    "react-native-screens": "~4.10.0",
+    "react-native-sound": "^0.11.2",
+    "react-native-web": "^0.20.0",
+    "recorder-js": "^1.0.7",
+    "uuid": "^11.1.0",
+    "web-streams-polyfill": "^4.1.0",
+    "ws": "^8.18.1",
+    "@expo/metro-runtime": "~5.0.4"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@types/react": "~19.0.10",
+    "@types/react-native": "^0.73.0",
+    "typescript": "~5.8.3"
+  },
+  "private": true
+}
