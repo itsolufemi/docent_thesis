@@ -1,0 +1,234 @@
+[2m00:26:21[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/TicketForm.js[39m:34:54
+[33m  32 |      <form className="ticket-form" onSubmit={(event) => event.preventDefault()}>
+  33 |        <div className="form-row">
+  34 |          <span className="ticket-label">Tickets</span>
+     |                                                       ^
+  35 |          <button type="button" className="form-button" onClick={decrement}>
+  36 |            -[39m
+[2m00:26:21[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/MainApplication.js[39m:124:11
+[33m  122|          />
+  123|        )}
+  124|      </div>
+     |            ^
+  125|    );
+  126|  }[39m
+[2m00:26:21[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/LoginForm.js[39m:38:18
+[33m  36 |          <button type="button" className="checkout-button" onClick={onSubmit}>
+  37 |            Check
+  38 |          </button>
+     |                   ^
+  39 |        </div>
+  40 |      </form>[39m
+[2m00:26:21[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/MainApplication.js[39m:124:11
+[33m  122|          />
+  123|        )}
+  124|      </div>
+     |            ^
+  125|    );
+  126|  }[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:26:21[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/TicketForm.js[39m:34:54
+[33m  32 |      <form className="ticket-form" onSubmit={(event) => event.preventDefault()}>
+  33 |        <div className="form-row">
+  34 |          <span className="ticket-label">Tickets</span>
+     |                                                       ^
+  35 |          <button type="button" className="form-button" onClick={decrement}>
+  36 |            -[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:26:21[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/LoginForm.js[39m:38:18
+[33m  36 |          <button type="button" className="checkout-button" onClick={onSubmit}>
+  37 |            Check
+  38 |          </button>
+     |                   ^
+  39 |        </div>
+  40 |      </form>[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:26:22[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/MainApplication.js[39m:124:11
+[33m  122|          />
+  123|        )}
+  124|      </div>
+     |            ^
+  125|    );
+  126|  }[39m
+[2m00:26:22[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/TicketForm.js[39m:34:54
+[33m  32 |      <form className="ticket-form" onSubmit={(event) => event.preventDefault()}>
+  33 |        <div className="form-row">
+  34 |          <span className="ticket-label">Tickets</span>
+     |                                                       ^
+  35 |          <button type="button" className="form-button" onClick={decrement}>
+  36 |            -[39m
+[2m00:26:22[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/LoginForm.js[39m:38:18
+[33m  36 |          <button type="button" className="checkout-button" onClick={onSubmit}>
+  37 |            Check
+  38 |          </button>
+     |                   ^
+  39 |        </div>
+  40 |      </form>[39m
+[2m00:26:57[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/TicketForm.js[39m:34:54
+[33m  32 |      <form className="ticket-form" onSubmit={(event) => event.preventDefault()}>
+  33 |        <div className="form-row">
+  34 |          <span className="ticket-label">Tickets</span>
+     |                                                       ^
+  35 |          <button type="button" className="form-button" onClick={decrement}>
+  36 |            -[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:26:57[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/LoginForm.js[39m:38:18
+[33m  36 |          <button type="button" className="checkout-button" onClick={onSubmit}>
+  37 |            Check
+  38 |          </button>
+     |                   ^
+  39 |        </div>
+  40 |      </form>[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:26:57[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/MainApplication.js[39m:124:11
+[33m  122|          />
+  123|        )}
+  124|      </div>
+     |            ^
+  125|    );
+  126|  }[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:29:05[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/TicketForm.js[39m:34:54
+[33m  32 |      <form className="ticket-form" onSubmit={(event) => event.preventDefault()}>
+  33 |        <div className="form-row">
+  34 |          <span className="ticket-label">Tickets</span>
+     |                                                       ^
+  35 |          <button type="button" className="form-button" onClick={decrement}>
+  36 |            -[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:29:05[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/MainApplication.js[39m:124:11
+[33m  122|          />
+  123|        )}
+  124|      </div>
+     |            ^
+  125|    );
+  126|  }[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:29:05[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/LoginForm.js[39m:38:18
+[33m  36 |          <button type="button" className="checkout-button" onClick={onSubmit}>
+  37 |            Check
+  38 |          </button>
+     |                   ^
+  39 |        </div>
+  40 |      </form>[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:29:29[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/MainApplication.js[39m:124:11
+[33m  122|          />
+  123|        )}
+  124|      </div>
+     |            ^
+  125|    );
+  126|  }[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:29:29[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/TicketForm.js[39m:34:54
+[33m  32 |      <form className="ticket-form" onSubmit={(event) => event.preventDefault()}>
+  33 |        <div className="form-row">
+  34 |          <span className="ticket-label">Tickets</span>
+     |                                                       ^
+  35 |          <button type="button" className="form-button" onClick={decrement}>
+  36 |            -[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)
+[2m00:29:29[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to parse source for import analysis because the content contains invalid JS syntax. If you are using JSX, make sure to name the file with the .jsx or .tsx extension.[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/itsol/Documents/docent_thesis/client_side/src/components/LoginForm.js[39m:38:18
+[33m  36 |          <button type="button" className="checkout-button" onClick={onSubmit}>
+  37 |            Check
+  38 |          </button>
+     |                   ^
+  39 |        </div>
+  40 |      </form>[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42658:41)
+      at TransformPluginContext.error (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42655:16)
+      at TransformPluginContext.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:40585:14)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:42453:18)
+      at async loadAndTransform (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:35845:27)
+      at async viteTransformMiddleware (file:///C:/Users/itsol/Documents/docent_thesis/client_side/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:37369:24)

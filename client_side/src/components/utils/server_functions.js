@@ -1,4 +1,3 @@
-import { fetch } from 'expo/fetch'; // Import fetch from expo
 import { ipv4 } from './ipv4_module'; // Import ipv4 module to get the local ip address
 const server = `ws://${ipv4}:8080`; // use the local ip address to connect to the server
 //console.log('1. server address:', server); // Log the server address

@@ -1,0 +1,234 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: rgba(255, 255, 255, 0.93);
+  color: #111;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.93);
+}
+
+.app-main {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.93);
+}
+
+.app-title {
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  color: #5c5c5c;
+  font-size: 15px;
+  font-weight: 300;
+}
+
+.application {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.start-screen,
+.main-app {
+  flex: 1;
+  width: 100%;
+}
+
+.start-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.main-app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 58px;
+}
+
+.player-controls {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px 0;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.round-button,
+.player-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  background: transparent;
+  color: #000;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.22);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.round-button {
+  width: 40px;
+  height: 40px;
+}
+
+.player-button {
+  width: 42px;
+  height: 42px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.round-button:disabled,
+.nav-button:disabled {
+  background: #d3d3d3;
+  border-color: #a9a9a9;
+  color: #808080;
+  opacity: 0.65;
+}
+
+.mic-button.is-recording {
+  width: 70px;
+  background: #4d7860;
+  color: #fff;
+}
+
+.stop-button {
+  color: #a62a12;
+}
+
+.text-panel {
+  width: 100%;
+  height: min(70vh, 600px);
+  margin-top: 10px;
+  overflow-y: auto;
+}
+
+.question-box,
+.caption-text {
+  width: 100%;
+  margin: 0;
+  padding: 20px;
+}
+
+.question-box {
+  color: green;
+}
+
+.caption-text {
+  padding-bottom: 40px;
+  text-align: justify;
+  white-space: pre-wrap;
+}
+
+.bottom-nav {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 30px;
+  background: #fff;
+}
+
+.nav-button,
+.close-button {
+  width: 58px;
+  min-height: 32px;
+  margin: 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nav-button {
+  border: 1px solid green;
+  background: #f0f0f0;
+  color: #000;
+}
+
+.close-button {
+  border: 0;
+  background: rgb(94, 31, 31);
+  color: #fff;
+}
+
+.ticket-form,
+.login-form {
+  width: min(520px, 100%);
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.ticket-label,
+.text-input {
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 10px;
+}
+
+.text-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.form-button,
+.checkout-button {
+  border: 0;
+  border-radius: 5px;
+  padding: 10px 12px;
+}
+
+.form-button {
+  background: #ddd;
+}
+
+.checkout-button {
+  background: seagreen;
+  color: #fff;
+}

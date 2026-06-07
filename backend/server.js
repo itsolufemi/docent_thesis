@@ -56,7 +56,7 @@ function get_ipv4_addr() {
 const ipv4_addr = get_ipv4_addr(); // get the ipv4 address
 const ipv4_module = `export const ipv4 = "${ipv4_addr}";\n` //module to be written to js file
 try {
-  fs.writeFileSync(path.join(__dirname, '..', 'components', 'utils', 'ipv4_module.js'), ipv4_module); // save the ipv4 address to a file
+  fs.writeFileSync(path.join(__dirname, '..', 'client_side', 'src', 'components', 'utils', 'ipv4_module.js'), ipv4_module); // save the ipv4 address to a file
   //console.log('ipv4 address saved to ipv4.txt');
 }catch (err) {
   console.error('Error saving ipv4:', err); // handle file write error
