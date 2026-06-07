@@ -1,20 +1,35 @@
 # backend_python
+
+This folder contains the FastAPI backend service for the project.
+It is organized around routers in `api/`, request/response schemas in `schemas/`, and business logic in `services/`.
+
 **Top-level file tree (backend_python/)**
 
 - `.env`
 - `api/`
+  - `__init__.py`       - package initializer for API routes
   - `routes_health.py`  - health endpoint router
   - `routes_query.py`   - query endpoint router
-- `config.py`           - settings and configuration
-- `memory/`             - local persistent memory store
-- `orchestrators/`      - orchestration logic (if present)
-- `rag/`                - retrieval/augmented-generation helpers
-- `requirements.txt`    - Python dependencies
-- `schemas/`            - Pydantic request/response schemas
-- `server.py`           - FastAPI app, CORS, router registration
-- `services/`           - business logic / helpers (query generation, etc.)
-- `utils/`              - utility modules
-- `venv/`               - virtual environment (not checked into VCS)
+  - `routes_llm.py`     - LLM / language model endpoint router
+- `config.py`            - settings and configuration
+- `memory/`              - local persistent memory store
+- `orchestrators/`       - orchestration logic and workflow coordination
+- `rag/`                 - retrieval-augmented generation helpers
+- `README.md`            - backend docs
+- `requirements.txt`     - Python dependencies
+- `schemas/`
+  - `__init__.py`
+  - `query_schemas.py`   - request/response schemas for query route
+  - `llm_schemas.py`     - request/response schemas for LLM route
+- `server.py`            - FastAPI app, CORS, router registration
+- `services/`
+  - `__init__.py`
+  - `query_service.py`   - business logic for query responses
+  - `llm_service.py`     - LLM helper service
+  - `prompt_service.py`  - prompt construction logic
+- `utils/`               - utility modules
+- `venv/`                - virtual environment (not checked into VCS)
+- `__pycache__/`         - Python bytecode cache
 
 **Request flow: example `POST /api/query`**
 
