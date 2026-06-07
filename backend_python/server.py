@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
-from config import settings
+from api.routes_health import router as health_router
+from api.routes_query import router as query_router
 
 app = FastAPI(
     title = "docent backend",
@@ -22,20 +22,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class QueryRequest(BaseModel):
-    text: str
-
-@app.get("/api/health")
-def health_check():
-    return {
-        "status": "ok",
-        "service": "backend-python",
-        "environment": settings.environment
-    }
-
-@app.post("/api/query")
-def query(request: QueryRequest):
-    return {
-        "request": request.text,
-        "response": f"echo: {request.text}"
-    }
+app.include_router(health_router)
+app.include_router(query_router)
