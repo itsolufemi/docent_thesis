@@ -1,5 +1,9 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# backend-python
+backend_python/.env
+backend_python/venv/
+
 # dependencies
 node_modules/
 /backend/.env 
@@ -7,6 +11,7 @@ node_modules/
 *.wav
 /components/utils/ipv4_module.js
 *.env
+
 # Expo
 .expo/
 dist/
