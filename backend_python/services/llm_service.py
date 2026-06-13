@@ -22,8 +22,8 @@ def check_llm_status() -> dict:
             message = 'llm is reachable and the configured model is available'
         else: 
             message = (
-            'llm is reachable but the configured model is not available',
-            'check OLLAMA_MODEL in you env'
+                "llm is reachable but the configured model is not available. "
+                "Check OLLAMA_MODEL in your .env file."
             )
 
         return {

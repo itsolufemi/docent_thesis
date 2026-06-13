@@ -3,6 +3,16 @@
 This folder contains the FastAPI backend service for the project.
 It is organized around routers in `api/`, request/response schemas in `schemas/`, and business logic in `services/`.
 
+**summary**
+`- server.py starts the backend`
+`- api/ receives requests`
+`- schemas/ define data contracts`
+`- services/ perform work`
+`- data/ stores facts`
+`- memory/ will track state`
+`- orchestrators/ will decide flow`
+`- rag/ will retrieve knowledge`
+
 **Top-level file tree (backend_python/)**
 
 - `.env`
