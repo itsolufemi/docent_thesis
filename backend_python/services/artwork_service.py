@@ -15,11 +15,11 @@ def load_artworks() -> list[Artwork]:
 def get_all_artworks() -> list[Artwork]:
     return load_artworks()
 
-def get_artwork_by_id(artwork_id: int) -> Artwork | None:
+def get_painting_by_index(painting_index: int) -> Artwork | None:
     artworks = load_artworks()
 
     for artwork in artworks:
-        if artwork.painting_index == artwork_id:
+        if artwork.painting_index == painting_index:
             return artwork
         
     return None

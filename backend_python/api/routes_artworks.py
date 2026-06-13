@@ -8,7 +8,7 @@ from schemas.artwork_schemas import (
 
 from services.artwork_service import (
     get_all_artworks,
-    get_artwork_by_id,
+    get_painting_by_index,
     search_artworks
 )
 
@@ -26,7 +26,7 @@ def search_list_artworks(query: str):
 
 @router.get("/api/artworks/{artwork_id}", response_model=Artwork)
 def get_artwork(artwork_id: int):
-    artwork = get_artwork_by_id(artwork_id)
+    artwork = get_painting_by_index(artwork_id)
 
     if artwork is None:
         raise HTTPException(

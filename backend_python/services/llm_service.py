@@ -63,7 +63,7 @@ def generate_llm_response(prompt: str) -> str:
     }
 
     try:
-        response = httpx.post(url, json=payload, timeout=60.0)
+        response = httpx.post(url, json=payload, timeout=120.0)
         response.raise_for_status()
 
         data = response.json()
