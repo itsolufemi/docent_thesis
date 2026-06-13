@@ -2,7 +2,10 @@ from services.llm_service import generate_llm_response
 from services.prompt_service import build_prompt
 from services.artwork_service import get_painting_by_index
 
-def generate_basic_response(text: str, painting_index: int | None = None ) -> tuple[str, str | None]:
+def generate_basic_response(
+        text: str, 
+        painting_index: int | None = None ) -> tuple[str, int | None]:
+    
     artwork = None
 
     if painting_index is not None:

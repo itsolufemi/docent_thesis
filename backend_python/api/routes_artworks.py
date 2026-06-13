@@ -24,9 +24,9 @@ def search_list_artworks(query: str):
     results = search_artworks(query)
     return ArtworkSearchResponse(query=query, results=results)
 
-@router.get("/api/artworks/{artwork_id}", response_model=Artwork)
-def get_artwork(artwork_id: int):
-    artwork = get_painting_by_index(artwork_id)
+@router.get("/api/artworks/{painting_index}", response_model=Artwork)
+def get_artwork(painting_index: int):
+    artwork = get_painting_by_index(painting_index)
 
     if artwork is None:
         raise HTTPException(
