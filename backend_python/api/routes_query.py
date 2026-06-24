@@ -9,11 +9,13 @@ router = APIRouter()
 def query(request: QueryRequest):
     response_text, resolved_painting_index = generate_basic_response(
         text = request.text,
-        painting_index = request.painting_index
+        painting_index = request.painting_index,
+        session_id = request.session_id
         )
     
     return QueryResponse(
         request=request.text, 
         response=response_text,
+        session_id=request.session_id,
         painting_index=resolved_painting_index
     )
