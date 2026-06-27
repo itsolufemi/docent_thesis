@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from schemas.session_schemas import SessionState
+from schemas.session_schemas import dialogue_role, DialogueTurn, SessionState
 
 sessions: dict[str, SessionState] = {}
 
@@ -36,3 +36,36 @@ def set_current_painting(
 
     sessions[session_id] = state
     return state
+
+def add_dialogue_turn(
+        session_id: str,
+        role: dialogue_role,
+        content: str,
+    ) -> SessionState | None:
+    state = get_session(session_id)
+
+    if state is None:
+        return None
+    
+    turn = DialogueTurn(
+        role=role,
+        content=content
+    )
+
+    state.dialogue_history.append(turn)
+
+    sessions[session_id] = state
+    return state
+
+def get_recent_dialogue_history(
+    session_id: str,
+    limit: int = 6,
+) -> list[DialogueTurn]:
+    state = get_session(session_id)
+
+    if state is None:
+        return []
+    
+    return state.dialogue_history[-limit:]
+
+

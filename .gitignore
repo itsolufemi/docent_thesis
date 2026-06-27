@@ -11,6 +11,7 @@ node_modules/
 *.wav
 /components/utils/ipv4_module.js
 *.env
+.tmp.driveupload/
 
 # Expo
 .expo/
