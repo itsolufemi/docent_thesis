@@ -2,14 +2,15 @@ from fastapi import APIRouter, HTTPException
 
 from schemas.artwork_schemas import (
     Artwork,
+    ArtworkDatasetSummaryResponse,
     ArtworkListResponse,
-    ArtworkSearchResponse
+    ArtworkSearchResponse,
 )
-
 from services.artwork_service import (
     get_all_artworks,
+    get_artwork_dataset_summary,
     get_painting_by_index,
-    search_artworks
+    search_artworks,
 )
 
 router = APIRouter()
@@ -18,6 +19,11 @@ router = APIRouter()
 def list_artworks():
     artworks = get_all_artworks()
     return ArtworkListResponse(artworks=artworks)
+
+@router.get("/api/artworks/summary", response_model=ArtworkDatasetSummaryResponse)
+def read_artwork_dataset_summary():
+    summary = get_artwork_dataset_summary()
+    return ArtworkDatasetSummaryResponse(**summary)
 
 @router.get("/api/artworks/search", response_model=ArtworkSearchResponse)
 def search_list_artworks(query: str):
