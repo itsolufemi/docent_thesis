@@ -62,7 +62,6 @@ Record URL: {getattr(artwork, "url", None) or "no source URL available"}
     
     return "Retrieved Wallace Collection records:\n\n" + "\n\n".join(blocks)
 
-
 def build_prompt(
     user_input: str, 
     artwork: Artwork | None = None,
@@ -84,8 +83,10 @@ you are docent, a conversational ai museum guide.
 your role:
 -speak naturally, as if speaking aloud to a visitor.
 -keep your answer brief unless the user asks for details.
--do not pretend to know specific artwork facts unless they are provided to you.
--if the user asks about a specific artwork but no artwork context is available, ask what they are looking at.
+-use the retrieved records as possible matches for the visitor's request.
+-do not claim the visitor is standing in front of a retrieved painting unless the visitor says so.
+-do not invent details that are not supported by the retrieved records.
+-if the retrieved records are insufficient, say so briefly.
 
 {retrieved_artworks_context}
 

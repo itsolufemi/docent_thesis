@@ -1,6 +1,9 @@
 from typing import Literal
+
 from pydantic import BaseModel, Field
+
 from schemas.retrieval_schemas import RetrievedArtwork
+from schemas.source_schemas import QuerySource
 
 
 ContextSource = Literal[
@@ -13,12 +16,16 @@ ContextSource = Literal[
     "retrieval_no_results",
 ]
 
+
 class QueryDebugInfo(BaseModel):
     resolved_painting_index: int | None = None
     context_source: ContextSource
     artwork_context_used: bool
     dialogue_turns_used: int
     prompt: str | None = None
+
     retrieval_used: bool = False
     retrieval_results: list[RetrievedArtwork] = Field(default_factory=list)
 
+    sources_count: int = 0
+    sources: list[QuerySource] = Field(default_factory=list)

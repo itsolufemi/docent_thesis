@@ -4,10 +4,15 @@ from memory.session_store import (
     get_session,
 )
 from schemas.context_schemas import QueryDebugInfo
+from schemas.source_schemas import QuerySource
 from services.artwork_service import get_painting_by_index
 from services.llm_service import generate_llm_response
 from services.prompt_service import build_prompt
 from services.retrieval_service import retrieve_artworks_for_query
+from services.source_service import (
+    build_source_from_artwork,
+    build_sources_from_retrieved_artworks,
+)
 
 
 def generate_basic_response(
@@ -15,11 +20,12 @@ def generate_basic_response(
     painting_index: int | None = None,
     session_id: str | None = None,
     include_debug: bool = False,
-) -> tuple[str, int | None, QueryDebugInfo | None]:
+) -> tuple[str, int | None, list[QuerySource], QueryDebugInfo | None]:
     resolved_painting_index = painting_index
     context_source = "no_artwork_context"
     dialogue_history = []
     retrieved_artworks = []
+    sources: list[QuerySource] = []
 
     session_state = None
 
@@ -64,6 +70,19 @@ def generate_basic_response(
         else:
             context_source = "retrieval_no_results"
 
+    if artwork is not None:
+        sources = [
+            build_source_from_artwork(
+                artwork=artwork,
+                source_type="artwork_context",
+            )
+        ]
+
+    if retrieved_artworks:
+        sources = build_sources_from_retrieved_artworks(
+            retrieved_artworks
+        )
+
     prompt = build_prompt(
         user_input=text,
         artwork=artwork,
@@ -103,6 +122,8 @@ def generate_basic_response(
             prompt=prompt,
             retrieval_used=bool(retrieved_artworks),
             retrieval_results=retrieved_artworks,
+            sources_count=len(sources),
+            sources=sources,
         )
 
-    return response, final_painting_index, debug_info
+    return response, final_painting_index, sources, debug_info

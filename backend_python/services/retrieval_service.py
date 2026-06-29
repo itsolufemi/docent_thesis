@@ -14,6 +14,20 @@ STOP_WORDS = {
     "this",
     "that",
     "from",
+    "hello",
+    "hi",
+    "hey",
+    "yourself",
+    "you",
+    "are",
+    "was",
+    "is",
+    "am",
+    "i",
+    "me",
+    "my",
+    "your",
+    "please",
     "into",
     "show",
     "tell",
@@ -106,8 +120,10 @@ def score_artwork_against_query(
         if normalised_query in normalised_field_value:
             field_score += field_weight * 3
         
+        field_terms = set(re.findall(r"[a-z0-9]+", normalised_field_value))
+
         for term in query_terms:
-            if term in normalised_field_value:
+            if term in field_terms:
                 field_score += field_weight
 
 
@@ -154,7 +170,9 @@ def retrieve_artworks_for_query(
 ) -> list[RetrievedArtwork]:
     query = query.strip()
 
-    if not query:
+    query_terms = tokenize_query(query)
+
+    if not query_terms:
         return []
 
     limit = max(1, min(limit, 10))
