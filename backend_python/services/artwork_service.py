@@ -4,7 +4,7 @@ from pathlib import Path
 from schemas.artwork_schemas import Artwork
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-ARTWORKS_FILE = DATA_DIR / "superlist.json"
+ARTWORKS_FILE = DATA_DIR / "artworks.json"
 
 _artworks_cache: list[Artwork] | None = None
 
