@@ -7,6 +7,8 @@ from api.routes_query import router as query_router
 from api.routes_llm import router as llm_router
 from api.routes_artworks import router as artworks_router
 from api.routes_retrieval import router as retrieval_router
+from api.routes_rag import router as rag_router
+
 
 app = FastAPI(
     title = "docent backend",
@@ -32,3 +34,4 @@ app.include_router(llm_router)
 app.include_router(artworks_router)
 app.include_router(session_router)
 app.include_router(retrieval_router)
+app.include_router(rag_router)

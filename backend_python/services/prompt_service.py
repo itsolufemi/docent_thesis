@@ -1,6 +1,8 @@
 from schemas.artwork_schemas import Artwork
 from schemas.session_schemas import DialogueTurn
 from schemas.retrieval_schemas import RetrievedArtwork
+from schemas.rag_schemas import RetrievedEvidenceChunk
+
 
 
 def format_dialogue_history_for_prompt(
@@ -62,12 +64,45 @@ Record URL: {getattr(artwork, "url", None) or "no source URL available"}
     
     return "Retrieved Wallace Collection records:\n\n" + "\n\n".join(blocks)
 
+def build_rag_evidence_context(
+    rag_results: list[RetrievedEvidenceChunk],
+) -> str:
+    if not rag_results:
+        return ""
+
+    blocks = []
+
+    for index, retrieved in enumerate(rag_results, start=1):
+        chunk = retrieved.chunk
+
+        block = f"""
+Evidence {index}:
+Chunk ID: {chunk.chunk_id}
+Chunk type: {chunk.chunk_type}
+Painting index: {chunk.painting_index}
+Title: {chunk.title}
+Artist: {chunk.artist or "unknown"}
+Inventory number: {chunk.inventory_number or "unknown"}
+Source URL: {chunk.url or "no source URL available"}
+Retrieval score: {retrieved.score}
+Matched terms: {", ".join(retrieved.matched_terms)}
+Evidence text:
+{chunk.text}
+""".strip()
+
+        blocks.append(block)
+
+    return "Retrieved evidence chunks:\n\n" + "\n\n".join(blocks)
+
 def build_prompt(
     user_input: str, 
     artwork: Artwork | None = None,
     dialogue_history: list[DialogueTurn] | None = None,
     retrieved_artworks: list[RetrievedArtwork] | None = None,
+    rag_results: list[RetrievedEvidenceChunk] | None = None,
     ) -> str:
+    rag_results = rag_results or []
+    rag_evidence_context = build_rag_evidence_context(rag_results)
 
     dialogue_history = dialogue_history or []
     retrieved_artworks = retrieved_artworks or []
@@ -76,6 +111,30 @@ def build_prompt(
     retrieved_artworks_context = build_retrieved_artworks_context(
         retrieved_artworks
     )
+
+    if artwork is None and rag_results:
+        return f"""
+you are docent, a conversational ai museum guide.
+
+your role:
+-speak naturally, as if speaking aloud to a visitor.
+-keep your answer brief unless the user asks for details.
+-use the retrieved evidence chunks below to answer the visitor.
+-do not invent details that are not supported by the evidence chunks.
+-if the evidence is incomplete, say so briefly.
+-do not claim the visitor is standing in front of a retrieved artwork unless the visitor says so.
+-when useful, mention the artwork title and artist.
+
+{rag_evidence_context}
+
+recent conversation:
+{formatted_history}
+
+the visitor now says:
+{user_input}
+
+respond as docent:
+""".strip()
 
     if artwork is None and retrieved_artworks:
         return f"""

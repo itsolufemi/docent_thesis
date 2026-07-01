@@ -4,14 +4,17 @@ from memory.session_store import (
     get_session,
 )
 from schemas.context_schemas import QueryDebugInfo
+from schemas.rag_schemas import RetrievedEvidenceChunk
 from schemas.source_schemas import QuerySource
 from services.artwork_service import get_painting_by_index
 from services.llm_service import generate_llm_response
 from services.prompt_service import build_prompt
+from services.rag_service import retrieve_evidence_chunks_for_query
 from services.retrieval_service import retrieve_artworks_for_query
 from services.source_service import (
     build_source_from_artwork,
     build_sources_from_retrieved_artworks,
+    build_sources_from_retrieved_evidence_chunks,
 )
 
 
@@ -23,8 +26,10 @@ def generate_basic_response(
 ) -> tuple[str, int | None, list[QuerySource], QueryDebugInfo | None]:
     resolved_painting_index = painting_index
     context_source = "no_artwork_context"
+
     dialogue_history = []
     retrieved_artworks = []
+    rag_results: list[RetrievedEvidenceChunk] = []
     sources: list[QuerySource] = []
 
     session_state = None
@@ -54,12 +59,29 @@ def generate_basic_response(
         if artwork is None:
             context_source = "painting_index_not_found"
 
-    should_use_retrieval = (
+    should_use_rag = (
         artwork is None
         and resolved_painting_index is None
     )
 
-    if should_use_retrieval:
+    if should_use_rag:
+        rag_results = retrieve_evidence_chunks_for_query(
+            query=text,
+            limit=5,
+        )
+
+        if rag_results:
+            context_source = "rag_evidence_chunks"
+        else:
+            context_source = "rag_no_evidence"
+
+    should_use_record_retrieval = (
+        artwork is None
+        and resolved_painting_index is None
+        and not rag_results
+    )
+
+    if should_use_record_retrieval:
         retrieved_artworks = retrieve_artworks_for_query(
             query=text,
             limit=3,
@@ -78,6 +100,11 @@ def generate_basic_response(
             )
         ]
 
+    if rag_results:
+        sources = build_sources_from_retrieved_evidence_chunks(
+            rag_results
+        )
+
     if retrieved_artworks:
         sources = build_sources_from_retrieved_artworks(
             retrieved_artworks
@@ -88,6 +115,7 @@ def generate_basic_response(
         artwork=artwork,
         dialogue_history=dialogue_history,
         retrieved_artworks=retrieved_artworks,
+        rag_results=rag_results,
     )
 
     response = generate_llm_response(prompt)
@@ -122,6 +150,8 @@ def generate_basic_response(
             prompt=prompt,
             retrieval_used=bool(retrieved_artworks),
             retrieval_results=retrieved_artworks,
+            rag_used=bool(rag_results),
+            rag_results=rag_results,
             sources_count=len(sources),
             sources=sources,
         )
