@@ -8,11 +8,11 @@ from schemas.source_schemas import QuerySource
 
 
 ContextSource = Literal[
+    "session_not_found", # framework api
     "direct_painting_index",
     "session_current_painting",
     "no_artwork_context",
     "painting_index_not_found",
-    "session_not_found",
     "retrieval_results",
     "retrieval_no_results",
     "rag_evidence_chunks",
@@ -20,7 +20,7 @@ ContextSource = Literal[
 ]
 
 
-class QueryDebugInfo(BaseModel):
+class QueryDebugInfo(BaseModel): #query debug information for logging and analysis
     resolved_painting_index: int | None = None
     context_source: ContextSource
     artwork_context_used: bool

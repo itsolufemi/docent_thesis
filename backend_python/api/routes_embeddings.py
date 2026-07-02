@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query
 
 from config import settings
+
 from schemas.embedding_schemas import (
     EmbeddingRequest,
     EmbeddingResponse,
