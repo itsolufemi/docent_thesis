@@ -9,6 +9,7 @@ from api.routes_artworks import router as artworks_router
 from api.routes_retrieval import router as retrieval_router
 from api.routes_rag import router as rag_router
 from api.routes_index import router as index_router
+from api.routes_embeddings import router as embeddings_router
 
 
 app = FastAPI(
@@ -37,3 +38,4 @@ app.include_router(session_router)
 app.include_router(retrieval_router)
 app.include_router(rag_router)
 app.include_router(index_router)
+app.include_router(embeddings_router)
