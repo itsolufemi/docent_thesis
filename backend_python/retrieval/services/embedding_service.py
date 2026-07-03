@@ -1,8 +1,8 @@
 import httpx
 
 from config import settings
-from schemas.embedding_schemas import IndexedChunkEmbedding
-from services.index_service import build_rag_index
+from backend_python.retrieval.schemas.embedding_schemas import IndexedChunkEmbedding
+from backend_python.retrieval.services.index_service import build_rag_index
 
 
 def generate_embedding(text: str) -> list[float]:

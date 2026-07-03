@@ -1,9 +1,9 @@
 import re
 import unicodedata
 
-from schemas.artwork_schemas import Artwork
-from schemas.retrieval_schemas import RetrievedArtwork
-from services.artwork_service import get_all_artworks
+from backend_python.docent.schemas.artwork_schemas import Artwork
+from backend_python.retrieval.schemas.keyword_retrieval_schemas import RetrievedArtwork
+from backend_python.docent.services.artwork_service import get_all_artworks
 
 STOP_WORDS = {
     "the",

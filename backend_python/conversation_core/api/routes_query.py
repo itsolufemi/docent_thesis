@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from schemas.query_schemas import QueryRequest, QueryResponse
-from services.query_service import generate_basic_response
+from backend_python.conversation_core.schemas.query_schemas import QueryRequest, QueryResponse
+from backend_python.conversation_core.services.query_service import generate_basic_response
 
 router = APIRouter()
 

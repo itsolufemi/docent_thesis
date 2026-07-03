@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from schemas.artwork_schemas import Artwork
+from backend_python.docent.schemas.artwork_schemas import Artwork
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 ARTWORKS_FILE = DATA_DIR / "artworks.json"

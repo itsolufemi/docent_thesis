@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException
 
-from schemas.artwork_schemas import (
+from backend_python.docent.schemas.artwork_schemas import (
     Artwork,
     ArtworkDatasetSummaryResponse,
     ArtworkListResponse,
     ArtworkSearchResponse,
 )
-from services.artwork_service import (
+from backend_python.docent.services.artwork_service import (
     get_all_artworks,
     get_artwork_dataset_summary,
     get_painting_by_index,

@@ -1,15 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes_session import router as session_router
+from backend_python.conversation_core.api.routes_session import router as session_router
 
-from api.routes_health import router as health_router
-from api.routes_query import router as query_router
-from api.routes_llm import router as llm_router
-from api.routes_artworks import router as artworks_router
-from api.routes_retrieval import router as retrieval_router
-from api.routes_rag import router as rag_router
-from api.routes_index import router as index_router
-from api.routes_embeddings import router as embeddings_router
+from backend_python.conversation_core.api.routes_health import router as health_router
+from backend_python.conversation_core.api.routes_query import router as query_router
+from backend_python.conversation_core.api.routes_llm import router as llm_router
+from backend_python.docent.api.routes_artworks import router as artworks_router
+from backend_python.retrieval.api.routes_keyword_retrieval import router as retrieval_router
+from backend_python.retrieval.api.routes_rag import router as rag_router
+from backend_python.retrieval.api.routes_index import router as index_router
+from backend_python.retrieval.api.routes_embeddings import router as embeddings_router
 
 
 app = FastAPI(

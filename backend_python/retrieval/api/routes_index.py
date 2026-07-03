@@ -1,10 +1,10 @@
 from fastapi import APIRouter
 
-from schemas.index_schemas import (
+from backend_python.retrieval.schemas.index_schemas import (
     RagIndexResponse,
     RagIndexSummaryResponse,
 )
-from services.index_service import (
+from backend_python.retrieval.services.index_service import (
     build_rag_index,
     summarize_rag_index,
 )

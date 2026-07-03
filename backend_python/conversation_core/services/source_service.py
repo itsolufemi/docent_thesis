@@ -1,7 +1,7 @@
-from schemas.artwork_schemas import Artwork
-from schemas.rag_schemas import RetrievedEvidenceChunk
-from schemas.retrieval_schemas import RetrievedArtwork
-from schemas.source_schemas import QuerySource
+from backend_python.docent.schemas.artwork_schemas import Artwork
+from backend_python.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
+from backend_python.retrieval.schemas.keyword_retrieval_schemas import RetrievedArtwork
+from backend_python.conversation_core.schemas.source_schemas import QuerySource
 
 
 def build_source_from_artwork(

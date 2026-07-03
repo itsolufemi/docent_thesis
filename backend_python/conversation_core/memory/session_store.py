@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from schemas.session_schemas import dialogue_role, DialogueTurn, SessionState
+from backend_python.conversation_core.schemas.session_schemas import dialogue_role, DialogueTurn, SessionState
 
 sessions: dict[str, SessionState] = {}
 

@@ -1,17 +1,17 @@
-from memory.session_store import (
+from backend_python.conversation_core.memory.session_store import (
     add_dialogue_turn,
     get_recent_dialogue_history,
     get_session,
 )
-from schemas.context_schemas import QueryDebugInfo
-from schemas.rag_schemas import RetrievedEvidenceChunk
-from schemas.source_schemas import QuerySource
-from services.artwork_service import get_painting_by_index
-from services.llm_service import generate_llm_response
-from services.prompt_service import build_prompt
-from services.rag_service import retrieve_evidence_chunks_for_query
-from services.retrieval_service import retrieve_artworks_for_query
-from services.source_service import (
+from backend_python.conversation_core.schemas.context_schemas import QueryDebugInfo
+from backend_python.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
+from backend_python.conversation_core.schemas.source_schemas import QuerySource
+from backend_python.docent.services.artwork_service import get_painting_by_index
+from backend_python.conversation_core.services.llm_service import generate_llm_response
+from backend_python.conversation_core.services.prompt_service import build_prompt
+from backend_python.retrieval.services.rag_service import retrieve_evidence_chunks_for_query
+from backend_python.retrieval.services.keyword_retrieval_service import retrieve_artworks_for_query
+from backend_python.conversation_core.services.source_service import (
     build_source_from_artwork,
     build_sources_from_retrieved_artworks,
     build_sources_from_retrieved_evidence_chunks,

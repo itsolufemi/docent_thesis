@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException
 
-from memory.session_store import (
+from backend_python.conversation_core.memory.session_store import (
     create_session,
     get_session,
     set_current_painting
 )
 
-from schemas.session_schemas import (
+from backend_python.conversation_core.schemas.session_schemas import (
     SessionState,
     StartSessionResponse,
     SetCurrentPaintingRequest,

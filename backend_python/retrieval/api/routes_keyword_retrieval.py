@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 
-from schemas.retrieval_schemas import RetrievalSearchResponse
-from services.retrieval_service import retrieve_artworks_for_query
+from backend_python.retrieval.schemas.keyword_retrieval_schemas import RetrievalSearchResponse
+from backend_python.retrieval.services.keyword_retrieval_service import retrieve_artworks_for_query
 
 router = APIRouter()
 

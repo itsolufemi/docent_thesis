@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
-from schemas.context_schemas import QueryDebugInfo
-from schemas.source_schemas import QuerySource
+from backend_python.conversation_core.schemas.context_schemas import QueryDebugInfo
+from backend_python.conversation_core.schemas.source_schemas import QuerySource
 
 
 class QueryRequest(BaseModel):
