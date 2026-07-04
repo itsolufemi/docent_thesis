@@ -43,7 +43,7 @@ def format_prompt_sections(
 
     return "\n\n".join(blocks)
 
-def build_conversation_prompt(
+def build_prompt(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     profile: PromptProfile,

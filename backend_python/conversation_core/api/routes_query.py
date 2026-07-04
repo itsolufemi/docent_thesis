@@ -1,30 +1,30 @@
 from fastapi import APIRouter
 
-from backend_python.conversation_core.schemas.query_schemas import QueryRequest, QueryResponse
-from backend_python.conversation_core.services.query_service import generate_basic_response
+from backend_python.conversation_core.schemas.query_schemas import (
+    QueryRequest,
+    QueryResponse,
+)
+from backend_python.docent.services.docent_query_service import (
+    docent_query_engine,
+)
 
 router = APIRouter()
 
 
 @router.post("/api/query", response_model=QueryResponse)
 def query(request: QueryRequest):
-    (
-        response_text,
-        resolved_painting_index,
-        sources,
-        debug_info,
-    ) = generate_basic_response(
+    result = docent_query_engine.generate_response(
         text=request.text,
-        painting_index=request.painting_index,
-        session_id=request.session_id,
+        conversation_id=request.conversation_id,
+        subject_reference=request.subject_reference,
         include_debug=request.debug,
     )
 
     return QueryResponse(
-        request=request.text,
-        response=response_text,
-        session_id=request.session_id,
-        painting_index=resolved_painting_index,
-        sources=sources,
-        debug=debug_info,
+        request=result.request,
+        response=result.response,
+        conversation_id=result.conversation_id,
+        subject_reference=result.subject_reference,
+        sources=result.sources,
+        debug=result.debug,
     )

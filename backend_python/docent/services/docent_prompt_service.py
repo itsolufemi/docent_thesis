@@ -4,7 +4,7 @@ from backend_python.conversation_core.schemas.prompt_schemas import (
     PromptSection,
 )
 
-from backend_python.conversation_core.services.prompt_service import build_conversation_prompt
+from backend_python.conversation_core.services.prompt_service import build_prompt
 from backend_python.docent.schemas.artwork_schemas import Artwork
 from backend_python.retrieval.schemas.keyword_retrieval_schemas import RetrievedArtwork
 from backend_python.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
@@ -109,7 +109,7 @@ Evidence text:
         content="\n\n".join(blocks),
     )
 
-def build_docent_prompt(
+def docent_build_prompt(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     artwork: Artwork | None = None,
@@ -136,7 +136,7 @@ def build_docent_prompt(
     if retrieved_section is not None:
         context_sections.append(retrieved_section)
 
-    return build_conversation_prompt(
+    return build_prompt(
         user_input=user_input,
         dialogue_history=dialogue_history,
         profile=DOCENT_PROMPT_PROFILE,

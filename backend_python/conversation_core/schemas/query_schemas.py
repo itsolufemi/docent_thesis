@@ -19,17 +19,18 @@ class QueryResponse(BaseModel):
     sources: list[QuerySource] = Field(default_factory=list)
     debug: QueryDebugInfo | None = None
 
-class ResolvedContext(BaseModel):
-    context_source: str
-    subject_reference: str | None = None
-    prompt_context: str = ""
-    sources: list[QuerySource] = Field(default_factory=list)
-    debug_payload: dict = Field(default_factory=dict)
-
 class QueryResult(BaseModel):
     request: str
     response: str
     conversation_id: str | None = None
     subject_reference: str | None = None
     sources: list[QuerySource] = Field(default_factory=list)
-    debug: dict | None = None
+    debug: QueryDebugInfo | None = None
+
+class ResolvedContext(BaseModel):
+    context_source: str
+    subject_reference: str | None = None
+    prompt_payload: dict = Field(default_factory=dict)
+    sources: list[QuerySource] = Field(default_factory=list)
+    debug_payload: dict = Field(default_factory=dict)
+

@@ -6,7 +6,7 @@ from backend_python.conversation_core.services.query_service import (
 from backend_python.conversation_core.schemas.source_schemas import QuerySource
 
 from backend_python.docent.services.artwork_service import get_painting_by_index
-from backend_python.docent.services.docent_prompt_service import build_docent_prompt
+from backend_python.docent.services.docent_prompt_service import docent_build_prompt
 from backend_python.retrieval.services.rag_service import retrieve_evidence_chunks_for_query
 from backend_python.retrieval.services.keyword_retrieval_service import retrieve_artworks_for_query
 from backend_python.docent.services.source_service import (
@@ -28,7 +28,7 @@ def docent_parse_subject_reference(
     except ValueError:
         return None
 
-def resolve_docent_context(
+def docent_resolve_context(
     subject_reference: str | None,
     user_input: str,
 ) -> ResolvedContext:
@@ -77,10 +77,10 @@ def resolve_docent_context(
                 },
             ) 
     
-        rag_results = retrieve_evidence_chunks_for_query(
+    rag_results = retrieve_evidence_chunks_for_query(
         query=user_input,
         limit=5,
-    )
+        )
 
     if rag_results:
         return ResolvedContext(
@@ -131,14 +131,14 @@ def resolve_docent_context(
         debug_payload={},
     )
 
-def build_docent_prompt_from_context(
+def docent_build_prompt_from_context(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     resolved_context: ResolvedContext,
 ) -> str:
     payload = resolved_context.prompt_payload
 
-    return build_docent_prompt(
+    return docent_build_prompt(
         user_input=user_input,
         dialogue_history=dialogue_history,
         artwork=payload.get("artwork"),
@@ -147,6 +147,6 @@ def build_docent_prompt_from_context(
     )
 
 docent_query_engine = QueryEngine(
-    subject_resolver=resolve_docent_context,
-    prompt_builder=build_docent_prompt_from_context,
+    subject_resolver=docent_resolve_context,
+    prompt_builder=docent_build_prompt_from_context,
 )
