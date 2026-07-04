@@ -1,37 +1,18 @@
-from typing import Literal
-
 from pydantic import BaseModel, Field
 
-from backend_python.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
-from backend_python.retrieval.schemas.keyword_retrieval_schemas import RetrievedArtwork
 from backend_python.conversation_core.schemas.source_schemas import QuerySource
 
 
-ContextSource = Literal[
-    "session_not_found", # framework api
-    "direct_painting_index",
-    "session_current_painting",
-    "no_artwork_context",
-    "painting_index_not_found",
-    "retrieval_results",
-    "retrieval_no_results",
-    "rag_evidence_chunks",
-    "rag_no_evidence",
-]
-
-
-class QueryDebugInfo(BaseModel): #query debug information for logging and analysis
-    resolved_painting_index: int | None = None
-    context_source: ContextSource
-    artwork_context_used: bool
-    dialogue_turns_used: int
+class QueryDebugInfo(BaseModel):
+    conversation_found: bool | None = None
+    subject_reference: str | None = None
+    context_source: str = "no_context"
+    context_used: bool = False
+    dialogue_turns_used: int = 0
     prompt: str | None = None
 
     retrieval_used: bool = False
-    retrieval_results: list[RetrievedArtwork] = Field(default_factory=list)
-
-    rag_used: bool = False
-    rag_results: list[RetrievedEvidenceChunk] = Field(default_factory=list)
-
     sources_count: int = 0
     sources: list[QuerySource] = Field(default_factory=list)
+
+    debug_payload: dict[str, object] = Field(default_factory=dict)

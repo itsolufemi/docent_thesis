@@ -1,5 +1,3 @@
-from pydantic import BaseModel, Field
-
 from backend_python.conversation_core.schemas.conversation_schemas import DialogueTurn
 
 from backend_python.conversation_core.schemas.prompt_schemas import PromptProfile, PromptSection
@@ -26,7 +24,6 @@ def format_dialogue_history_for_prompt(
 
     return "\n".join(formatted_turns)
 
-
 def format_prompt_sections(
     sections: list[PromptSection],
 ) -> str:
@@ -45,7 +42,6 @@ def format_prompt_sections(
         )
 
     return "\n\n".join(blocks)
-
 
 def build_conversation_prompt(
     user_input: str,

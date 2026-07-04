@@ -11,7 +11,7 @@ from backend_python.conversation_core.services.llm_service import generate_llm_r
 from backend_python.conversation_core.services.prompt_service import build_prompt
 from backend_python.retrieval.services.rag_service import retrieve_evidence_chunks_for_query
 from backend_python.retrieval.services.keyword_retrieval_service import retrieve_artworks_for_query
-from backend_python.conversation_core.services.source_service import (
+from backend_python.docent.services.source_service import (
     build_source_from_artwork,
     build_sources_from_retrieved_artworks,
     build_sources_from_retrieved_evidence_chunks,
