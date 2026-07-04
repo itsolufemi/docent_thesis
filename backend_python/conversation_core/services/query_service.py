@@ -1,4 +1,4 @@
-from backend_python.conversation_core.memory.session_store import (
+from backend_python.conversation_core.memory.conversation_store import (
     add_dialogue_turn,
     get_recent_dialogue_history,
     get_session,
