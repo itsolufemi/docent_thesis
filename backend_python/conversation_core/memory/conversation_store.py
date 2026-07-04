@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 from backend_python.conversation_core.schemas.conversation_schemas import (
-    dialogueRole, DialogueTurn, ConversationState
+    DialogueRole, DialogueTurn, ConversationState
 )
 
 conversations: dict[str, ConversationState] = {}
@@ -21,7 +21,7 @@ def get_conversation(conversation_id:str) -> ConversationState | None:
 
 def set_current_subject(
         conversation_id:str,
-        subject_reference: int,
+        subject_reference: str,
 ) -> ConversationState | None:
     state = get_conversation(conversation_id)
 
@@ -42,7 +42,7 @@ def set_current_subject(
 
 def add_dialogue_turn(
         conversation_id: str,
-        role: dialogueRole,
+        role: DialogueRole,
         content: str,
     ) -> ConversationState | None:
     state = get_conversation(conversation_id)

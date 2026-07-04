@@ -1,10 +1,10 @@
 from typing import Literal
 from pydantic import BaseModel, Field
 
-dialogueRole = Literal["user", "assistant", "system"]
+DialogueRole = Literal["user", "assistant", "system"]
 
 class DialogueTurn(BaseModel):
-    role: dialogueRole
+    role: DialogueRole
     content: str
 
 class ConversationState(BaseModel):
@@ -20,7 +20,7 @@ class StartConversationResponse(BaseModel):
     state: ConversationState
 
 class SetCurrentSubjectRequest(BaseModel):
-    subject: str
+    subject_reference: str
 
 class SetCurrentSubjectResponse(BaseModel):
     conversation_id: str

@@ -1,159 +1,123 @@
+from collections.abc import Callable
+from pydantic import BaseModel, Field
+
 from backend_python.conversation_core.memory.conversation_store import (
-    add_dialogue_turn,
-    get_recent_dialogue_history,
-    get_session,
+    add_conversation_turn,
+    get_conversation,
+    get_recent_conversation_history,
 )
-from backend_python.conversation_core.schemas.context_schemas import QueryDebugInfo
-from backend_python.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
+from backend_python.conversation_core.schemas.conversation_schemas import (
+    DialogueTurn,
+)
 from backend_python.conversation_core.schemas.source_schemas import QuerySource
-from backend_python.docent.services.artwork_service import get_painting_by_index
+
 from backend_python.conversation_core.services.llm_service import generate_llm_response
-from backend_python.conversation_core.services.prompt_service import build_prompt
-from backend_python.retrieval.services.rag_service import retrieve_evidence_chunks_for_query
-from backend_python.retrieval.services.keyword_retrieval_service import retrieve_artworks_for_query
-from backend_python.conversation_core.services.source_service import (
-    build_source_from_artwork,
-    build_sources_from_retrieved_artworks,
-    build_sources_from_retrieved_evidence_chunks,
-)
 
 
-def generate_basic_response(
-    text: str,
-    painting_index: int | None = None,
-    session_id: str | None = None,
-    include_debug: bool = False,
-) -> tuple[str, int | None, list[QuerySource], QueryDebugInfo | None]:
-    resolved_painting_index = painting_index
-    context_source = "no_artwork_context"
+class ResolvedContext(BaseModel):
+    context_source: str
+    subject_reference: str | None = None
+    prompt_context: str = ""
+    sources: list[QuerySource] = Field(default_factory=list)
+    debug_payload: dict = Field(default_factory=dict)
 
-    dialogue_history = []
-    retrieved_artworks = []
-    rag_results: list[RetrievedEvidenceChunk] = []
-    sources: list[QuerySource] = []
+class QueryResult(BaseModel):
+    request: str
+    response: str
+    conversation_id: str | None = None
+    subject_reference: str | None = None
+    sources: list[QuerySource] = Field(default_factory=list)
+    debug: dict | None = None
 
-    session_state = None
+    SubjectResolver = Callable[
+        [str | None, str],
+        ResolvedContext
+    ]
 
-    if session_id is not None:
-        session_state = get_session(session_id)
+    PromptBuilder = Callable[
+        [str, list[DialogueTurn], ResolvedContext],
+        str
+    ]
 
-        if session_state is None:
-            context_source = "session_not_found"
-        else:
-            dialogue_history = get_recent_dialogue_history(session_id)
+    ResponseGenerator = Callable[[str], str]
 
-    if resolved_painting_index is not None:
-        context_source = "direct_painting_index"
+    class QueryEngine:
+        def __init__(
+            self,
+            subject_resolver: SubjectResolver,
+            prompt_builder: PromptBuilder,
+            response_generator: ResponseGenerator | None = None,
+        ):
+            self.subject_resolver = subject_resolver
+            self.prompt_builder = prompt_builder
+            self.response_generator = response_generator or generate_llm_response
 
-    if resolved_painting_index is None and session_state is not None:
-        resolved_painting_index = session_state.current_painting_index
 
-        if resolved_painting_index is not None:
-            context_source = "session_current_painting"
+        def generate_response(
+            self,
+            text: str,
+            conversation_id: str | None = None,
+            subject_reference: str | None = None,
+            include_debug: bool = False,
+        ) -> QueryResult:
+            conversation_state = None
+            dialogue_history: list[DialogueTurn] = []   
 
-    artwork = None
+            if conversation_id is not None:
+                conversation_state = get_conversation(conversation_id)
 
-    if resolved_painting_index is not None:
-        artwork = get_painting_by_index(resolved_painting_index)
+                if conversation_state is not None:
+                    dialogue_history = get_recent_conversation_history(
+                        conversation_id=conversation_id,
+                    )
 
-        if artwork is None:
-            context_source = "painting_index_not_found"
+                    if subject_reference is None:
+                        subject_reference = conversation_state.current_subject
 
-    should_use_rag = (
-        artwork is None
-        and resolved_painting_index is None
-    )
-
-    if should_use_rag:
-        rag_results = retrieve_evidence_chunks_for_query(
-            query=text,
-            limit=5,
-        )
-
-        if rag_results:
-            context_source = "rag_evidence_chunks"
-        else:
-            context_source = "rag_no_evidence"
-
-    should_use_record_retrieval = (
-        artwork is None
-        and resolved_painting_index is None
-        and not rag_results
-    )
-
-    if should_use_record_retrieval:
-        retrieved_artworks = retrieve_artworks_for_query(
-            query=text,
-            limit=3,
-        )
-
-        if retrieved_artworks:
-            context_source = "retrieval_results"
-        else:
-            context_source = "retrieval_no_results"
-
-    if artwork is not None:
-        sources = [
-            build_source_from_artwork(
-                artwork=artwork,
-                source_type="artwork_context",
+            resolved_context = self.subject_resolver(
+                subject_reference,
+                text,
             )
-        ]
 
-    if rag_results:
-        sources = build_sources_from_retrieved_evidence_chunks(
-            rag_results
-        )
+            prompt = self.prompt_builder(
+            text,
+            dialogue_history,
+            resolved_context,
+            )
 
-    if retrieved_artworks:
-        sources = build_sources_from_retrieved_artworks(
-            retrieved_artworks
-        )
+            response = self.response_generator(prompt)
 
-    prompt = build_prompt(
-        user_input=text,
-        artwork=artwork,
-        dialogue_history=dialogue_history,
-        retrieved_artworks=retrieved_artworks,
-        rag_results=rag_results,
-    )
+            if conversation_state is not None:
+                add_conversation_turn(
+                    conversation_id=conversation_state.conversation_id,
+                    role="user",
+                    content=text,
+                )
 
-    response = generate_llm_response(prompt)
+                add_conversation_turn(
+                    conversation_id=conversation_state.conversation_id,
+                    role="assistant",
+                    content=response,
+                )
 
-    if session_state is not None:
-        add_dialogue_turn(
-            session_id=session_state.session_id,
-            role="user",
-            content=text,
-        )
+            debug = None
 
-        add_dialogue_turn(
-            session_id=session_state.session_id,
-            role="assistant",
-            content=response,
-        )
+            if include_debug:
+                debug = {
+                    "conversation_found": conversation_state is not None,
+                    "dialogue_turns_used": len(dialogue_history),
+                    "subject_reference": resolved_context.subject_reference,
+                    "context_source": resolved_context.context_source,
+                    "sources_count": len(resolved_context.sources),
+                    "prompt": prompt,
+                    "resolver_debug": resolved_context.debug_payload,
+                }
 
-    final_painting_index = (
-        artwork.painting_index
-        if artwork is not None
-        else None
-    )
-
-    debug_info = None
-
-    if include_debug:
-        debug_info = QueryDebugInfo(
-            resolved_painting_index=final_painting_index,
-            context_source=context_source,
-            artwork_context_used=artwork is not None,
-            dialogue_turns_used=len(dialogue_history),
-            prompt=prompt,
-            retrieval_used=bool(retrieved_artworks),
-            retrieval_results=retrieved_artworks,
-            rag_used=bool(rag_results),
-            rag_results=rag_results,
-            sources_count=len(sources),
-            sources=sources,
-        )
-
-    return response, final_painting_index, sources, debug_info
+            return QueryResult(
+                request=text,
+                response=response,
+                conversation_id=conversation_id,
+                subject_reference=resolved_context.subject_reference,
+                sources=resolved_context.sources,
+                debug=debug,
+            )

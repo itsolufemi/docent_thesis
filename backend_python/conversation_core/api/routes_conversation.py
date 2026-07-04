@@ -15,7 +15,7 @@ from backend_python.conversation_core.schemas.conversation_schemas import (
 
 router = APIRouter()
 
-@router.post("/api/conversation/start", response_model=StartConversationResponse)
+@router.post("/api/conversations/start", response_model=StartConversationResponse)
 def start_conversation():
     state = create_conversation()
 
@@ -24,7 +24,7 @@ def start_conversation():
         state=state
     )
 
-@router.get("/api/conversation/{conversation_id}", response_model=ConversationState)
+@router.get("/api/conversations/{conversation_id}", response_model=ConversationState)
 
 def read_conversation(conversation_id:str):
     state = get_conversation(conversation_id)
@@ -35,7 +35,7 @@ def read_conversation(conversation_id:str):
     return state
 
 @router.post(
-    "/api/conversation/{conversation_id}/set/current_subject", 
+    "/api/conversations/{conversation_id}/set/current_subject", 
     response_model=SetCurrentSubjectResponse
 )
 
