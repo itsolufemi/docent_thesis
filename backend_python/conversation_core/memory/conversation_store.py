@@ -1,48 +1,51 @@
 from uuid import uuid4
 
-from backend_python.conversation_core.schemas.conversation_schemas import dialogue_role, DialogueTurn, SessionState
+from backend_python.conversation_core.schemas.conversation_schemas import (
+    dialogueRole, DialogueTurn, ConversationState
+)
 
-sessions: dict[str, SessionState] = {}
+conversations: dict[str, ConversationState] = {}
 
-def create_session() -> SessionState:
-    session_id = str(uuid4())
+def create_conversation() -> ConversationState:
+    conversation_id = str(uuid4())
     
-    state = SessionState(
-        session_id = session_id,
+    state = ConversationState(
+        conversation_id = conversation_id,
     )
 
-    sessions[session_id] = state
+    conversations[conversation_id] = state
     return state
 
-def get_session(session_id:str) -> SessionState | None:
-    return sessions.get(session_id)
+def get_conversation(conversation_id:str) -> ConversationState | None:
+    return conversations.get(conversation_id)
 
-def set_current_painting(
-        session_id:str,
-        painting_index: int,
-) -> SessionState | None:
-    state = get_session(session_id)
+def set_current_subject(
+        conversation_id:str,
+        subject_reference: int,
+) -> ConversationState | None:
+    state = get_conversation(conversation_id)
 
     if state is None:
         return None
     
-    if state.current_painting_index is not None:
-        state.previous_painting_index = state.current_painting_index
+    if state.current_subject is not None:
+        state.previous_subject = state.current_subject
 
-        if state.current_painting_index not in state.visited_painting_indexes:
-            state.visited_painting_indexes.append(state.current_painting_index)
+        if state.current_subject not in state.discussed_subjects:
+            state.discussed_subjects.append(state.current_subject)
 
-    state.current_painting_index = painting_index
+    state.current_subject = subject_reference
 
-    sessions[session_id] = state
+    conversations[conversation_id] = state
+
     return state
 
 def add_dialogue_turn(
-        session_id: str,
-        role: dialogue_role,
+        conversation_id: str,
+        role: dialogueRole,
         content: str,
-    ) -> SessionState | None:
-    state = get_session(session_id)
+    ) -> ConversationState | None:
+    state = get_conversation(conversation_id)
 
     if state is None:
         return None
@@ -54,14 +57,15 @@ def add_dialogue_turn(
 
     state.dialogue_history.append(turn)
 
-    sessions[session_id] = state
+    conversations[conversation_id] = state
+
     return state
 
-def get_recent_dialogue_history(
-    session_id: str,
+def get_recent_conversation_history(
+    conversation_id: str,
     limit: int = 6,
 ) -> list[DialogueTurn]:
-    state = get_session(session_id)
+    state = get_conversation(conversation_id)
 
     if state is None:
         return []
