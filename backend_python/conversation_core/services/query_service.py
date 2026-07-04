@@ -1,21 +1,24 @@
 from collections.abc import Callable
-
 from backend_python.conversation_core.schemas.query_schemas import (
     QueryResult,
     ResolvedContext,
 )
+from backend_python.conversation_core.schemas.prompt_schemas import PromptProfile
+from backend_python.conversation_core.schemas.conversation_schemas import (
+    DialogueTurn,
+)
+from backend_python.conversation_core.schemas.context_schemas import QueryDebugInfo
+from backend_python.conversation_core.schemas.source_schemas import QuerySource
+
+from backend_python.conversation_core.services.llm_service import generate_llm_response
+from backend_python.conversation_core.services.prompt_service import build_prompt
+from backend_python.conversation_core.services.query_service import QueryEngine
 
 from backend_python.conversation_core.memory.conversation_store import (
     add_conversation_turn,
     get_conversation,
     get_recent_conversation_history,
 )
-from backend_python.conversation_core.schemas.conversation_schemas import (
-    DialogueTurn,
-)
-from backend_python.conversation_core.schemas.source_schemas import QuerySource
-
-from backend_python.conversation_core.services.llm_service import generate_llm_response
 
 
 
@@ -90,18 +93,27 @@ class QueryEngine:
                 content=response,
             )
 
+
         debug = None
 
         if include_debug:
-            debug = {
-                "conversation_found": conversation_state is not None,
-                "dialogue_turns_used": len(dialogue_history),
-                "subject_reference": resolved_context.subject_reference,
-                "context_source": resolved_context.context_source,
-                "sources_count": len(resolved_context.sources),
-                "prompt": prompt,
-                "resolver_debug": resolved_context.debug_payload,
-            }
+            debug = QueryDebugInfo(
+                conversation_found=conversation_state is not None,
+                subject_reference=resolved_context.subject_reference,
+                context_source=resolved_context.context_source,
+                context_used=bool(resolved_context.sources or resolved_context.prompt_payload),
+                dialogue_turns_used=len(dialogue_history),
+                prompt=prompt,
+                retrieval_used=resolved_context.context_source not in [
+                    "no_context",
+                    "no_external_context",
+                    "subject_reference",
+                    "subject_not_found",
+                ],
+                sources_count=len(resolved_context.sources),
+                sources=resolved_context.sources,
+                debug_payload=resolved_context.debug_payload,
+            )
 
         return QueryResult(
             request=text,
@@ -111,3 +123,44 @@ class QueryEngine:
             sources=resolved_context.sources,
             debug=debug,
         )
+
+### default query engine
+DEFAULT_CONVERSATION_PROFILE = PromptProfile(
+    behavioural_rules=[
+        "Respond naturally.",
+        "Use the recent dialogue to understand follow-up questions.",
+        "If no external context is provided, do not pretend that you have one.",
+    ]
+)
+
+def default_resolve_context(
+    subject_reference: str | None,
+    user_input: str,
+) -> ResolvedContext:
+    return ResolvedContext(
+        context_source="no_external_context",
+        subject_reference=subject_reference,
+        sources=[],
+        prompt_payload={},
+        debug_payload={
+            "note": "Default conversation engine used; no domain resolver configured."
+        },
+    )
+
+
+def default_build_prompt(
+    user_input: str,
+    dialogue_history: list[DialogueTurn],
+    resolved_context: ResolvedContext,
+) -> str:
+    return build_prompt(
+        user_input=user_input,
+        dialogue_history=dialogue_history,
+        profile=DEFAULT_CONVERSATION_PROFILE,
+        context_sections=[],
+    )
+
+default_query_engine = QueryEngine(
+    subject_resolver=default_resolve_context,
+    prompt_builder=default_build_prompt,
+)

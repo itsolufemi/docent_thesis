@@ -1,6 +1,6 @@
-from backend_python.retrieval.schemas.index_schemas import IndexedEvidenceChunk
-from backend_python.retrieval.schemas.rag_schemas import EvidenceChunk
-from backend_python.retrieval.services.rag_service import build_all_evidence_chunks
+from backend_python.extensions.retrieval.schemas.index_schemas import IndexedEvidenceChunk
+from backend_python.extensions.retrieval.schemas.rag_schemas import EvidenceChunk
+from backend_python.extensions.retrieval.services.rag_service import build_all_evidence_chunks
 
 
 def build_embedding_text_for_chunk(chunk: EvidenceChunk) -> str:

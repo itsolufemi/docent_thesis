@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
 
-
 class QuerySource(BaseModel):
     source_type: str
     title: str | None = None
@@ -8,4 +7,4 @@ class QuerySource(BaseModel):
     url: str | None = None
     score: float | int | None = None
     snippet: str | None = None
-    metadata: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+    metadata: dict[str, object] = Field(default_factory=dict)

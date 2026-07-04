@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Query
 
-from backend_python.retrieval.schemas.rag_schemas import (
+from backend_python.extensions.retrieval.schemas.rag_schemas import (
     RagChunkListResponse,
     RagSearchResponse,
 )
-from backend_python.retrieval.services.rag_service import (
+from backend_python.extensions.retrieval.services.rag_service import (
     build_all_evidence_chunks,
     retrieve_evidence_chunks_for_query,
 )

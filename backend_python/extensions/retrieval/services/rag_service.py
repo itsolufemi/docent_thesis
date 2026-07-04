@@ -1,9 +1,9 @@
 import re
 
 from backend_python.docent.schemas.artwork_schemas import Artwork
-from backend_python.retrieval.schemas.rag_schemas import EvidenceChunk, RetrievedEvidenceChunk
+from backend_python.extensions.retrieval.schemas.rag_schemas import EvidenceChunk, RetrievedEvidenceChunk
 from backend_python.docent.services.artwork_service import get_all_artworks
-from backend_python.retrieval.services.keyword_retrieval_service import normalise_text, tokenize_query
+from backend_python.extensions.retrieval.services.keyword_retrieval_service import normalise_text, tokenize_query
 
 
 CHUNK_TYPE_WEIGHTS = {

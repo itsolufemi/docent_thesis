@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from backend_python.retrieval.schemas.rag_schemas import EvidenceChunk
+from backend_python.extensions.retrieval.schemas.rag_schemas import EvidenceChunk
 
 
 class IndexedEvidenceChunk(BaseModel):

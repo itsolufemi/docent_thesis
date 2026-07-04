@@ -1,6 +1,6 @@
 from backend_python.docent.schemas.artwork_schemas import Artwork
-from backend_python.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
-from backend_python.retrieval.schemas.keyword_retrieval_schemas import RetrievedArtwork
+from backend_python.extensions.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
+from backend_python.extensions.retrieval.schemas.keyword_retrieval_schemas import RetrievedArtwork
 from backend_python.conversation_core.schemas.source_schemas import QuerySource
 
 

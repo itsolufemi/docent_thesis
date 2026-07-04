@@ -4,13 +4,13 @@ from backend_python.conversation_core.memory.conversation_store import (
     get_session,
 )
 from backend_python.conversation_core.schemas.context_schemas import QueryDebugInfo
-from backend_python.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
+from backend_python.extensions.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
 from backend_python.conversation_core.schemas.source_schemas import QuerySource
 from backend_python.docent.services.artwork_service import get_painting_by_index
 from backend_python.conversation_core.services.llm_service import generate_llm_response
 from backend_python.conversation_core.services.prompt_service import build_prompt
-from backend_python.retrieval.services.rag_service import retrieve_evidence_chunks_for_query
-from backend_python.retrieval.services.keyword_retrieval_service import retrieve_artworks_for_query
+from backend_python.extensions.retrieval.services.rag_service import retrieve_evidence_chunks_for_query
+from backend_python.extensions.retrieval.services.keyword_retrieval_service import retrieve_artworks_for_query
 from backend_python.docent.services.source_service import (
     build_source_from_artwork,
     build_sources_from_retrieved_artworks,

@@ -1,14 +1,12 @@
 from backend_python.conversation_core.schemas.conversation_schemas import DialogueTurn
-from backend_python.conversation_core.services.query_service import (
-    QueryEngine,
-    ResolvedContext,
-)
+from backend_python.conversation_core.schemas.query_schemas import ResolvedContext
+from backend_python.conversation_core.services.query_service import QueryEngine
 from backend_python.conversation_core.schemas.source_schemas import QuerySource
 
 from backend_python.docent.services.artwork_service import get_painting_by_index
 from backend_python.docent.services.docent_prompt_service import docent_build_prompt
-from backend_python.retrieval.services.rag_service import retrieve_evidence_chunks_for_query
-from backend_python.retrieval.services.keyword_retrieval_service import retrieve_artworks_for_query
+from backend_python.extensions.retrieval.services.rag_service import retrieve_evidence_chunks_for_query
+from backend_python.extensions.retrieval.services.keyword_retrieval_service import retrieve_artworks_for_query
 from backend_python.docent.services.source_service import (
     build_source_from_artwork,
     build_sources_from_retrieved_artworks,
