@@ -1,27 +1,32 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend_python.conversation_core.api.routes_conversation import router as conversation_router
 
+from backend_python.conversation_core.api.routes_conversation import (
+    router as conversation_router,
+)
 from backend_python.conversation_core.api.routes_health import router as health_router
-from backend_python.docent.services.docent_query_service import docent_query_engine
-from backend_python.conversation_core.api.routes_query import router as query_router
-from backend_python.conversation_core.api.routes_query import create_query_router   
 from backend_python.conversation_core.api.routes_llm import router as llm_router
+from backend_python.conversation_core.api.routes_query import create_query_router
 from backend_python.docent.api.routes_artworks import router as artworks_router
-from backend_python.extensions.retrieval.api.routes_keyword_retrieval import router as retrieval_router
-from backend_python.extensions.retrieval.api.routes_rag import router as rag_router
+from backend_python.docent.services.docent_query_service import docent_query_engine
+from backend_python.extensions.retrieval.api.routes_embeddings import (
+    router as embeddings_router,
+)
 from backend_python.extensions.retrieval.api.routes_index import router as index_router
-from backend_python.extensions.retrieval.api.routes_embeddings import router as embeddings_router
+from backend_python.extensions.retrieval.api.kw_routes_keyword_retrieval import (
+    router as retrieval_router,
+)
+from backend_python.extensions.retrieval.api.routes_rag import router as rag_router
 
 
 app = FastAPI(
-    title = "docent backend",
-    version = "0.1.0"
+    title="docent backend",
+    version="0.1.0",
 )
 
-permitted_origins = [ #clientside origins
+permitted_origins = [
     "http://localhost:5173",
-    "http://127.0.0.1:5173"
+    "http://127.0.0.1:5173",
 ]
 
 app.add_middleware(
@@ -32,11 +37,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+query_router = create_query_router(
+    query_engine=docent_query_engine,
+)
+
 app.include_router(health_router)
 app.include_router(query_router)
-query_router = create_query_router(
-    query_engine = docent_query_engine
-)
 app.include_router(llm_router)
 app.include_router(artworks_router)
 app.include_router(conversation_router)

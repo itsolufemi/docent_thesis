@@ -1,38 +1,33 @@
 from collections.abc import Callable
-from backend_python.conversation_core.schemas.query_schemas import (
-    QueryResult,
-    ResolvedContext,
-)
-from backend_python.conversation_core.schemas.prompt_schemas import PromptProfile
-from backend_python.conversation_core.schemas.conversation_schemas import (
-    DialogueTurn,
-)
-from backend_python.conversation_core.schemas.context_schemas import QueryDebugInfo
-from backend_python.conversation_core.schemas.source_schemas import QuerySource
-
-from backend_python.conversation_core.services.llm_service import generate_llm_response
-from backend_python.conversation_core.services.prompt_service import build_prompt
-from backend_python.conversation_core.services.query_service import QueryEngine
 
 from backend_python.conversation_core.memory.conversation_store import (
     add_conversation_turn,
     get_conversation,
     get_recent_conversation_history,
 )
-
+from backend_python.conversation_core.schemas.context_schemas import QueryDebugInfo
+from backend_python.conversation_core.schemas.conversation_schemas import DialogueTurn
+from backend_python.conversation_core.schemas.prompt_schemas import PromptProfile
+from backend_python.conversation_core.schemas.query_schemas import (
+    QueryResult,
+    ResolvedContext,
+)
+from backend_python.conversation_core.services.llm_service import generate_llm_response
+from backend_python.conversation_core.services.prompt_service import build_prompt
 
 
 SubjectResolver = Callable[
     [str | None, str],
-    ResolvedContext
+    ResolvedContext,
 ]
 
 PromptBuilder = Callable[
     [str, list[DialogueTurn], ResolvedContext],
-    str
+    str,
 ]
 
 ResponseGenerator = Callable[[str], str]
+
 
 class QueryEngine:
     def __init__(
@@ -45,7 +40,6 @@ class QueryEngine:
         self.prompt_builder = prompt_builder
         self.response_generator = response_generator or generate_llm_response
 
-
     def generate_response(
         self,
         text: str,
@@ -54,7 +48,7 @@ class QueryEngine:
         include_debug: bool = False,
     ) -> QueryResult:
         conversation_state = None
-        dialogue_history: list[DialogueTurn] = []   
+        dialogue_history: list[DialogueTurn] = []
 
         if conversation_id is not None:
             conversation_state = get_conversation(conversation_id)
@@ -73,9 +67,9 @@ class QueryEngine:
         )
 
         prompt = self.prompt_builder(
-        text,
-        dialogue_history,
-        resolved_context,
+            text,
+            dialogue_history,
+            resolved_context,
         )
 
         response = self.response_generator(prompt)
@@ -93,7 +87,6 @@ class QueryEngine:
                 content=response,
             )
 
-
         debug = None
 
         if include_debug:
@@ -101,10 +94,13 @@ class QueryEngine:
                 conversation_found=conversation_state is not None,
                 subject_reference=resolved_context.subject_reference,
                 context_source=resolved_context.context_source,
-                context_used=bool(resolved_context.sources or resolved_context.prompt_payload),
+                context_used=bool(
+                    resolved_context.sources or resolved_context.prompt_payload
+                ),
                 dialogue_turns_used=len(dialogue_history),
                 prompt=prompt,
-                retrieval_used=resolved_context.context_source not in [
+                retrieval_used=resolved_context.context_source
+                not in [
                     "no_context",
                     "no_external_context",
                     "subject_reference",
@@ -124,14 +120,18 @@ class QueryEngine:
             debug=debug,
         )
 
-### default query engine
+
 DEFAULT_CONVERSATION_PROFILE = PromptProfile(
+    assistant_name="Assistant",
+    user_name="User",
+    assistant_role="You are a helpful conversational AI assistant.",
     behavioural_rules=[
         "Respond naturally.",
         "Use the recent dialogue to understand follow-up questions.",
         "If no external context is provided, do not pretend that you have one.",
-    ]
+    ],
 )
+
 
 def default_resolve_context(
     subject_reference: str | None,
@@ -143,7 +143,7 @@ def default_resolve_context(
         sources=[],
         prompt_payload={},
         debug_payload={
-            "note": "Default conversation engine used; no domain resolver configured."
+            "note": "Default conversation engine used; no domain resolver configured.",
         },
     )
 
@@ -159,6 +159,7 @@ def default_build_prompt(
         profile=DEFAULT_CONVERSATION_PROFILE,
         context_sections=[],
     )
+
 
 default_query_engine = QueryEngine(
     subject_resolver=default_resolve_context,

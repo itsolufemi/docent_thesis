@@ -6,7 +6,7 @@ from backend_python.conversation_core.schemas.prompt_schemas import (
 
 from backend_python.conversation_core.services.prompt_service import build_prompt
 from backend_python.docent.schemas.artwork_schemas import Artwork
-from backend_python.extensions.retrieval.schemas.keyword_retrieval_schemas import RetrievedArtwork
+from backend_python.extensions.retrieval.schemas.kw_keyword_retrieval_schemas import RetrievedArtwork
 from backend_python.extensions.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
 
 DOCENT_PROMPT_PROFILE = PromptProfile(
@@ -39,7 +39,7 @@ Themes: {", ".join(artwork.themes) if artwork.themes else "no themes available"}
         content=content,
     )
 
-def build_retrieved_artworks_section(
+def build_retrieved_documents_section(
     retrieved_artworks: list[RetrievedArtwork],
 ) -> PromptSection | None:
     if not retrieved_artworks:
@@ -76,7 +76,7 @@ Record URL: {getattr(artwork, "url", None) or "no source URL available"}
         content="\n\n".join(blocks),
     )
 
-def build_rag_evidence_section(
+def build_retrieved_chunks_section(
     rag_results: list[RetrievedEvidenceChunk],
 ) -> PromptSection | None:
     if not rag_results:
@@ -126,11 +126,11 @@ def docent_build_prompt(
             build_artwork_context_section(artwork)
         )
 
-    rag_section = build_rag_evidence_section(rag_results)
+    rag_section = build_retrieved_chunks_section(rag_results)
     if rag_section is not None:
         context_sections.append(rag_section)
 
-    retrieved_section = build_retrieved_artworks_section(
+    retrieved_section = build_retrieved_documents_section(
         retrieved_artworks
     )
     if retrieved_section is not None:

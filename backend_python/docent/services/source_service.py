@@ -1,6 +1,6 @@
 from backend_python.docent.schemas.artwork_schemas import Artwork
-from backend_python.extensions.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
-from backend_python.extensions.retrieval.schemas.keyword_retrieval_schemas import RetrievedArtwork
+from backend_python.extensions.retrieval.schemas.rag_schemas import RetrievedChunk
+from backend_python.extensions.retrieval.schemas.kw_keyword_retrieval_schemas import RetrievedDocument
 from backend_python.conversation_core.schemas.source_schemas import QuerySource
 
 
@@ -20,13 +20,13 @@ def build_source_from_artwork(
         },
     )
 
-def build_sources_from_retrieved_artworks(
-    retrieved_artworks: list[RetrievedArtwork],
+def build_sources_from_retrieved_documents(
+    retrieved_documents: list[RetrievedDocument],
 ) -> list[QuerySource]:
     sources = []
 
-    for retrieved in retrieved_artworks:
-        artwork = retrieved.artwork
+    for retrieved in retrieved_documents:
+        document = retrieved.document``
 
         sources.append(
             QuerySource(
@@ -48,8 +48,8 @@ def build_sources_from_retrieved_artworks(
     return sources
 
 
-def build_sources_from_retrieved_evidence_chunks(
-    retrieved_chunks: list[RetrievedEvidenceChunk],
+def build_sources_from_retrieved_chunks(
+    retrieved_chunks: list[RetrievedChunk],
 ) -> list[QuerySource]:
     sources = []
 

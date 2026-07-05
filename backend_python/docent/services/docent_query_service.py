@@ -5,8 +5,18 @@ from backend_python.conversation_core.schemas.source_schemas import QuerySource
 
 from backend_python.docent.services.artwork_service import get_painting_by_index
 from backend_python.docent.services.docent_prompt_service import docent_build_prompt
-from backend_python.extensions.retrieval.services.rag_service import retrieve_evidence_chunks_for_query
-from backend_python.extensions.retrieval.services.keyword_retrieval_service import retrieve_artworks_for_query
+
+from backend_python.docent.services.docent_retrieval_adapter import (
+    get_docent_retrieval_chunks,
+    get_docent_retrieval_documents,
+)
+from backend_python.extensions.retrieval.services.keyword_retrieval_service import (
+    retrieve_documents_by_keyword,
+)
+from backend_python.extensions.retrieval.services.rag_service import (
+    retrieve_chunks_for_query,
+)
+
 from backend_python.docent.services.source_service import (
     build_source_from_artwork,
     build_sources_from_retrieved_artworks,
@@ -75,10 +85,13 @@ def docent_resolve_context(
                 },
             ) 
     
-    rag_results = retrieve_evidence_chunks_for_query(
+    chunks = get_docent_retrieval_chunks()
+
+    rag_results = retrieve_chunks_for_query(
         query=user_input,
+        chunks=chunks,
         limit=5,
-        )
+    )
 
     if rag_results:
         return ResolvedContext(
@@ -96,8 +109,11 @@ def docent_resolve_context(
             },
         )
 
-    retrieved_artworks = retrieve_artworks_for_query(
+    documents = get_docent_retrieval_documents()
+
+    retrieved_artworks = retrieve_documents_by_keyword(
         query=user_input,
+        documents=documents,
         limit=3,
     )
 

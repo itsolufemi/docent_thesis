@@ -1,229 +1,175 @@
 import re
 
-from backend_python.docent.schemas.artwork_schemas import Artwork
-from backend_python.extensions.retrieval.schemas.rag_schemas import EvidenceChunk, RetrievedEvidenceChunk
-from backend_python.docent.services.artwork_service import get_all_artworks
-from backend_python.extensions.retrieval.services.keyword_retrieval_service import normalise_text, tokenize_query
+from backend_python.extensions.retrieval.schemas.chunk_schemas import (
+    RetrievedChunk,
+    RetrievalChunk,
+)
 
 
-CHUNK_TYPE_WEIGHTS = {
-    "identity": 8,
-    "description": 5,
-    "provenance": 5,
-    "location": 4,
-    "metadata": 4,
+STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "but",
+    "by",
+    "for",
+    "from",
+    "how",
+    "i",
+    "in",
+    "is",
+    "it",
+    "me",
+    "of",
+    "on",
+    "or",
+    "that",
+    "the",
+    "this",
+    "to",
+    "was",
+    "what",
+    "who",
+    "why",
+    "with",
+    "you",
+    "your",
 }
 
 
-def build_chunk_id(
-    painting_index: int,
-    chunk_type: str,
-) -> str:
-    return f"{painting_index}-{chunk_type}"
-
-
-def build_evidence_chunk(
-    artwork: Artwork,
-    chunk_type: str,
-    text: str,
-) -> EvidenceChunk:
-    return EvidenceChunk(
-        chunk_id=build_chunk_id(
-            painting_index=artwork.painting_index,
-            chunk_type=chunk_type,
-        ),
-        chunk_type=chunk_type,
-        painting_index=artwork.painting_index,
-        title=artwork.title,
-        artist=artwork.artist,
-        inventory_number=getattr(artwork, "inventory_number", None),
-        url=getattr(artwork, "url", None),
-        text=text.strip(),
-    )
-
-
-def build_identity_chunk(artwork: Artwork) -> EvidenceChunk:
-    text = f"""
-Title: {artwork.title}
-Artist: {artwork.artist or "unknown"}
-Date: {artwork.date or "unknown"}
-Object type: {getattr(artwork, "object_type", None) or "unknown"}
-Inventory number: {getattr(artwork, "inventory_number", None) or "unknown"}
-""".strip()
-
-    return build_evidence_chunk(
-        artwork=artwork,
-        chunk_type="identity",
-        text=text,
-    )
-
-
-def build_description_chunk(artwork: Artwork) -> EvidenceChunk | None:
-    if not artwork.description:
-        return None
-
-    return build_evidence_chunk(
-        artwork=artwork,
-        chunk_type="description",
-        text=artwork.description,
-    )
-
-
-def build_provenance_chunk(artwork: Artwork) -> EvidenceChunk | None:
-    provenance = getattr(artwork, "provenance", None)
-
-    if not provenance:
-        return None
-
-    return build_evidence_chunk(
-        artwork=artwork,
-        chunk_type="provenance",
-        text=provenance,
-    )
-
-
-def build_location_chunk(artwork: Artwork) -> EvidenceChunk | None:
-    room = getattr(artwork, "room_name", None) or artwork.room
-    room_index = getattr(artwork, "room_index", None)
-
-    if not room and room_index is None:
-        return None
-
-    text = f"""
-Room: {room or "unknown"}
-Room index: {room_index if room_index is not None else "unknown"}
-""".strip()
-
-    return build_evidence_chunk(
-        artwork=artwork,
-        chunk_type="location",
-        text=text,
-    )
-
-
-def build_metadata_chunk(artwork: Artwork) -> EvidenceChunk:
-    text = f"""
-School: {getattr(artwork, "school", None) or "unknown"}
-Date: {artwork.date or "unknown"}
-Medium: {artwork.medium or "unknown"}
-Object type: {getattr(artwork, "object_type", None) or "unknown"}
-""".strip()
-
-    return build_evidence_chunk(
-        artwork=artwork,
-        chunk_type="metadata",
-        text=text,
-    )
-
-
-def build_evidence_chunks_for_artwork(
-    artwork: Artwork,
-) -> list[EvidenceChunk]:
-    possible_chunks = [
-        build_identity_chunk(artwork),
-        build_description_chunk(artwork),
-        build_provenance_chunk(artwork),
-        build_location_chunk(artwork),
-        build_metadata_chunk(artwork),
-    ]
+def tokenize_query(query: str) -> list[str]:
+    tokens = re.findall(r"[a-zA-Z0-9]+", query.lower())
 
     return [
-        chunk
-        for chunk in possible_chunks
-        if chunk is not None and chunk.text
+        token for token in tokens
+        if token not in STOP_WORDS and len(token) > 1
     ]
 
 
-def build_all_evidence_chunks() -> list[EvidenceChunk]:
-    artworks = get_all_artworks()
-    chunks = []
+def chunk_search_text(
+    chunk: RetrievalChunk,
+) -> str:
+    metadata_text = " ".join(
+        str(value)
+        for value in chunk.metadata.values()
+        if value is not None
+    )
 
-    for artwork in artworks:
-        chunks.extend(
-            build_evidence_chunks_for_artwork(artwork)
-        )
-
-    return chunks
-
-
-def get_chunk_search_text(chunk: EvidenceChunk) -> str:
     return " ".join(
         [
             chunk.title or "",
-            chunk.artist or "",
-            chunk.inventory_number or "",
             chunk.chunk_type,
-            chunk.text or "",
+            chunk.text,
+            chunk.source_reference or "",
+            metadata_text,
         ]
-    )
+    ).lower()
 
 
-def score_chunk_against_query(
-    chunk: EvidenceChunk,
-    query: str,
+def score_chunk(
+    chunk: RetrievalChunk,
+    query_terms: list[str],
 ) -> tuple[int, list[str]]:
-    query_terms = tokenize_query(query)
+    search_text = chunk_search_text(chunk)
 
-    if not query_terms:
+    matched_terms = [
+        term for term in query_terms
+        if term in search_text
+    ]
+
+    if not matched_terms:
         return 0, []
 
-    normalised_query = normalise_text(query)
-    normalised_chunk_text = normalise_text(
-        get_chunk_search_text(chunk)
-    )
+    score = len(matched_terms)
 
-    chunk_terms = set(
-        re.findall(r"[a-z0-9]+", normalised_chunk_text)
-    )
+    if chunk.title:
+        title_text = chunk.title.lower()
+        score += sum(
+            2 for term in matched_terms
+            if term in title_text
+        )
 
-    score = 0
-    matched_terms = []
-
-    chunk_weight = CHUNK_TYPE_WEIGHTS.get(
-        chunk.chunk_type,
-        1,
-    )
-
-    if normalised_query in normalised_chunk_text:
-        score += chunk_weight * 3
-
-    for term in query_terms:
-        if term in chunk_terms:
-            matched_terms.append(term)
-            score += chunk_weight
+    if chunk.chunk_type:
+        chunk_type_text = chunk.chunk_type.lower()
+        score += sum(
+            1 for term in matched_terms
+            if term in chunk_type_text
+        )
 
     return score, matched_terms
 
 
-def retrieve_evidence_chunks_for_query(
+def build_chunk_snippet(
+    chunk: RetrievalChunk,
+    query_terms: list[str],
+    max_length: int = 260,
+) -> str | None:
+    text = chunk.text.strip()
+
+    if not text:
+        return None
+
+    lower_text = text.lower()
+    first_match_index = None
+
+    for term in query_terms:
+        match_index = lower_text.find(term)
+
+        if match_index != -1:
+            if first_match_index is None or match_index < first_match_index:
+                first_match_index = match_index
+
+    if first_match_index is None:
+        return text[:max_length]
+
+    start = max(first_match_index - 60, 0)
+    end = min(start + max_length, len(text))
+
+    snippet = text[start:end].strip()
+
+    if start > 0:
+        snippet = "..." + snippet
+
+    if end < len(text):
+        snippet = snippet + "..."
+
+    return snippet
+
+
+def retrieve_chunks_for_query(
     query: str,
+    chunks: list[RetrievalChunk],
     limit: int = 5,
-) -> list[RetrievedEvidenceChunk]:
-    query = query.strip()
+) -> list[RetrievedChunk]:
     query_terms = tokenize_query(query)
 
     if not query_terms:
         return []
 
-    limit = max(1, min(limit, 10))
-
-    chunks = build_all_evidence_chunks()
-    results = []
+    results: list[RetrievedChunk] = []
 
     for chunk in chunks:
-        score, matched_terms = score_chunk_against_query(
+        score, matched_terms = score_chunk(
             chunk=chunk,
-            query=query,
+            query_terms=query_terms,
         )
 
         if score <= 0:
             continue
 
         results.append(
-            RetrievedEvidenceChunk(
+            RetrievedChunk(
                 chunk=chunk,
                 score=score,
                 matched_terms=matched_terms,
+                snippet=build_chunk_snippet(
+                    chunk=chunk,
+                    query_terms=query_terms,
+                ),
             )
         )
 

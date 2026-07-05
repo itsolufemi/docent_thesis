@@ -1,202 +1,180 @@
 import re
-import unicodedata
 
-from backend_python.docent.schemas.artwork_schemas import Artwork
-from backend_python.extensions.retrieval.schemas.keyword_retrieval_schemas import RetrievedArtwork
-from backend_python.docent.services.artwork_service import get_all_artworks
+from backend_python.extensions.retrieval.schemas.document_schemas import (
+    RetrievedDocument,
+    RetrievalDocument,
+)
+
 
 STOP_WORDS = {
-    "the",
+    "a",
+    "an",
     "and",
-    "for",
-    "with",
-    "about",
-    "this",
-    "that",
-    "from",
-    "hello",
-    "hi",
-    "hey",
-    "yourself",
-    "you",
     "are",
-    "was",
-    "is",
-    "am",
+    "as",
+    "at",
+    "be",
+    "but",
+    "by",
+    "for",
+    "from",
+    "how",
     "i",
+    "in",
+    "is",
+    "it",
     "me",
-    "my",
-    "your",
-    "please",
-    "into",
-    "show",
-    "tell",
-    "give",
+    "of",
+    "on",
+    "or",
+    "that",
+    "the",
+    "this",
+    "to",
+    "was",
     "what",
     "who",
     "why",
-    "how",
-    "painting",
-    "artwork",
-    "picture",
+    "with",
+    "you",
+    "your",
 }
+
+
+def normalise_text(text: str) -> str:
+    return text.lower()
+
+
+def tokenize_query(query: str) -> list[str]:
+    tokens = re.findall(r"[a-zA-Z0-9]+", query.lower())
+
+    return [
+        token for token in tokens
+        if token not in STOP_WORDS and len(token) > 1
+    ]
+
+
+def document_search_fields(
+    document: RetrievalDocument,
+) -> dict[str, str]:
+    metadata_text = " ".join(
+        str(value)
+        for value in document.metadata.values()
+        if value is not None
+    )
+
+    return {
+        "title": document.title or "",
+        "text": document.text,
+        "source_reference": document.source_reference or "",
+        "metadata": metadata_text,
+    }
 
 
 FIELD_WEIGHTS = {
-    "title": 10,
-    "artist": 8,
-    "inventory_number": 8,
-    "school": 5,
-    "object_type": 5,
-    "room": 4,
-    "room_name": 4,
-    "date": 4,
-    "medium": 3,
-    "themes": 6,
-    "description": 3,
-    "provenance": 2,
+    "title": 6,
+    "source_reference": 5,
+    "text": 3,
+    "metadata": 2,
 }
 
-def normalise_text(value: str | None) -> str:
-    if value is None:
-        return ""
-    
-    value = value.lower().strip()
-    value = unicodedata.normalize("NFD", value)
-    value = value.encode("ascii", "ignore").decode("utf-8")
-    
-    return value
 
-def tokenize_query(query: str) -> list[str]:
-    normalised_query = normalise_text(query)
-    tokens = re.findall(r"[a-z0-9]+", normalised_query)
-
-    return [
-        token
-        for token in tokens
-        if len(token) > 2 and token not in STOP_WORDS
-    ]
-
-def get_artwork_search_fields(artwork: Artwork) -> dict[str, str]:
-    return {
-        "title": getattr(artwork, "title", "") or "",
-        "artist": getattr(artwork, "artist", "") or "",
-        "school": getattr(artwork, "school", "") or "",
-        "date": getattr(artwork, "date", "") or "",
-        "object_type": getattr(artwork, "object_type", "") or "",
-        "medium": getattr(artwork, "medium", "") or "",
-        "room": getattr(artwork, "room", "") or "",
-        "room_name": getattr(artwork, "room_name", "") or "",
-        "description": getattr(artwork, "description", "") or "",
-        "provenance": getattr(artwork, "provenance", "") or "",
-        "inventory_number": getattr(artwork, "inventory_number", "") or "",
-        "themes": " ".join(getattr(artwork, "themes", []) or []),
-    }
-
-def score_artwork_against_query(
-    artwork: Artwork,
-    query: str,
+def score_document(
+    document: RetrievalDocument,
+    query_terms: list[str],
 ) -> tuple[int, list[str]]:
-    normalised_query = normalise_text(query)
-    query_terms = tokenize_query(query)
+    fields = document_search_fields(document)
 
-    if not query_terms and not normalised_query:
-        return 0, []
-    
-    fields = get_artwork_search_fields(artwork)
+    score = 0
+    matched_fields: list[str] = []
 
-    total_score = 0
-    matched_fields = []
+    for field_name, field_text in fields.items():
+        normalised_field = normalise_text(field_text)
+        field_tokens = set(
+            re.findall(r"[a-zA-Z0-9]+", normalised_field)
+        )
 
-    for field_name, field_value in fields.items():
-        normalised_field_value = normalise_text(field_value)
-
-        if not normalised_field_value:
-            continue
-        
-        field_score = 0
-        field_weight = FIELD_WEIGHTS.get(field_name, 1)
-
-        if normalised_query in normalised_field_value:
-            field_score += field_weight * 3
-        
-        field_terms = set(re.findall(r"[a-z0-9]+", normalised_field_value))
+        field_matched = False
 
         for term in query_terms:
-            if term in field_terms:
-                field_score += field_weight
+            if term in field_tokens:
+                score += FIELD_WEIGHTS.get(field_name, 1)
+                field_matched = True
 
-
-        if field_score > 0:
+        if field_matched:
             matched_fields.append(field_name)
-            total_score += field_score
 
-    return total_score, matched_fields
+    return score, matched_fields
+
 
 def build_snippet(
-    artwork: Artwork,
-    matched_fields: list[str],
-    max_length: int = 280,
+    document: RetrievalDocument,
+    query_terms: list[str],
+    max_length: int = 220,
 ) -> str | None:
-    preferred_fields = [
-        "description",
-        "provenance",
-        "title",
-        "artist",
-        "school",
-        "room_name",
-        "room",
-    ]
+    text = document.text.strip()
 
-    fields = get_artwork_search_fields(artwork)
+    if not text:
+        return None
 
-    for field_name in preferred_fields:
-        if field_name not in matched_fields:
-            continue
+    lower_text = text.lower()
 
-        value = fields.get(field_name, "").strip()
+    first_match_index = None
 
-        if value:
-            if len(value) <= max_length:
-                return value
+    for term in query_terms:
+        match_index = lower_text.find(term.lower())
 
-            return value[:max_length].rstrip() + "..."
+        if match_index != -1:
+            if first_match_index is None or match_index < first_match_index:
+                first_match_index = match_index
 
-    return None
+    if first_match_index is None:
+        return text[:max_length]
 
-def retrieve_artworks_for_query(
+    start = max(first_match_index - 60, 0)
+    end = min(start + max_length, len(text))
+
+    snippet = text[start:end].strip()
+
+    if start > 0:
+        snippet = "..." + snippet
+
+    if end < len(text):
+        snippet = snippet + "..."
+
+    return snippet
+
+
+def retrieve_documents_by_keyword(
     query: str,
+    documents: list[RetrievalDocument],
     limit: int = 5,
-) -> list[RetrievedArtwork]:
-    query = query.strip()
-
+) -> list[RetrievedDocument]:
     query_terms = tokenize_query(query)
 
     if not query_terms:
         return []
 
-    limit = max(1, min(limit, 10))
+    results: list[RetrievedDocument] = []
 
-    artworks = get_all_artworks()
-    results = []
-
-    for artwork in artworks:
-        score, matched_fields = score_artwork_against_query(
-            artwork=artwork,
-            query=query,
+    for document in documents:
+        score, matched_fields = score_document(
+            document=document,
+            query_terms=query_terms,
         )
 
         if score <= 0:
             continue
 
         results.append(
-            RetrievedArtwork(
-                artwork=artwork,
+            RetrievedDocument(
+                document=document,
                 score=score,
+                matched_terms=query_terms,
                 matched_fields=matched_fields,
                 snippet=build_snippet(
-                    artwork=artwork,
-                    matched_fields=matched_fields,
+                    document=document,
+                    query_terms=query_terms,
                 ),
             )
         )
@@ -207,8 +185,3 @@ def retrieve_artworks_for_query(
     )
 
     return results[:limit]
-
-
-
-
-
