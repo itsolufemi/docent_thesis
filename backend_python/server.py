@@ -12,6 +12,10 @@ from backend_python.docent.services.docent_query_service import docent_query_eng
 from backend_python.extensions.retrieval.api.routes_embeddings import (
     router as embeddings_router,
 )
+from backend_python.docent.api.routes_docent_retrieval import (
+    router as docent_retrieval_router,
+)
+
 from backend_python.extensions.retrieval.api.routes_index import router as index_router
 from backend_python.extensions.retrieval.api.kw_routes_keyword_retrieval import (
     router as retrieval_router,
@@ -49,4 +53,5 @@ app.include_router(conversation_router)
 app.include_router(retrieval_router)
 app.include_router(rag_router)
 app.include_router(index_router)
+app.include_router(docent_retrieval_router)
 app.include_router(embeddings_router)

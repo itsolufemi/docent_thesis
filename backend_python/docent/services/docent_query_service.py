@@ -1,14 +1,17 @@
 from backend_python.conversation_core.schemas.conversation_schemas import DialogueTurn
 from backend_python.conversation_core.schemas.query_schemas import ResolvedContext
-from backend_python.conversation_core.services.query_service import QueryEngine
 from backend_python.conversation_core.schemas.source_schemas import QuerySource
-
+from backend_python.conversation_core.services.query_service import QueryEngine
 from backend_python.docent.services.artwork_service import get_painting_by_index
 from backend_python.docent.services.docent_prompt_service import docent_build_prompt
-
 from backend_python.docent.services.docent_retrieval_adapter import (
     get_docent_retrieval_chunks,
     get_docent_retrieval_documents,
+)
+from backend_python.docent.services.source_service import (
+    build_source_from_artwork,
+    build_sources_from_retrieved_chunks,
+    build_sources_from_retrieved_documents,
 )
 from backend_python.extensions.retrieval.services.keyword_retrieval_service import (
     retrieve_documents_by_keyword,
@@ -17,11 +20,6 @@ from backend_python.extensions.retrieval.services.rag_service import (
     retrieve_chunks_for_query,
 )
 
-from backend_python.docent.services.source_service import (
-    build_source_from_artwork,
-    build_sources_from_retrieved_artworks,
-    build_sources_from_retrieved_evidence_chunks,
-)
 
 def docent_parse_subject_reference(
     subject_reference: str,
@@ -36,13 +34,11 @@ def docent_parse_subject_reference(
     except ValueError:
         return None
 
+
 def docent_resolve_context(
     subject_reference: str | None,
     user_input: str,
 ) -> ResolvedContext:
-    artwork = None
-    rag_results = []
-    retrieved_artworks = []
     sources: list[QuerySource] = []
 
     if subject_reference is not None:
@@ -65,8 +61,8 @@ def docent_resolve_context(
                     sources=sources,
                     prompt_payload={
                         "artwork": artwork,
-                        "rag_results": [],
-                        "retrieved_artworks": [],
+                        "retrieved_chunks": [],
+                        "retrieved_documents": [],
                     },
                     debug_payload={
                         "painting_index": painting_index,
@@ -83,53 +79,53 @@ def docent_resolve_context(
                     "painting_index": painting_index,
                     "artwork_found": False,
                 },
-            ) 
-    
+            )
+
     chunks = get_docent_retrieval_chunks()
 
-    rag_results = retrieve_chunks_for_query(
+    retrieved_chunks = retrieve_chunks_for_query(
         query=user_input,
         chunks=chunks,
         limit=5,
     )
 
-    if rag_results:
+    if retrieved_chunks:
         return ResolvedContext(
-            context_source="rag_evidence_chunks",
+            context_source="retrieved_chunks",
             subject_reference=None,
-            sources=build_sources_from_retrieved_evidence_chunks(rag_results),
+            sources=build_sources_from_retrieved_chunks(retrieved_chunks),
             prompt_payload={
                 "artwork": None,
-                "rag_results": rag_results,
-                "retrieved_artworks": [],
+                "retrieved_chunks": retrieved_chunks,
+                "retrieved_documents": [],
             },
             debug_payload={
-                "rag_used": True,
-                "rag_result_count": len(rag_results),
+                "chunk_retrieval_used": True,
+                "retrieved_chunk_count": len(retrieved_chunks),
             },
         )
 
     documents = get_docent_retrieval_documents()
 
-    retrieved_artworks = retrieve_documents_by_keyword(
+    retrieved_documents = retrieve_documents_by_keyword(
         query=user_input,
         documents=documents,
         limit=3,
     )
 
-    if retrieved_artworks:
+    if retrieved_documents:
         return ResolvedContext(
-            context_source="keyword_retrieval_results",
+            context_source="retrieved_documents",
             subject_reference=None,
-            sources=build_sources_from_retrieved_artworks(retrieved_artworks),
+            sources=build_sources_from_retrieved_documents(retrieved_documents),
             prompt_payload={
                 "artwork": None,
-                "rag_results": [],
-                "retrieved_artworks": retrieved_artworks,
+                "retrieved_chunks": [],
+                "retrieved_documents": retrieved_documents,
             },
             debug_payload={
-                "keyword_retrieval_used": True,
-                "retrieved_artwork_count": len(retrieved_artworks),
+                "document_retrieval_used": True,
+                "retrieved_document_count": len(retrieved_documents),
             },
         )
 
@@ -139,11 +135,12 @@ def docent_resolve_context(
         sources=[],
         prompt_payload={
             "artwork": None,
-            "rag_results": [],
-            "retrieved_artworks": [],
+            "retrieved_chunks": [],
+            "retrieved_documents": [],
         },
         debug_payload={},
     )
+
 
 def docent_build_prompt_from_context(
     user_input: str,
@@ -156,9 +153,10 @@ def docent_build_prompt_from_context(
         user_input=user_input,
         dialogue_history=dialogue_history,
         artwork=payload.get("artwork"),
-        retrieved_artworks=payload.get("retrieved_artworks", []),
-        rag_results=payload.get("rag_results", []),
+        retrieved_documents=payload.get("retrieved_documents", []),
+        retrieved_chunks=payload.get("retrieved_chunks", []),
     )
+
 
 docent_query_engine = QueryEngine(
     subject_resolver=docent_resolve_context,

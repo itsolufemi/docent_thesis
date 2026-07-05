@@ -3,11 +3,11 @@ from backend_python.conversation_core.schemas.prompt_schemas import (
     PromptProfile,
     PromptSection,
 )
-
 from backend_python.conversation_core.services.prompt_service import build_prompt
 from backend_python.docent.schemas.artwork_schemas import Artwork
-from backend_python.extensions.retrieval.schemas.kw_keyword_retrieval_schemas import RetrievedArtwork
-from backend_python.extensions.retrieval.schemas.rag_schemas import RetrievedEvidenceChunk
+from backend_python.extensions.retrieval.schemas.chunk_schemas import RetrievedChunk
+from backend_python.extensions.retrieval.schemas.document_schemas import RetrievedDocument
+
 
 DOCENT_PROMPT_PROFILE = PromptProfile(
     assistant_name="Docent",
@@ -21,6 +21,7 @@ DOCENT_PROMPT_PROFILE = PromptProfile(
         "If the supplied context is insufficient, say so briefly.",
     ],
 )
+
 
 def build_artwork_context_section(
     artwork: Artwork,
@@ -39,34 +40,34 @@ Themes: {", ".join(artwork.themes) if artwork.themes else "no themes available"}
         content=content,
     )
 
+
 def build_retrieved_documents_section(
-    retrieved_artworks: list[RetrievedArtwork],
+    retrieved_documents: list[RetrievedDocument],
 ) -> PromptSection | None:
-    if not retrieved_artworks:
+    if not retrieved_documents:
         return None
 
-    blocks = []
+    blocks: list[str] = []
 
-    for index, retrieved in enumerate(retrieved_artworks, start=1):
-        artwork = retrieved.artwork
+    for index, retrieved in enumerate(retrieved_documents, start=1):
+        document = retrieved.document
+        metadata = document.metadata
 
         block = f"""
 Retrieved record {index}:
-Painting index: {artwork.painting_index}
-Title: {artwork.title}
-Artist: {artwork.artist or "unknown"}
-School: {getattr(artwork, "school", None) or "unknown"}
-Date: {artwork.date or "unknown"}
-Object type: {getattr(artwork, "object_type", None) or "unknown"}
-Medium: {artwork.medium or "unknown"}
-Room: {getattr(artwork, "room_name", None) or artwork.room or "unknown"}
-Inventory number: {getattr(artwork, "inventory_number", None) or "unknown"}
-Matched fields: {", ".join(retrieved.matched_fields)}
+Document ID: {document.document_id}
+Reference: {document.source_reference or "unknown"}
+Title: {document.title or "unknown"}
+Artist: {metadata.get("artist") or "unknown"}
+Painting index: {metadata.get("painting_index") or "unknown"}
+Inventory number: {metadata.get("inventory_number") or "unknown"}
 Retrieval score: {retrieved.score}
+Matched fields: {", ".join(retrieved.matched_fields)}
+Matched terms: {", ".join(retrieved.matched_terms)}
 Snippet: {retrieved.snippet or "no snippet available"}
-Description: {artwork.description or "no description available"}
-Provenance: {getattr(artwork, "provenance", None) or "no provenance available"}
-Record URL: {getattr(artwork, "url", None) or "no source URL available"}
+Document text:
+{document.text}
+Source URL: {document.url or "no source URL available"}
 """.strip()
 
         blocks.append(block)
@@ -76,25 +77,29 @@ Record URL: {getattr(artwork, "url", None) or "no source URL available"}
         content="\n\n".join(blocks),
     )
 
+
 def build_retrieved_chunks_section(
-    rag_results: list[RetrievedEvidenceChunk],
+    retrieved_chunks: list[RetrievedChunk],
 ) -> PromptSection | None:
-    if not rag_results:
+    if not retrieved_chunks:
         return None
 
-    blocks = []
+    blocks: list[str] = []
 
-    for index, retrieved in enumerate(rag_results, start=1):
+    for index, retrieved in enumerate(retrieved_chunks, start=1):
         chunk = retrieved.chunk
+        metadata = chunk.metadata
 
         block = f"""
 Evidence {index}:
 Chunk ID: {chunk.chunk_id}
 Chunk type: {chunk.chunk_type}
-Painting index: {chunk.painting_index}
-Title: {chunk.title}
-Artist: {chunk.artist or "unknown"}
-Inventory number: {chunk.inventory_number or "unknown"}
+Parent document ID: {chunk.parent_document_id}
+Reference: {chunk.source_reference or "unknown"}
+Title: {chunk.title or "unknown"}
+Artist: {metadata.get("artist") or "unknown"}
+Painting index: {metadata.get("painting_index") or "unknown"}
+Inventory number: {metadata.get("inventory_number") or "unknown"}
 Source URL: {chunk.url or "no source URL available"}
 Retrieval score: {retrieved.score}
 Matched terms: {", ".join(retrieved.matched_terms)}
@@ -109,15 +114,16 @@ Evidence text:
         content="\n\n".join(blocks),
     )
 
+
 def docent_build_prompt(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     artwork: Artwork | None = None,
-    retrieved_artworks: list[RetrievedArtwork] | None = None,
-    rag_results: list[RetrievedEvidenceChunk] | None = None,
+    retrieved_documents: list[RetrievedDocument] | None = None,
+    retrieved_chunks: list[RetrievedChunk] | None = None,
 ) -> str:
-    retrieved_artworks = retrieved_artworks or []
-    rag_results = rag_results or []
+    retrieved_documents = retrieved_documents or []
+    retrieved_chunks = retrieved_chunks or []
 
     context_sections: list[PromptSection] = []
 
@@ -126,15 +132,17 @@ def docent_build_prompt(
             build_artwork_context_section(artwork)
         )
 
-    rag_section = build_retrieved_chunks_section(rag_results)
-    if rag_section is not None:
-        context_sections.append(rag_section)
-
-    retrieved_section = build_retrieved_documents_section(
-        retrieved_artworks
+    chunk_section = build_retrieved_chunks_section(
+        retrieved_chunks
     )
-    if retrieved_section is not None:
-        context_sections.append(retrieved_section)
+    if chunk_section is not None:
+        context_sections.append(chunk_section)
+
+    document_section = build_retrieved_documents_section(
+        retrieved_documents
+    )
+    if document_section is not None:
+        context_sections.append(document_section)
 
     return build_prompt(
         user_input=user_input,
