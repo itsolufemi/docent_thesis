@@ -12,9 +12,7 @@ from docent.api.routes_artworks import router as artworks_router
 from docent.api.routes_docent_retrieval import router as docent_retrieval_router
 from docent.api.routes_docent_index import router as docent_index_router
 from docent.services.docent_query_service import docent_query_engine
-#from extensions.retrieval.api.routes_embeddings import (
-#    router as embeddings_router,
-#)
+from docent.api.routes_docent_embeddings import router as docent_embeddings_router
 
 
 app = FastAPI(
@@ -46,4 +44,4 @@ app.include_router(artworks_router)
 app.include_router(conversation_router)
 app.include_router(docent_retrieval_router)
 app.include_router(docent_index_router)
-#app.include_router(embeddings_router)
+app.include_router(docent_embeddings_router)

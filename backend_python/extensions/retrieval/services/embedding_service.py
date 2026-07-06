@@ -2,7 +2,7 @@ import httpx
 
 from config import settings
 from extensions.retrieval.schemas.embedding_schemas import IndexedChunkEmbedding
-from extensions.retrieval.services.index_service import build_rag_index
+from extensions.retrieval.schemas.index_schemas import IndexedRetrievalChunk
 
 
 def generate_embedding(text: str) -> list[float]:
@@ -28,46 +28,35 @@ def generate_embedding(text: str) -> list[float]:
 
 
 def embed_indexed_chunk(
-    chunk_id: str,
-    embedding_text: str,
+    indexed_chunk: IndexedRetrievalChunk,
 ) -> IndexedChunkEmbedding:
-    embedding = generate_embedding(embedding_text)
+    embedding = generate_embedding(indexed_chunk.embedding_text)
 
     return IndexedChunkEmbedding(
-        chunk_id=chunk_id,
-        embedding_text=embedding_text,
+        chunk_id=indexed_chunk.chunk.chunk_id,
+        embedding_text=indexed_chunk.embedding_text,
         model=settings.ollama_embedding_model,
         dimensions=len(embedding),
         embedding=embedding,
     )
 
 
-def build_rag_embedding_index(
+def embed_indexed_chunks(
+    indexed_chunks: list[IndexedRetrievalChunk],
     limit: int | None = None,
 ) -> list[IndexedChunkEmbedding]:
-    indexed_chunks = build_rag_index()
-
     if limit is not None:
         indexed_chunks = indexed_chunks[:limit]
 
-    embedded_chunks = []
-
-    for indexed_chunk in indexed_chunks:
-        embedded_chunks.append(
-            embed_indexed_chunk(
-                chunk_id=indexed_chunk.chunk.chunk_id,
-                embedding_text=indexed_chunk.embedding_text,
-            )
-        )
-
-    return embedded_chunks
+    return [
+        embed_indexed_chunk(indexed_chunk)
+        for indexed_chunk in indexed_chunks
+    ]
 
 
-def summarize_rag_embedding_index(
-    limit: int | None = None,
+def summarize_embedded_chunks(
+    embedded_chunks: list[IndexedChunkEmbedding],
 ) -> dict:
-    embedded_chunks = build_rag_embedding_index(limit=limit)
-
     if not embedded_chunks:
         return {
             "total_vectors": 0,

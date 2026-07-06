@@ -20,7 +20,11 @@ class IndexedChunkEmbedding(BaseModel):
     embedding: list[float] = Field(default_factory=list)
 
 
-class RagEmbeddingIndexSummaryResponse(BaseModel):
+class EmbeddingIndexResponse(BaseModel):
+    chunks: list[IndexedChunkEmbedding] = Field(default_factory=list)
+
+
+class EmbeddingIndexSummaryResponse(BaseModel):
     total_vectors: int
     dimensions: int
     model: str
