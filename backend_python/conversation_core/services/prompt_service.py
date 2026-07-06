@@ -1,6 +1,6 @@
-from backend_python.conversation_core.schemas.conversation_schemas import DialogueTurn
+from conversation_core.schemas.conversation_schemas import DialogueTurn
 
-from backend_python.conversation_core.schemas.prompt_schemas import PromptProfile, PromptSection
+from conversation_core.schemas.prompt_schemas import PromptProfile, PromptSection
 
 def format_dialogue_history_for_prompt(
     dialogue_history: list[DialogueTurn],

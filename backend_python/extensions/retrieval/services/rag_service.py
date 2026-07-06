@@ -1,6 +1,6 @@
 import re
 
-from backend_python.extensions.retrieval.schemas.chunk_schemas import (
+from extensions.retrieval.schemas.chunk_schemas import (
     RetrievedChunk,
     RetrievalChunk,
 )

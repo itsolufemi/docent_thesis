@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from backend_python.docent.schemas.artwork_schemas import Artwork
+from docent.schemas.artwork_schemas import Artwork
 
 class RetrievedArtwork(BaseModel):
     artwork: Artwork

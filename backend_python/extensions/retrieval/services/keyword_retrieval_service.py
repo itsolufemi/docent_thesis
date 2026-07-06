@@ -1,6 +1,6 @@
 import re
 
-from backend_python.extensions.retrieval.schemas.document_schemas import (
+from extensions.retrieval.schemas.document_schemas import (
     RetrievedDocument,
     RetrievalDocument,
 )

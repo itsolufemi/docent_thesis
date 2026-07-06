@@ -1,5 +1,5 @@
-from backend_python.docent.schemas.artwork_schemas import Artwork
-from backend_python.docent.services.artwork_service import get_all_artworks
+from docent.schemas.artwork_schemas import Artwork
+from docent.services.artwork_service import get_all_artworks
 from backend_python.extensions.retrieval.schemas.chunk_schemas import RetrievalChunk
 from backend_python.extensions.retrieval.schemas.document_schemas import RetrievalDocument
 

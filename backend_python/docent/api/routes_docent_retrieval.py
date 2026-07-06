@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 
-from backend_python.docent.services.docent_retrieval_adapter import (
+from docent.services.docent_retrieval_adapter import (
     get_docent_retrieval_chunks,
     get_docent_retrieval_documents,
 )

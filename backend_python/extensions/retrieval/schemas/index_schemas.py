@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from backend_python.extensions.retrieval.schemas.chunk_schemas import RetrievalChunk
+from chunk_schemas import RetrievalChunk
 
 
 class IndexedRetrievalChunk(BaseModel):

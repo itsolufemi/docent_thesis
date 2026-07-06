@@ -2,12 +2,12 @@ from fastapi import APIRouter, Query
 
 from config import settings
 
-from backend_python.extensions.retrieval.schemas.embedding_schemas import (
+from retrieval.schemas.embedding_schemas import (
     EmbeddingRequest,
     EmbeddingResponse,
     RagEmbeddingIndexSummaryResponse,
 )
-from backend_python.extensions.retrieval.services.embedding_service import (
+from retrieval.services.embedding_service import (
     build_rag_embedding_index,
     generate_embedding,
     summarize_rag_embedding_index,

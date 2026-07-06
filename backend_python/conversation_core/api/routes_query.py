@@ -1,11 +1,11 @@
 from fastapi import APIRouter
 
-from backend_python.conversation_core.schemas.query_schemas import (
+from conversation_core.schemas.query_schemas import (
     QueryRequest,
     QueryResponse,
 )
-from backend_python.conversation_core.services.query_service import QueryEngine
-from backend_python.conversation_core.services.query_service import (
+from conversation_core.services.query_service import QueryEngine
+from conversation_core.services.query_service import (
     default_query_engine,
 )
 

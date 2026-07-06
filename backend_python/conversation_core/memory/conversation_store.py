@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from backend_python.conversation_core.schemas.conversation_schemas import (
+from conversation_core.schemas.conversation_schemas import (
     DialogueRole, DialogueTurn, ConversationState
 )
 

@@ -1,19 +1,19 @@
 from collections.abc import Callable
 
-from backend_python.conversation_core.memory.conversation_store import (
+from conversation_core.memory.conversation_store import (
     add_conversation_turn,
     get_conversation,
     get_recent_conversation_history,
 )
-from backend_python.conversation_core.schemas.context_schemas import QueryDebugInfo
-from backend_python.conversation_core.schemas.conversation_schemas import DialogueTurn
-from backend_python.conversation_core.schemas.prompt_schemas import PromptProfile
-from backend_python.conversation_core.schemas.query_schemas import (
+from conversation_core.schemas.context_schemas import QueryDebugInfo
+from conversation_core.schemas.conversation_schemas import DialogueTurn
+from conversation_core.schemas.prompt_schemas import PromptProfile
+from conversation_core.schemas.query_schemas import (
     QueryResult,
     ResolvedContext,
 )
-from backend_python.conversation_core.services.llm_service import generate_llm_response
-from backend_python.conversation_core.services.prompt_service import build_prompt
+from conversation_core.services.llm_service import generate_llm_response
+from conversation_core.services.prompt_service import build_prompt
 
 
 SubjectResolver = Callable[

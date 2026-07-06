@@ -4,7 +4,7 @@ from backend_python.conversation_core.schemas.prompt_schemas import (
     PromptSection,
 )
 from backend_python.conversation_core.services.prompt_service import build_prompt
-from backend_python.docent.schemas.artwork_schemas import Artwork
+from docent.schemas.artwork_schemas import Artwork
 from backend_python.extensions.retrieval.schemas.chunk_schemas import RetrievedChunk
 from backend_python.extensions.retrieval.schemas.document_schemas import RetrievedDocument
 

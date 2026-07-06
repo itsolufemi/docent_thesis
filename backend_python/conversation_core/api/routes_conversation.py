@@ -1,16 +1,16 @@
 from fastapi import APIRouter, HTTPException
 
-from backend_python.conversation_core.memory.conversation_store import (
+from conversation_core.memory.conversation_store import (
     create_conversation,
     get_conversation,
-    set_current_subject
+    set_current_subject,
 )
 
-from backend_python.conversation_core.schemas.conversation_schemas import (
+from conversation_core.schemas.conversation_schemas import (
     ConversationState,
     StartConversationResponse,
     SetCurrentSubjectRequest,
-    SetCurrentSubjectResponse
+    SetCurrentSubjectResponse,
 )
 
 router = APIRouter()

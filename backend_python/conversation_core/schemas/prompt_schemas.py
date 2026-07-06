@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from backend_python.conversation_core.schemas.conversation_schemas import DialogueTurn
+from conversation_core.schemas.conversation_schemas import DialogueTurn
 
 
 class PromptSection(BaseModel):

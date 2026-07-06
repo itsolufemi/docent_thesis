@@ -2,13 +2,13 @@ from backend_python.conversation_core.schemas.conversation_schemas import Dialog
 from backend_python.conversation_core.schemas.query_schemas import ResolvedContext
 from backend_python.conversation_core.schemas.source_schemas import QuerySource
 from backend_python.conversation_core.services.query_service import QueryEngine
-from backend_python.docent.services.artwork_service import get_painting_by_index
-from backend_python.docent.services.docent_prompt_service import docent_build_prompt
-from backend_python.docent.services.docent_retrieval_adapter import (
+from docent.services.artwork_service import get_painting_by_index
+from docent.services.docent_prompt_service import docent_build_prompt
+from docent.services.docent_retrieval_adapter import (
     get_docent_retrieval_chunks,
     get_docent_retrieval_documents,
 )
-from backend_python.docent.services.source_service import (
+from docent.services.source_service import (
     build_source_from_artwork,
     build_sources_from_retrieved_chunks,
     build_sources_from_retrieved_documents,
