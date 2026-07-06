@@ -1,10 +1,10 @@
 from fastapi import APIRouter
 
-from retrieval.schemas.index_schemas import (
-    RagIndexResponse,
-    RagIndexSummaryResponse,
+from extensions.retrieval.schemas.index_schemas import (
+    RetrievalIndexResponse,
+    RetrievalIndexSummaryResponse,
 )
-from retrieval.services.index_service import (
+from extensions.retrieval.services.index_service import (
     build_rag_index,
     summarize_rag_index,
 )
@@ -13,17 +13,17 @@ from retrieval.services.index_service import (
 router = APIRouter()
 
 
-@router.get("/api/index/rag", response_model=RagIndexResponse)
+@router.get("/api/index/rag", response_model=RetrievalIndexResponse)
 def read_rag_index():
     indexed_chunks = build_rag_index()
 
-    return RagIndexResponse(
+    return RetrievalIndexResponse(
         chunks=indexed_chunks,
     )
 
 
-@router.get("/api/index/rag/summary", response_model=RagIndexSummaryResponse)
+@router.get("/api/index/rag/summary", response_model=RetrievalIndexSummaryResponse)
 def read_rag_index_summary():
     summary = summarize_rag_index()
 
-    return RagIndexSummaryResponse(**summary)
+    return RetrievalIndexSummaryResponse(**summary)

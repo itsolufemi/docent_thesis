@@ -1,7 +1,7 @@
 from collections.abc import Callable
 
 from conversation_core.memory.conversation_store import (
-    add_conversation_turn,
+    add_dialogue_turn,
     get_conversation,
     get_recent_conversation_history,
 )
@@ -75,13 +75,13 @@ class QueryEngine:
         response = self.response_generator(prompt)
 
         if conversation_state is not None:
-            add_conversation_turn(
+            add_dialogue_turn(
                 conversation_id=conversation_state.conversation_id,
                 role="user",
                 content=text,
             )
 
-            add_conversation_turn(
+            add_dialogue_turn(
                 conversation_id=conversation_state.conversation_id,
                 role="assistant",
                 content=response,

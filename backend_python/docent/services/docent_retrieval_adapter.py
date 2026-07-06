@@ -1,7 +1,8 @@
 from docent.schemas.artwork_schemas import Artwork
 from docent.services.artwork_service import get_all_artworks
-from backend_python.extensions.retrieval.schemas.chunk_schemas import RetrievalChunk
-from backend_python.extensions.retrieval.schemas.document_schemas import RetrievalDocument
+
+from extensions.retrieval.schemas.chunk_schemas import RetrievalChunk
+from extensions.retrieval.schemas.document_schemas import RetrievalDocument
 
 
 def artwork_as_subject_get_reference(

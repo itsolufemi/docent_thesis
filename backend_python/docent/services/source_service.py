@@ -1,7 +1,7 @@
-from backend_python.conversation_core.schemas.source_schemas import QuerySource
+from conversation_core.schemas.source_schemas import QuerySource
 from docent.schemas.artwork_schemas import Artwork
-from backend_python.extensions.retrieval.schemas.chunk_schemas import RetrievedChunk
-from backend_python.extensions.retrieval.schemas.document_schemas import RetrievedDocument
+from extensions.retrieval.schemas.chunk_schemas import RetrievedChunk
+from extensions.retrieval.schemas.document_schemas import RetrievedDocument
 
 
 def build_source_from_artwork(

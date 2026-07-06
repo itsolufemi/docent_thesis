@@ -7,15 +7,17 @@ from conversation_core.api.routes_conversation import (
 from conversation_core.api.routes_health import router as health_router
 from conversation_core.api.routes_llm import router as llm_router
 from conversation_core.api.routes_query import create_query_router
+
 from docent.api.routes_artworks import router as artworks_router
 from docent.api.routes_docent_retrieval import (
     router as docent_retrieval_router,
 )
 from docent.services.docent_query_service import docent_query_engine
-from extensions.retrieval.api.routes_embeddings import (
-    router as embeddings_router,
-)
-from extensions.retrieval.api.routes_index import router as index_router
+
+#from extensions.retrieval.api.routes_embeddings import (
+#    router as embeddings_router,
+#)
+#from extensions.retrieval.api.routes_index import router as index_router
 
 
 app = FastAPI(
@@ -46,5 +48,5 @@ app.include_router(llm_router)
 app.include_router(artworks_router)
 app.include_router(conversation_router)
 app.include_router(docent_retrieval_router)
-app.include_router(index_router)
-app.include_router(embeddings_router)
+#app.include_router(index_router)
+#app.include_router(embeddings_router)

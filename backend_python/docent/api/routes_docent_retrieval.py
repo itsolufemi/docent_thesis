@@ -4,17 +4,18 @@ from docent.services.docent_retrieval_adapter import (
     get_docent_retrieval_chunks,
     get_docent_retrieval_documents,
 )
-from backend_python.extensions.retrieval.schemas.chunk_schemas import (
+
+from extensions.retrieval.schemas.chunk_schemas import (
     ChunkListResponse,
     ChunkSearchResponse,
 )
-from backend_python.extensions.retrieval.schemas.document_schemas import (
+from extensions.retrieval.schemas.document_schemas import (
     RetrievalSearchResponse,
 )
-from backend_python.extensions.retrieval.services.keyword_retrieval_service import (
+from extensions.retrieval.services.keyword_retrieval_service import (
     retrieve_documents_by_keyword,
 )
-from backend_python.extensions.retrieval.services.rag_service import (
+from extensions.retrieval.services.rag_service import (
     retrieve_chunks_for_query,
 )
 

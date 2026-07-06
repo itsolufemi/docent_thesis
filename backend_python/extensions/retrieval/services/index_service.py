@@ -1,6 +1,6 @@
-from extensions.retrieval.schemas.index_schemas import IndexedRetrievalChunk
-from extensions.retrieval.schemas.rag_schemas import EvidenceChunk
-from extensions.retrieval.services.rag_service import retrieve_chunks_for_query
+from backend_python.extensions.retrieval.schemas.index_schemas import IndexedRetrievalChunk
+from backend_python.extensions.retrieval.schemas.rag_schemas import EvidenceChunk
+from backend_python.extensions.retrieval.services.rag_service import build_all_evidence_chunks
 
 
 def build_embedding_text_for_chunk(chunk: EvidenceChunk) -> str:
@@ -48,7 +48,7 @@ def build_rag_index(
     if _rag_index_cache is not None and force_reload is False:
         return _rag_index_cache
 
-    chunks = []
+    chunks = build_all_evidence_chunks()
 
     _rag_index_cache = [
         build_indexed_chunk(chunk)

@@ -1,7 +1,8 @@
-from backend_python.conversation_core.schemas.conversation_schemas import DialogueTurn
-from backend_python.conversation_core.schemas.query_schemas import ResolvedContext
-from backend_python.conversation_core.schemas.source_schemas import QuerySource
-from backend_python.conversation_core.services.query_service import QueryEngine
+from conversation_core.schemas.conversation_schemas import DialogueTurn
+from conversation_core.schemas.query_schemas import ResolvedContext
+from conversation_core.schemas.source_schemas import QuerySource
+from conversation_core.services.query_service import QueryEngine
+
 from docent.services.artwork_service import get_painting_by_index
 from docent.services.docent_prompt_service import docent_build_prompt
 from docent.services.docent_retrieval_adapter import (
@@ -13,10 +14,10 @@ from docent.services.source_service import (
     build_sources_from_retrieved_chunks,
     build_sources_from_retrieved_documents,
 )
-from backend_python.extensions.retrieval.services.keyword_retrieval_service import (
+from extensions.retrieval.services.keyword_retrieval_service import (
     retrieve_documents_by_keyword,
 )
-from backend_python.extensions.retrieval.services.rag_service import (
+from extensions.retrieval.services.rag_service import (
     retrieve_chunks_for_query,
 )
 

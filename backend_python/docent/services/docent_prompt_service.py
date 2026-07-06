@@ -1,12 +1,14 @@
-from backend_python.conversation_core.schemas.conversation_schemas import DialogueTurn
-from backend_python.conversation_core.schemas.prompt_schemas import (
+from conversation_core.schemas.conversation_schemas import DialogueTurn
+from conversation_core.schemas.prompt_schemas import (
     PromptProfile,
     PromptSection,
 )
-from backend_python.conversation_core.services.prompt_service import build_prompt
+from conversation_core.services.prompt_service import build_prompt
+
 from docent.schemas.artwork_schemas import Artwork
-from backend_python.extensions.retrieval.schemas.chunk_schemas import RetrievedChunk
-from backend_python.extensions.retrieval.schemas.document_schemas import RetrievedDocument
+
+from extensions.retrieval.schemas.chunk_schemas import RetrievedChunk
+from extensions.retrieval.schemas.document_schemas import RetrievedDocument
 
 
 DOCENT_PROMPT_PROFILE = PromptProfile(
