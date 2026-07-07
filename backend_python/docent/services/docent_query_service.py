@@ -6,8 +6,10 @@ from conversation_core.services.query_service import QueryEngine
 from docent.services.artwork_service import get_painting_by_index
 from docent.services.docent_prompt_service import docent_build_prompt
 from docent.services.docent_retrieval_adapter import (
-    get_docent_retrieval_chunks,
     get_docent_retrieval_documents,
+)
+from docent.services.docent_vector_retrieval_service import (
+    retrieve_docent_chunks_by_vector_similarity,
 )
 from docent.services.source_service import (
     build_source_from_artwork,
@@ -16,9 +18,6 @@ from docent.services.source_service import (
 )
 from extensions.retrieval.services.keyword_retrieval_service import (
     retrieve_documents_by_keyword,
-)
-from extensions.retrieval.services.rag_service import (
-    retrieve_chunks_for_query,
 )
 
 
@@ -82,17 +81,14 @@ def docent_resolve_context(
                 },
             )
 
-    chunks = get_docent_retrieval_chunks()
-
-    retrieved_chunks = retrieve_chunks_for_query(
+    retrieved_chunks = retrieve_docent_chunks_by_vector_similarity(
         query=user_input,
-        chunks=chunks,
         limit=5,
     )
 
     if retrieved_chunks:
         return ResolvedContext(
-            context_source="retrieved_chunks",
+            context_source="vector_retrieved_chunks",
             subject_reference=None,
             sources=build_sources_from_retrieved_chunks(retrieved_chunks),
             prompt_payload={
@@ -101,7 +97,7 @@ def docent_resolve_context(
                 "retrieved_documents": [],
             },
             debug_payload={
-                "chunk_retrieval_used": True,
+                "vector_retrieval_used": True,
                 "retrieved_chunk_count": len(retrieved_chunks),
             },
         )
