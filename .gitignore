@@ -3,6 +3,7 @@
 # backend-python
 backend_python/.env
 backend_python/venv/
+backend_python/x_bin/
 
 # dependencies
 node_modules/

@@ -19,6 +19,9 @@ from docent.services.source_service import (
 from extensions.retrieval.services.keyword_retrieval_service import (
     retrieve_documents_by_keyword,
 )
+from docent.services.docent_vector_retrieval_service import (
+    retrieve_docent_chunks_by_vector_similarity,
+)
 
 
 def docent_parse_subject_reference(
@@ -99,7 +102,7 @@ def docent_resolve_context(
             debug_payload={
                 "vector_retrieval_used": True,
                 "retrieved_chunk_count": len(retrieved_chunks),
-            },
+            }
         )
 
     documents = get_docent_retrieval_documents()
