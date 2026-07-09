@@ -9,6 +9,9 @@ from extensions.retrieval.services.index_service import build_retrieval_index
 from extensions.retrieval.services.vector_similarity_service import (
     retrieve_chunks_by_vector_similarity,
 )
+from extensions.retrieval.services.chunk_expansion_service import (
+    expand_retrieved_chunks_by_parent_document,
+)
 
 from docent.services.docent_retrieval_adapter import get_docent_retrieval_chunks
 
@@ -37,9 +40,10 @@ def get_docent_vector_index(
 
 def retrieve_docent_chunks_by_vector_similarity(
     query: str,
-    limit: int = 5,
+    limit: int = 8,
     min_score: float = 0.0,
     force_refresh: bool = False,
+    expand_parent_documents: bool = True,
 ) -> list[RetrievedChunk]:
     query_embedding = generate_embedding(query)
 
@@ -50,7 +54,7 @@ def retrieve_docent_chunks_by_vector_similarity(
         force_refresh=force_refresh,
     )
 
-    return retrieve_chunks_by_vector_similarity(
+    vector_results = retrieve_chunks_by_vector_similarity(
         query_embedding=query_embedding,
         indexed_chunks=indexed_chunks,
         chunk_embeddings=chunk_embeddings,
@@ -58,6 +62,19 @@ def retrieve_docent_chunks_by_vector_similarity(
         min_score=min_score,
     )
 
+    if not expand_parent_documents:
+        return vector_results
+
+    all_chunks = [
+        indexed_chunk.chunk
+        for indexed_chunk in indexed_chunks
+    ]
+
+    return expand_retrieved_chunks_by_parent_document(
+        retrieved_chunks=vector_results,
+        all_chunks=all_chunks,
+        limit=limit,
+    )
 
 def summarize_docent_vector_index(
     force_refresh: bool = False,

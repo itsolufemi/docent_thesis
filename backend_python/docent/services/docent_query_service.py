@@ -8,9 +8,6 @@ from docent.services.docent_prompt_service import docent_build_prompt
 from docent.services.docent_retrieval_adapter import (
     get_docent_retrieval_documents,
 )
-from docent.services.docent_vector_retrieval_service import (
-    retrieve_docent_chunks_by_vector_similarity,
-)
 from docent.services.source_service import (
     build_source_from_artwork,
     build_sources_from_retrieved_chunks,
@@ -86,7 +83,8 @@ def docent_resolve_context(
 
     retrieved_chunks = retrieve_docent_chunks_by_vector_similarity(
         query=user_input,
-        limit=5,
+        limit=8,
+        expand_parent_documents=True,
     )
 
     if retrieved_chunks:
@@ -101,6 +99,7 @@ def docent_resolve_context(
             },
             debug_payload={
                 "vector_retrieval_used": True,
+                "parent_document_expansion_used": True,
                 "retrieved_chunk_count": len(retrieved_chunks),
             }
         )
