@@ -85,6 +85,7 @@ def docent_resolve_context(
         query=user_input,
         limit=8,
         expand_parent_documents=True,
+        use_hybrid_scoring=True,
     )
 
     if retrieved_chunks:
@@ -100,6 +101,7 @@ def docent_resolve_context(
             debug_payload={
                 "vector_retrieval_used": True,
                 "parent_document_expansion_used": True,
+                "hybrid_scoring_used": True,
                 "retrieved_chunk_count": len(retrieved_chunks),
             }
         )

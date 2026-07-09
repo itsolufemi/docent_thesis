@@ -12,6 +12,9 @@ from extensions.retrieval.services.vector_similarity_service import (
 from extensions.retrieval.services.chunk_expansion_service import (
     expand_retrieved_chunks_by_parent_document,
 )
+from extensions.retrieval.services.hybrid_scoring_service import (
+    rerank_retrieved_chunks_hybrid,
+)
 
 from docent.services.docent_retrieval_adapter import get_docent_retrieval_chunks
 
@@ -44,6 +47,7 @@ def retrieve_docent_chunks_by_vector_similarity(
     min_score: float = 0.0,
     force_refresh: bool = False,
     expand_parent_documents: bool = True,
+    use_hybrid_scoring: bool = True,
 ) -> list[RetrievedChunk]:
     query_embedding = generate_embedding(query)
 
@@ -62,17 +66,26 @@ def retrieve_docent_chunks_by_vector_similarity(
         min_score=min_score,
     )
 
-    if not expand_parent_documents:
-        return vector_results
+    if expand_parent_documents:
+        all_chunks = [
+            indexed_chunk.chunk
+            for indexed_chunk in indexed_chunks
+        ]
 
-    all_chunks = [
-        indexed_chunk.chunk
-        for indexed_chunk in indexed_chunks
-    ]
+        retrieved_chunks = expand_retrieved_chunks_by_parent_document(
+            retrieved_chunks=vector_results,
+            all_chunks=all_chunks,
+            limit=limit,
+        )
+    else:
+        retrieved_chunks = vector_results
 
-    return expand_retrieved_chunks_by_parent_document(
-        retrieved_chunks=vector_results,
-        all_chunks=all_chunks,
+    if not use_hybrid_scoring:
+        return retrieved_chunks
+
+    return rerank_retrieved_chunks_hybrid(
+        query=query,
+        retrieved_chunks=retrieved_chunks,
         limit=limit,
     )
 

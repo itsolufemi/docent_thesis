@@ -27,6 +27,7 @@ def search_docent_chunks_by_vector(
     min_score: float = Query(default=0.0, ge=-1.0, le=1.0),
     force_refresh: bool = False,
     expand_parent_documents: bool = True,
+    use_hybrid_scoring: bool = True,
 ):
     results = retrieve_docent_chunks_by_vector_similarity(
         query=query,
@@ -34,6 +35,7 @@ def search_docent_chunks_by_vector(
         min_score=min_score,
         force_refresh=force_refresh,
         expand_parent_documents=expand_parent_documents,
+        use_hybrid_scoring=use_hybrid_scoring,
     )
 
     return ChunkSearchResponse(
