@@ -15,6 +15,16 @@ from conversation_core.schemas.query_schemas import (
 from conversation_core.services.llm_service import generate_llm_response
 from conversation_core.services.prompt_service import build_prompt
 
+NON_RETRIEVAL_CONTEXT_SOURCES = {
+    "no_context",
+    "no_external_context",
+    "subject_reference",
+    "subject_not_found",
+    "noise",
+    "utterance_interruption",
+    "utterance_call_to_action",
+}
+
 
 SubjectResolver = Callable[
     [str | None, str],
@@ -100,12 +110,7 @@ class QueryEngine:
                 dialogue_turns_used=len(dialogue_history),
                 prompt=prompt,
                 retrieval_used=resolved_context.context_source
-                not in [
-                    "no_context",
-                    "no_external_context",
-                    "subject_reference",
-                    "subject_not_found",
-                ],
+                not in NON_RETRIEVAL_CONTEXT_SOURCES,
                 sources_count=len(resolved_context.sources),
                 sources=resolved_context.sources,
                 debug_payload=resolved_context.debug_payload,

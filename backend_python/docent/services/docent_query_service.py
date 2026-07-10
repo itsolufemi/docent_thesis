@@ -34,6 +34,95 @@ def docent_parse_subject_reference(
         return int(raw_value)
     except ValueError:
         return None
+    
+def build_utterance_route_debug_payload(
+    utterance_route,
+    retrieval_skipped_by_utterance_route: bool,
+) -> dict:
+    return {
+        "utterance_route_type": utterance_route.route_type,
+        "utterance_route_confidence": utterance_route.confidence,
+        "utterance_route_reason": utterance_route.reason,
+        "utterance_is_relevant": utterance_route.is_relevant,
+        "utterance_should_ignore": utterance_route.should_ignore,
+        "retrieval_skipped_by_utterance_route": retrieval_skipped_by_utterance_route,
+    }
+
+
+def build_route_handled_context(
+    utterance_route,
+) -> ResolvedContext | None:
+    if utterance_route.route_type == "noise":
+        return ResolvedContext(
+            context_source="noise",
+            subject_reference=None,
+            sources=[],
+            prompt_payload={
+                "route_type": utterance_route.route_type,
+                "route_handled_without_retrieval": True,
+                "route_message": "The utterance was treated as noise.",
+                "artwork": None,
+                "retrieved_chunks": [],
+                "retrieved_documents": [],
+            },
+            debug_payload=build_utterance_route_debug_payload(
+                utterance_route=utterance_route,
+                retrieval_skipped_by_utterance_route=True,
+            ),
+        )
+
+    if utterance_route.route_type == "interruption":
+        return ResolvedContext(
+            context_source="utterance_interruption",
+            subject_reference=None,
+            sources=[],
+            prompt_payload={
+                "route_type": utterance_route.route_type,
+                "route_handled_without_retrieval": True,
+                "route_message": (
+                    "The utterance was classified as an interruption. "
+                    "No artwork retrieval was performed."
+                ),
+                "artwork": None,
+                "retrieved_chunks": [],
+                "retrieved_documents": [],
+            },
+            debug_payload=build_utterance_route_debug_payload(
+                utterance_route=utterance_route,
+                retrieval_skipped_by_utterance_route=True,
+            ),
+        )
+
+    if utterance_route.route_type == "call_to_action":
+        return ResolvedContext(
+            context_source="utterance_call_to_action",
+            subject_reference=None,
+            sources=[],
+            prompt_payload={
+                "route_type": utterance_route.route_type,
+                "route_handled_without_retrieval": True,
+                "route_message": (
+                    "The utterance was classified as a call to action. "
+                    "No action executor is connected at this stage."
+                ),
+                "artwork": None,
+                "retrieved_chunks": [],
+                "retrieved_documents": [],
+            },
+            debug_payload={
+                **build_utterance_route_debug_payload(
+                    utterance_route=utterance_route,
+                    retrieval_skipped_by_utterance_route=True,
+                ),
+                "action_execution_available": False,
+                "action_execution_note": (
+                    "Stage 20 detects action-like utterances but does not "
+                    "execute tools yet."
+                ),
+            },
+        )
+
+    return None
 
 
 def docent_resolve_context(
@@ -43,26 +132,10 @@ def docent_resolve_context(
     sources: list[QuerySource] = []
     utterance_route = route_utterance(user_input)
 
-    if utterance_route.should_ignore:
-        return ResolvedContext(
-            context_source="noise",
-            subject_reference=None,
-            sources=[],
-            prompt_payload={
-                "artwork": None,
-                "retrieved_chunks": [],
-                "retrieved_documents": [],
-            },
-            
-            debug_payload={
-                "utterance_route_type": utterance_route.route_type,
-                "utterance_route_confidence": utterance_route.confidence,
-                "utterance_route_reason": utterance_route.reason,
-                "utterance_is_relevant": utterance_route.is_relevant,
-                "utterance_should_ignore": utterance_route.should_ignore,
-                "retrieval_skipped_by_utterance_route": True,
-            },
-        )
+    route_handled_context = build_route_handled_context(utterance_route)
+
+    if route_handled_context is not None:
+        return route_handled_context
 
     if subject_reference is not None:
         painting_index = docent_parse_subject_reference(subject_reference)
@@ -88,12 +161,10 @@ def docent_resolve_context(
                         "retrieved_documents": [],
                     },
                     debug_payload={
-                        "utterance_route_type": utterance_route.route_type,
-                        "utterance_route_confidence": utterance_route.confidence,
-                        "utterance_route_reason": utterance_route.reason,
-                        "utterance_is_relevant": utterance_route.is_relevant,
-                        "utterance_should_ignore": utterance_route.should_ignore,
-                        "retrieval_skipped_by_utterance_route": False,
+                        **build_utterance_route_debug_payload(
+                            utterance_route=utterance_route,
+                            retrieval_skipped_by_utterance_route=False,
+                        ),
                         "painting_index": painting_index,
                         "artwork_found": True,
                     },
@@ -105,12 +176,10 @@ def docent_resolve_context(
                 sources=[],
                 prompt_payload={},
                 debug_payload={
-                    "utterance_route_type": utterance_route.route_type,
-                    "utterance_route_confidence": utterance_route.confidence,
-                    "utterance_route_reason": utterance_route.reason,
-                    "utterance_is_relevant": utterance_route.is_relevant,
-                    "utterance_should_ignore": utterance_route.should_ignore,
-                    "retrieval_skipped_by_utterance_route": False,
+                    **build_utterance_route_debug_payload(
+                        utterance_route=utterance_route,
+                        retrieval_skipped_by_utterance_route=False,
+                    ),
                     "painting_index": painting_index,
                     "artwork_found": False,
                 },
@@ -136,12 +205,10 @@ def docent_resolve_context(
                 "retrieved_documents": [],
             },
             debug_payload={
-                "utterance_route_type": utterance_route.route_type,
-                "utterance_route_confidence": utterance_route.confidence,
-                "utterance_route_reason": utterance_route.reason,
-                "utterance_is_relevant": utterance_route.is_relevant,
-                "utterance_should_ignore": utterance_route.should_ignore,
-                "retrieval_skipped_by_utterance_route": False,
+                **build_utterance_route_debug_payload(
+                    utterance_route=utterance_route,
+                    retrieval_skipped_by_utterance_route=False,
+                ),
                 "vector_retrieval_used": True,
                 "parent_document_expansion_used": True,
                 "hybrid_scoring_used": True,
@@ -170,12 +237,10 @@ def docent_resolve_context(
                 "retrieved_documents": retrieved_documents,
             },
             debug_payload={
-                "utterance_route_type": utterance_route.route_type,
-                "utterance_route_confidence": utterance_route.confidence,
-                "utterance_route_reason": utterance_route.reason,
-                "utterance_is_relevant": utterance_route.is_relevant,
-                "utterance_should_ignore": utterance_route.should_ignore,
-                "retrieval_skipped_by_utterance_route": False,
+                **build_utterance_route_debug_payload(
+                    utterance_route=utterance_route,
+                    retrieval_skipped_by_utterance_route=False,
+                ),
                 "document_retrieval_used": True,
                 "retrieved_document_count": len(retrieved_documents),
             },
@@ -191,12 +256,10 @@ def docent_resolve_context(
             "retrieved_documents": [],
         },
         debug_payload={
-            "utterance_route_type": utterance_route.route_type,
-            "utterance_route_confidence": utterance_route.confidence,
-            "utterance_route_reason": utterance_route.reason,
-            "utterance_is_relevant": utterance_route.is_relevant,
-            "utterance_should_ignore": utterance_route.should_ignore,
-            "retrieval_skipped_by_utterance_route": False,
+            **build_utterance_route_debug_payload(
+                utterance_route=utterance_route,
+                retrieval_skipped_by_utterance_route=False,
+            ),
         },
     )
 
@@ -208,6 +271,26 @@ def docent_build_prompt_from_context(
 ) -> str:
     payload = resolved_context.prompt_payload
 
+    if payload.get("route_handled_without_retrieval"):
+        return f"""
+You are Docent, a voice-led conversational guide.
+
+The user's utterance has already been classified by the conversation router.
+
+Route type:
+{payload.get("route_type")}
+
+Routing note:
+{payload.get("route_message")}
+
+User utterance:
+{user_input}
+
+Respond briefly and naturally.
+Do not invent artwork information.
+Do not use external context because none was retrieved.
+""".strip()
+
     return docent_build_prompt(
         user_input=user_input,
         dialogue_history=dialogue_history,
@@ -215,7 +298,6 @@ def docent_build_prompt_from_context(
         retrieved_documents=payload.get("retrieved_documents", []),
         retrieved_chunks=payload.get("retrieved_chunks", []),
     )
-
 
 docent_query_engine = QueryEngine(
     subject_resolver=docent_resolve_context,

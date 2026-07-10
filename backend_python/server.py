@@ -12,10 +12,8 @@ from conversation_core.api.routes_utterance_router import (
 )
 
 from docent.api.routes_artworks import router as artworks_router
-from docent.api.routes_docent_embeddings import router as docent_embeddings_router
 from docent.api.routes_docent_index import router as docent_index_router
 from docent.api.routes_docent_retrieval import router as docent_retrieval_router
-from docent.api.routes_docent_vector import router as docent_vector_router
 from docent.services.docent_query_service import docent_query_engine
 from docent.api.routes_docent_embeddings import router as docent_embeddings_router
 from docent.api.routes_docent_vector import router as docent_vector_router
