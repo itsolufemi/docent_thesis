@@ -2,6 +2,7 @@ from conversation_core.schemas.conversation_schemas import DialogueTurn
 from conversation_core.schemas.query_schemas import ResolvedContext
 from conversation_core.schemas.source_schemas import QuerySource
 from conversation_core.services.query_service import QueryEngine
+from conversation_core.services.utterance_router_service import route_utterance
 
 from docent.services.artwork_service import get_painting_by_index
 from docent.services.docent_prompt_service import docent_build_prompt
@@ -40,6 +41,28 @@ def docent_resolve_context(
     user_input: str,
 ) -> ResolvedContext:
     sources: list[QuerySource] = []
+    utterance_route = route_utterance(user_input)
+
+    if utterance_route.should_ignore:
+        return ResolvedContext(
+            context_source="noise",
+            subject_reference=None,
+            sources=[],
+            prompt_payload={
+                "artwork": None,
+                "retrieved_chunks": [],
+                "retrieved_documents": [],
+            },
+            
+            debug_payload={
+                "utterance_route_type": utterance_route.route_type,
+                "utterance_route_confidence": utterance_route.confidence,
+                "utterance_route_reason": utterance_route.reason,
+                "utterance_is_relevant": utterance_route.is_relevant,
+                "utterance_should_ignore": utterance_route.should_ignore,
+                "retrieval_skipped_by_utterance_route": True,
+            },
+        )
 
     if subject_reference is not None:
         painting_index = docent_parse_subject_reference(subject_reference)
@@ -65,6 +88,12 @@ def docent_resolve_context(
                         "retrieved_documents": [],
                     },
                     debug_payload={
+                        "utterance_route_type": utterance_route.route_type,
+                        "utterance_route_confidence": utterance_route.confidence,
+                        "utterance_route_reason": utterance_route.reason,
+                        "utterance_is_relevant": utterance_route.is_relevant,
+                        "utterance_should_ignore": utterance_route.should_ignore,
+                        "retrieval_skipped_by_utterance_route": False,
                         "painting_index": painting_index,
                         "artwork_found": True,
                     },
@@ -76,6 +105,12 @@ def docent_resolve_context(
                 sources=[],
                 prompt_payload={},
                 debug_payload={
+                    "utterance_route_type": utterance_route.route_type,
+                    "utterance_route_confidence": utterance_route.confidence,
+                    "utterance_route_reason": utterance_route.reason,
+                    "utterance_is_relevant": utterance_route.is_relevant,
+                    "utterance_should_ignore": utterance_route.should_ignore,
+                    "retrieval_skipped_by_utterance_route": False,
                     "painting_index": painting_index,
                     "artwork_found": False,
                 },
@@ -101,6 +136,12 @@ def docent_resolve_context(
                 "retrieved_documents": [],
             },
             debug_payload={
+                "utterance_route_type": utterance_route.route_type,
+                "utterance_route_confidence": utterance_route.confidence,
+                "utterance_route_reason": utterance_route.reason,
+                "utterance_is_relevant": utterance_route.is_relevant,
+                "utterance_should_ignore": utterance_route.should_ignore,
+                "retrieval_skipped_by_utterance_route": False,
                 "vector_retrieval_used": True,
                 "parent_document_expansion_used": True,
                 "hybrid_scoring_used": True,
@@ -129,6 +170,12 @@ def docent_resolve_context(
                 "retrieved_documents": retrieved_documents,
             },
             debug_payload={
+                "utterance_route_type": utterance_route.route_type,
+                "utterance_route_confidence": utterance_route.confidence,
+                "utterance_route_reason": utterance_route.reason,
+                "utterance_is_relevant": utterance_route.is_relevant,
+                "utterance_should_ignore": utterance_route.should_ignore,
+                "retrieval_skipped_by_utterance_route": False,
                 "document_retrieval_used": True,
                 "retrieved_document_count": len(retrieved_documents),
             },
@@ -143,7 +190,14 @@ def docent_resolve_context(
             "retrieved_chunks": [],
             "retrieved_documents": [],
         },
-        debug_payload={},
+        debug_payload={
+            "utterance_route_type": utterance_route.route_type,
+            "utterance_route_confidence": utterance_route.confidence,
+            "utterance_route_reason": utterance_route.reason,
+            "utterance_is_relevant": utterance_route.is_relevant,
+            "utterance_should_ignore": utterance_route.should_ignore,
+            "retrieval_skipped_by_utterance_route": False,
+        },
     )
 
 
