@@ -15,6 +15,10 @@ from extensions.retrieval.services.chunk_expansion_service import (
 from extensions.retrieval.services.hybrid_scoring_service import (
     rerank_retrieved_chunks_hybrid,
 )
+from extensions.retrieval.services.retrieval_confidence_service import (
+    DEFAULT_MIN_RETRIEVAL_CONFIDENCE,
+    filter_chunks_by_confidence,
+)
 
 from docent.services.docent_retrieval_adapter import get_docent_retrieval_chunks
 
@@ -40,7 +44,6 @@ def get_docent_vector_index(
 
     return _docent_indexed_chunks, _docent_chunk_embeddings
 
-
 def retrieve_docent_chunks_by_vector_similarity(
     query: str,
     limit: int = 8,
@@ -48,6 +51,8 @@ def retrieve_docent_chunks_by_vector_similarity(
     force_refresh: bool = False,
     expand_parent_documents: bool = True,
     use_hybrid_scoring: bool = True,
+    apply_confidence_gate: bool = True,
+    min_confidence_score: float = DEFAULT_MIN_RETRIEVAL_CONFIDENCE,
 ) -> list[RetrievedChunk]:
     query_embedding = generate_embedding(query)
 
@@ -80,13 +85,19 @@ def retrieve_docent_chunks_by_vector_similarity(
     else:
         retrieved_chunks = vector_results
 
-    if not use_hybrid_scoring:
+    if use_hybrid_scoring:
+        retrieved_chunks = rerank_retrieved_chunks_hybrid(
+            query=query,
+            retrieved_chunks=retrieved_chunks,
+            limit=limit,
+        )
+
+    if not apply_confidence_gate:
         return retrieved_chunks
 
-    return rerank_retrieved_chunks_hybrid(
-        query=query,
+    return filter_chunks_by_confidence(
         retrieved_chunks=retrieved_chunks,
-        limit=limit,
+        min_score=min_confidence_score,
     )
 
 def summarize_docent_vector_index(

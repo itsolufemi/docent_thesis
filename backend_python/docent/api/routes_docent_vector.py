@@ -21,6 +21,7 @@ router = APIRouter()
     "/api/docent/vector/search",
     response_model=ChunkSearchResponse,
 )
+
 def search_docent_chunks_by_vector(
     query: str,
     limit: int = Query(default=8, ge=1, le=20),
@@ -28,6 +29,8 @@ def search_docent_chunks_by_vector(
     force_refresh: bool = False,
     expand_parent_documents: bool = True,
     use_hybrid_scoring: bool = True,
+    apply_confidence_gate: bool = True,
+    min_confidence_score: float = Query(default=0.40, ge=0.0, le=1.0),
 ):
     results = retrieve_docent_chunks_by_vector_similarity(
         query=query,
@@ -36,8 +39,10 @@ def search_docent_chunks_by_vector(
         force_refresh=force_refresh,
         expand_parent_documents=expand_parent_documents,
         use_hybrid_scoring=use_hybrid_scoring,
+        apply_confidence_gate=apply_confidence_gate,
+        min_confidence_score=min_confidence_score,
     )
-
+    
     return ChunkSearchResponse(
         query=query,
         results=results,

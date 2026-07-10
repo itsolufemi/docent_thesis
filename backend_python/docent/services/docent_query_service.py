@@ -86,6 +86,8 @@ def docent_resolve_context(
         limit=8,
         expand_parent_documents=True,
         use_hybrid_scoring=True,
+        apply_confidence_gate=True,
+        min_confidence_score=0.45,
     )
 
     if retrieved_chunks:
@@ -102,6 +104,8 @@ def docent_resolve_context(
                 "vector_retrieval_used": True,
                 "parent_document_expansion_used": True,
                 "hybrid_scoring_used": True,
+                "confidence_gate_used": True,
+                "min_confidence_score": 0.45,
                 "retrieved_chunk_count": len(retrieved_chunks),
             }
         )
