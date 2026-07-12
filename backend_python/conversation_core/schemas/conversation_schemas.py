@@ -1,26 +1,99 @@
 from typing import Literal
+from uuid import uuid4
+
 from pydantic import BaseModel, Field
 
+
 DialogueRole = Literal["user", "assistant", "system"]
+ConversationBranchType = Literal["open", "bounded"]
+ConversationBranchStatus = Literal[
+    "active",
+    "suspended",
+    "closed",
+]
+
 
 class DialogueTurn(BaseModel):
     role: DialogueRole
     content: str
 
+
+class ConversationSubject(BaseModel):
+    """
+    A subject being tracked within a conversation branch.
+
+    `label` is the readable form supplied to the LLM.
+    `reference` is an optional stable application or domain identifier.
+    """
+
+    label: str
+    reference: str | None = None
+
+
+class ConversationBranch(BaseModel):
+    """
+    A structured representation of the conversational focus
+    within one branch of a conversation tree.
+    """
+
+    branch_id: str = Field(
+        default_factory=lambda: str(uuid4())
+    )
+
+    parent_branch_id: str | None = None
+
+    name: str
+    branch_type: ConversationBranchType
+
+    status: ConversationBranchStatus = "active"
+
+    previous_subjects: list[ConversationSubject] = Field(
+        default_factory=list
+    )
+
+    current_subjects: list[ConversationSubject] = Field(
+        default_factory=list
+    )
+
+    remaining_subjects: list[ConversationSubject] = Field(
+        default_factory=list
+    )
+
+
+class ConversationTree(BaseModel):
+    """
+    The structured focus state for one conversation.
+
+    Every conversation has one root branch, and one branch is active
+    at any given time.
+    """
+
+    root_branch_id: str
+    active_branch_id: str
+
+    branches: dict[str, ConversationBranch] = Field(
+        default_factory=dict
+    )
+
+
 class ConversationState(BaseModel):
     conversation_id: str
-    current_subject: str | None = None
-    previous_subject: str | None = None
-    discussed_subjects: list[str] = Field(default_factory=list)
-    dialogue_history: list[DialogueTurn] = Field(default_factory=list)
+
+    conversation_tree: ConversationTree
+
+    dialogue_history: list[DialogueTurn] = Field(
+        default_factory=list
+    )
 
 
 class StartConversationResponse(BaseModel):
     conversation_id: str
     state: ConversationState
 
+
 class SetCurrentSubjectRequest(BaseModel):
     subject_reference: str
+
 
 class SetCurrentSubjectResponse(BaseModel):
     conversation_id: str

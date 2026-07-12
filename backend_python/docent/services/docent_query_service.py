@@ -21,7 +21,6 @@ from docent.services.docent_vector_retrieval_service import (
     retrieve_docent_chunks_by_vector_similarity,
 )
 
-
 def docent_parse_subject_reference(
     subject_reference: str,
 ) -> int | None:
