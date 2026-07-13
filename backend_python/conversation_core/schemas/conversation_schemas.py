@@ -8,7 +8,6 @@ DialogueRole = Literal["user", "assistant", "system"]
 ConversationBranchType = Literal["open", "bounded"]
 ConversationBranchStatus = Literal[
     "active",
-    "suspended",
     "closed",
 ]
 

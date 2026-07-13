@@ -1,7 +1,8 @@
 from uuid import uuid4
 
-from conversation_core.schemas.conversation_schemas import (
+from ..schemas.conversation_schemas import (
     ConversationBranch,
+    ConversationBranchType,
     ConversationState,
     ConversationTree,
     ConversationSubject,
