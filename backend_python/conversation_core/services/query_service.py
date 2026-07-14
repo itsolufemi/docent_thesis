@@ -2,18 +2,28 @@ from collections.abc import Callable
 
 from conversation_core.memory.conversation_store import (
     add_dialogue_turn,
+    get_active_branch,
     get_conversation,
     get_recent_conversation_history,
 )
 from conversation_core.schemas.context_schemas import QueryDebugInfo
-from conversation_core.schemas.conversation_schemas import DialogueTurn
+from conversation_core.schemas.conversation_schemas import (
+    DialogueTurn,
+    ConversationBranch,
+)
 from conversation_core.schemas.prompt_schemas import PromptProfile
 from conversation_core.schemas.query_schemas import (
     QueryResult,
     ResolvedContext,
 )
-from conversation_core.services.llm_service import generate_llm_response
-from conversation_core.services.prompt_service import build_prompt
+from conversation_core.services.llm_service import (
+    generate_llm_response,
+    generate_tool_aware_llm_response,
+)
+from conversation_core.services.prompt_service import (
+    build_prompt,
+    format_conversation_branch_for_prompt,
+)
 
 NON_RETRIEVAL_CONTEXT_SOURCES = {
     "no_context",
@@ -32,11 +42,31 @@ SubjectResolver = Callable[
 ]
 
 PromptBuilder = Callable[
-    [str, list[DialogueTurn], ResolvedContext],
+    [
+        str,
+        list[DialogueTurn],
+        ResolvedContext,
+        ConversationBranch | None,
+    ],
     str,
 ]
 
-ResponseGenerator = Callable[[str], str]
+ResponseGenerator = Callable[
+    [str, str | None],
+    str,
+]
+
+def default_response_generator(
+    prompt: str,
+    conversation_id: str | None,
+) -> str:
+    if conversation_id is None:
+        return generate_llm_response(prompt)
+
+    return generate_tool_aware_llm_response(
+        prompt=prompt,
+        conversation_id=conversation_id,
+    )
 
 
 class QueryEngine:
@@ -48,7 +78,9 @@ class QueryEngine:
     ):
         self.subject_resolver = subject_resolver
         self.prompt_builder = prompt_builder
-        self.response_generator = response_generator or generate_llm_response
+        self.response_generator = (
+            response_generator or default_response_generator
+        )
 
     def generate_response(
         self,
@@ -59,43 +91,56 @@ class QueryEngine:
     ) -> QueryResult:
         conversation_state = None
         dialogue_history: list[DialogueTurn] = []
-
-        if conversation_id is not None:
-            conversation_state = get_conversation(conversation_id)
-
-            if conversation_state is not None:
-                dialogue_history = get_recent_conversation_history(
-                    conversation_id=conversation_id,
-                )
-
-                if subject_reference is None:
-                    subject_reference = conversation_state.current_subject
-
-        resolved_context = self.subject_resolver(
-            subject_reference,
-            text,
-        )
-
-        prompt = self.prompt_builder(
-            text,
-            dialogue_history,
-            resolved_context,
-        )
-
-        response = self.response_generator(prompt)
+        active_branch: ConversationBranch | None = None
 
         if conversation_state is not None:
-            add_dialogue_turn(
-                conversation_id=conversation_state.conversation_id,
-                role="user",
-                content=text,
+            dialogue_history = get_recent_conversation_history(
+                conversation_id=conversation_id,
             )
 
-            add_dialogue_turn(
-                conversation_id=conversation_state.conversation_id,
-                role="assistant",
-                content=response,
+            active_branch = get_active_branch(
+                conversation_id=conversation_id
             )
+
+            if (
+                subject_reference is None
+                and active_branch is not None
+                and active_branch.current_subjects
+            ):
+                subject_reference = (
+                    active_branch.current_subjects[0].reference
+                    or active_branch.current_subjects[0].label
+                )
+
+                resolved_context = self.subject_resolver(
+                    subject_reference,
+                    text,
+                )
+
+                prompt = self.prompt_builder(
+                    text,
+                    dialogue_history,
+                    resolved_context,
+                    active_branch,
+                )
+
+                response = self.response_generator(
+                    prompt,
+                    conversation_id,
+                )
+
+                if conversation_state is not None:
+                    add_dialogue_turn(
+                        conversation_id=conversation_state.conversation_id,
+                        role="user",
+                        content=text,
+                    )
+
+                    add_dialogue_turn(
+                        conversation_id=conversation_state.conversation_id,
+                        role="assistant",
+                        content=response,
+                    )
 
         debug = None
 
@@ -157,12 +202,28 @@ def default_build_prompt(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     resolved_context: ResolvedContext,
+    active_branch: ConversationBranch | None,
 ) -> str:
+    branch_context = format_conversation_branch_for_prompt(
+        active_branch
+    )
+
     return build_prompt(
         user_input=user_input,
         dialogue_history=dialogue_history,
         profile=DEFAULT_CONVERSATION_PROFILE,
-        context_sections=[],
+        context_sections=[
+            f"""
+        ACTIVE CONVERSATION BRANCH
+
+        {branch_context}
+
+        Operational rules:
+        - A digression does not close an active bounded branch.
+        - Keep a bounded branch active until its activity is complete or the user clearly asks to stop.
+        - Use operational tools only when conversation-tree state actually needs to change.
+        """.strip()
+        ]
     )
 
 

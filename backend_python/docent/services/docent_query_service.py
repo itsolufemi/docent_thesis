@@ -1,8 +1,14 @@
-from conversation_core.schemas.conversation_schemas import DialogueTurn
+from conversation_core.schemas.conversation_schemas import (
+    DialogueTurn,
+    ConversationBranch,
+)
 from conversation_core.schemas.query_schemas import ResolvedContext
 from conversation_core.schemas.source_schemas import QuerySource
 from conversation_core.services.query_service import QueryEngine
 from conversation_core.services.utterance_router_service import route_utterance
+from conversation_core.services.prompt_service import (
+    format_conversation_branch_for_prompt,
+)
 
 from docent.services.artwork_service import get_painting_by_index
 from docent.services.docent_prompt_service import docent_build_prompt
@@ -102,7 +108,8 @@ def build_route_handled_context(
                 "route_handled_without_retrieval": True,
                 "route_message": (
                     "The utterance was classified as a call to action. "
-                    "No action executor is connected at this stage."
+                    "Use an available operational tool when the request "
+                    "requires a conversation-state change."
                 ),
                 "artwork": None,
                 "retrieved_chunks": [],
@@ -113,10 +120,9 @@ def build_route_handled_context(
                     utterance_route=utterance_route,
                     retrieval_skipped_by_utterance_route=True,
                 ),
-                "action_execution_available": False,
+                "action_execution_available": True,
                 "action_execution_note": (
-                    "Stage 20 detects action-like utterances but does not "
-                    "execute tools yet."
+                    "Operational conversation-tree tools are available."
                 ),
             },
         )
@@ -267,31 +273,67 @@ def docent_build_prompt_from_context(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     resolved_context: ResolvedContext,
+    active_branch: ConversationBranch | None,
 ) -> str:
+    branch_context = format_conversation_branch_for_prompt(
+        active_branch
+    )
+
     payload = resolved_context.prompt_payload
 
     if payload.get("route_handled_without_retrieval"):
         return f"""
-You are Docent, a voice-led conversational guide.
+    You are Docent, a voice-led conversational guide.
 
-The user's utterance has already been classified by the conversation router.
+    The user's utterance has already been classified by the conversation router.
 
-Route type:
-{payload.get("route_type")}
+    Active conversation branch:
+    {branch_context}
 
-Routing note:
-{payload.get("route_message")}
+    Route type:
+    {payload.get("route_type")}
 
-User utterance:
-{user_input}
+    Routing note:
+    {payload.get("route_message")}
 
-Respond briefly and naturally.
-Do not invent artwork information.
-Do not use external context because none was retrieved.
-""".strip()
+    User utterance:
+    {user_input}
+
+    Respond briefly and naturally.
+
+    The active branch represents the current overarching conversational activity.
+    A digression does not automatically close a bounded branch.
+
+    Use conversation-tree tools only when the branch state genuinely needs to change.
+
+    Do not invent artwork information.
+    Do not use external context because none was retrieved.
+    """.strip()
+
+    user_input_with_branch_context = f"""
+    ACTIVE CONVERSATION BRANCH
+
+    {branch_context}
+
+    CONVERSATION-TREE GUIDANCE
+
+    The active branch represents the current overarching conversational activity.
+
+    Do not close a bounded branch merely because the user asks a digressive or unrelated question.
+
+    Keep a bounded branch active until:
+    - its defined activity is complete; or
+    - the user clearly asks to stop it.
+
+    Use operational tools only when the conversation-tree state genuinely needs to change.
+
+    USER UTTERANCE
+
+    {user_input}
+    """.strip()
 
     return docent_build_prompt(
-        user_input=user_input,
+        user_input=user_input_with_branch_context,
         dialogue_history=dialogue_history,
         artwork=payload.get("artwork"),
         retrieved_documents=payload.get("retrieved_documents", []),
