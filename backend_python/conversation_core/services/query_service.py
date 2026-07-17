@@ -11,7 +11,11 @@ from conversation_core.schemas.conversation_schemas import (
     DialogueTurn,
     ConversationBranch,
 )
-from conversation_core.schemas.prompt_schemas import PromptProfile
+from conversation_core.schemas.prompt_schemas import (
+    PromptProfile,
+    PromptSection,
+)
+
 from conversation_core.schemas.query_schemas import (
     QueryResult,
     ResolvedContext,
@@ -89,58 +93,81 @@ class QueryEngine:
         subject_reference: str | None = None,
         include_debug: bool = False,
     ) -> QueryResult:
+        """
+        Process one user query.
+
+        The method:
+        1. Loads stored conversation context when a conversation ID exists.
+        2. Resolves external/domain context.
+        3. Builds the final prompt.
+        4. Generates a response, with tools available for stored conversations.
+        5. Saves the user and assistant turns.
+        """
+
         conversation_state = None
         dialogue_history: list[DialogueTurn] = []
         active_branch: ConversationBranch | None = None
 
+        # Load conversation memory only when the request contains
+        # a valid conversation ID.
+        if conversation_id is not None:
+            conversation_state = get_conversation(conversation_id)
+
+            if conversation_state is not None:
+                dialogue_history = get_recent_conversation_history(
+                    conversation_id=conversation_id,
+                )
+
+                active_branch = get_active_branch(
+                    conversation_id=conversation_id,
+                )
+
+                # Preserve compatibility with the existing resolver,
+                # which currently accepts one subject reference.
+                if (
+                    subject_reference is None
+                    and active_branch is not None
+                    and active_branch.current_subjects
+                ):
+                    current_subject = active_branch.current_subjects[0]
+
+                    subject_reference = (
+                        current_subject.reference
+                        or current_subject.label
+                    )
+
+        # Context resolution must happen for every request,
+        # including requests without a stored conversation.
+        resolved_context = self.subject_resolver(
+            subject_reference,
+            text,
+        )
+
+        prompt = self.prompt_builder(
+            text,
+            dialogue_history,
+            resolved_context,
+            active_branch,
+        )
+
+        response = self.response_generator(
+            prompt,
+            conversation_id,
+        )
+
+        # Store dialogue only when the supplied conversation exists.
         if conversation_state is not None:
-            dialogue_history = get_recent_conversation_history(
-                conversation_id=conversation_id,
+            add_dialogue_turn(
+                conversation_id=conversation_state.conversation_id,
+                role="user",
+                content=text,
             )
 
-            active_branch = get_active_branch(
-                conversation_id=conversation_id
+            add_dialogue_turn(
+                conversation_id=conversation_state.conversation_id,
+                role="assistant",
+                content=response,
             )
-
-            if (
-                subject_reference is None
-                and active_branch is not None
-                and active_branch.current_subjects
-            ):
-                subject_reference = (
-                    active_branch.current_subjects[0].reference
-                    or active_branch.current_subjects[0].label
-                )
-
-                resolved_context = self.subject_resolver(
-                    subject_reference,
-                    text,
-                )
-
-                prompt = self.prompt_builder(
-                    text,
-                    dialogue_history,
-                    resolved_context,
-                    active_branch,
-                )
-
-                response = self.response_generator(
-                    prompt,
-                    conversation_id,
-                )
-
-                if conversation_state is not None:
-                    add_dialogue_turn(
-                        conversation_id=conversation_state.conversation_id,
-                        role="user",
-                        content=text,
-                    )
-
-                    add_dialogue_turn(
-                        conversation_id=conversation_state.conversation_id,
-                        role="assistant",
-                        content=response,
-                    )
 
         debug = None
 
@@ -150,12 +177,15 @@ class QueryEngine:
                 subject_reference=resolved_context.subject_reference,
                 context_source=resolved_context.context_source,
                 context_used=bool(
-                    resolved_context.sources or resolved_context.prompt_payload
+                    resolved_context.sources
+                    or resolved_context.prompt_payload
                 ),
                 dialogue_turns_used=len(dialogue_history),
                 prompt=prompt,
-                retrieval_used=resolved_context.context_source
-                not in NON_RETRIEVAL_CONTEXT_SOURCES,
+                retrieval_used=(
+                    resolved_context.context_source
+                    not in NON_RETRIEVAL_CONTEXT_SOURCES
+                ),
                 sources_count=len(resolved_context.sources),
                 sources=resolved_context.sources,
                 debug_payload=resolved_context.debug_payload,
@@ -169,7 +199,6 @@ class QueryEngine:
             sources=resolved_context.sources,
             debug=debug,
         )
-
 
 DEFAULT_CONVERSATION_PROFILE = PromptProfile(
     assistant_name="Assistant",
@@ -213,19 +242,19 @@ def default_build_prompt(
         dialogue_history=dialogue_history,
         profile=DEFAULT_CONVERSATION_PROFILE,
         context_sections=[
-            f"""
-        ACTIVE CONVERSATION BRANCH
+            PromptSection(
+                title="Active conversation branch",
+                content=f"""
+                    {branch_context}
 
-        {branch_context}
-
-        Operational rules:
-        - A digression does not close an active bounded branch.
-        - Keep a bounded branch active until its activity is complete or the user clearly asks to stop.
-        - Use operational tools only when conversation-tree state actually needs to change.
-        """.strip()
-        ]
+                    Operational rules:
+                    - A digression does not close an active bounded branch.
+                    - Keep a bounded branch active until its activity is complete or the user clearly asks to stop.
+                    - Use operational tools only when conversation-tree state actually needs to change.
+                """.strip(),
+            )
+        ],
     )
-
 
 default_query_engine = QueryEngine(
     subject_resolver=default_resolve_context,
