@@ -1,5 +1,6 @@
 from time import perf_counter
 
+from config import settings
 from extensions.retrieval.schemas.chunk_schemas import (
     RetrievalTimings,
     VectorRetrievalResult,
@@ -24,6 +25,10 @@ from extensions.retrieval.services.retrieval_confidence_service import (
     DEFAULT_MIN_RETRIEVAL_CONFIDENCE,
     filter_chunks_by_confidence,
 )
+from extensions.retrieval.services.vector_store_service import (
+    load_vector_store,
+    save_vector_store,
+)
 
 from docent.services.docent_retrieval_adapter import get_docent_retrieval_chunks
 
@@ -38,14 +43,36 @@ def get_docent_vector_index(
     global _docent_indexed_chunks
     global _docent_chunk_embeddings
 
-    if (
-        force_refresh
-        or _docent_indexed_chunks is None
-        or _docent_chunk_embeddings is None
-    ):
-        chunks = get_docent_retrieval_chunks()
-        _docent_indexed_chunks = build_retrieval_index(chunks)
-        _docent_chunk_embeddings = embed_indexed_chunks(_docent_indexed_chunks)
+    memory_cache_available = (
+        _docent_indexed_chunks is not None
+        and _docent_chunk_embeddings is not None
+    )
+
+    if memory_cache_available and not force_refresh:
+        return _docent_indexed_chunks, _docent_chunk_embeddings
+
+    persisted_store_available = (
+        settings.docent_vector_metadata_path.exists()
+        and settings.docent_vector_embeddings_path.exists()
+    )
+
+    if persisted_store_available and not force_refresh:
+        _docent_indexed_chunks, _docent_chunk_embeddings = load_vector_store(
+            metadata_path=settings.docent_vector_metadata_path,
+            embeddings_path=settings.docent_vector_embeddings_path,
+        )
+        return _docent_indexed_chunks, _docent_chunk_embeddings
+
+    chunks = get_docent_retrieval_chunks()
+    _docent_indexed_chunks = build_retrieval_index(chunks)
+    _docent_chunk_embeddings = embed_indexed_chunks(_docent_indexed_chunks)
+
+    save_vector_store(
+        indexed_chunks=_docent_indexed_chunks,
+        chunk_embeddings=_docent_chunk_embeddings,
+        metadata_path=settings.docent_vector_metadata_path,
+        embeddings_path=settings.docent_vector_embeddings_path,
+    )
 
     return _docent_indexed_chunks, _docent_chunk_embeddings
 
@@ -79,11 +106,23 @@ def retrieve_docent_chunks_by_vector_similarity(
             timings=timings,
         )
 
-    index_needs_rebuild = (
-        force_refresh
-        or _docent_indexed_chunks is None
-        or _docent_chunk_embeddings is None
+    memory_cache_available = (
+        _docent_indexed_chunks is not None
+        and _docent_chunk_embeddings is not None
     )
+    persisted_store_available = (
+        settings.docent_vector_metadata_path.exists()
+        and settings.docent_vector_embeddings_path.exists()
+    )
+
+    if force_refresh:
+        vector_index_source = "rebuilt"
+    elif memory_cache_available:
+        vector_index_source = "memory"
+    elif persisted_store_available:
+        vector_index_source = "disk"
+    else:
+        vector_index_source = "rebuilt"
 
     vector_index_started_at = perf_counter()
     indexed_chunks, chunk_embeddings = get_docent_vector_index(
@@ -93,7 +132,8 @@ def retrieve_docent_chunks_by_vector_similarity(
         perf_counter() - vector_index_started_at,
         4,
     )
-    timings.vector_index_rebuilt = index_needs_rebuild
+    timings.vector_index_source = vector_index_source
+    timings.vector_index_rebuilt = vector_index_source == "rebuilt"
 
     vector_similarity_started_at = perf_counter()
     retrieved_chunks = retrieve_chunks_by_vector_similarity(

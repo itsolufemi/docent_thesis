@@ -33,6 +33,7 @@ class RetrievalTimings(BaseModel):
     hybrid_reranking_seconds: float = 0.0
     confidence_filter_seconds: float = 0.0
     vector_index_rebuilt: bool = False
+    vector_index_source: str | None = None
 
 
 class VectorRetrievalResult(BaseModel):
