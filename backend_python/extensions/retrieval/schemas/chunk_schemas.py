@@ -24,9 +24,26 @@ class RetrievedChunk(BaseModel):
     snippet: str | None = None
 
 
+class RetrievalTimings(BaseModel):
+    total_seconds: float = 0.0
+    query_embedding_seconds: float = 0.0
+    vector_index_seconds: float = 0.0
+    vector_similarity_seconds: float = 0.0
+    parent_expansion_seconds: float = 0.0
+    hybrid_reranking_seconds: float = 0.0
+    confidence_filter_seconds: float = 0.0
+    vector_index_rebuilt: bool = False
+
+
+class VectorRetrievalResult(BaseModel):
+    results: list[RetrievedChunk] = Field(default_factory=list)
+    timings: RetrievalTimings = Field(default_factory=RetrievalTimings)
+
+
 class ChunkSearchResponse(BaseModel):
     query: str
     results: list[RetrievedChunk] = Field(default_factory=list)
+    timings: RetrievalTimings | None = None
 
 
 class ChunkListResponse(BaseModel):

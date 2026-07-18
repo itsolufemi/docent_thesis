@@ -32,7 +32,7 @@ def search_docent_chunks_by_vector(
     apply_confidence_gate: bool = True,
     min_confidence_score: float = Query(default=0.40, ge=0.0, le=1.0),
 ):
-    results = retrieve_docent_chunks_by_vector_similarity(
+    retrieval_result = retrieve_docent_chunks_by_vector_similarity(
         query=query,
         limit=limit,
         min_score=min_score,
@@ -45,7 +45,8 @@ def search_docent_chunks_by_vector(
     
     return ChunkSearchResponse(
         query=query,
-        results=results,
+        results=retrieval_result.results,
+        timings=retrieval_result.timings,
     )
 
 

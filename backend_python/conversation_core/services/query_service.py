@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from time import perf_counter
 
 from conversation_core.memory.conversation_store import (
     add_dialogue_turn,
@@ -103,6 +104,7 @@ class QueryEngine:
         4. Generates a response, with tools available for stored conversations.
         5. Saves the user and assistant turns.
         """
+        request_started_at = perf_counter()
 
         conversation_state = None
         dialogue_history: list[DialogueTurn] = []
@@ -138,9 +140,16 @@ class QueryEngine:
 
         # Context resolution must happen for every request,
         # including requests without a stored conversation.
+
+        context_resolution_started_at = perf_counter()
+
         resolved_context = self.subject_resolver(
             subject_reference,
             text,
+        )
+
+        context_resolution_seconds = (
+            perf_counter() - context_resolution_started_at
         )
 
         prompt = self.prompt_builder(
@@ -150,9 +159,15 @@ class QueryEngine:
             active_branch,
         )
 
+        response_generation_started_at = perf_counter()
+
         response = self.response_generator(
             prompt,
             conversation_id,
+        )
+
+        response_generation_seconds = (
+            perf_counter() - response_generation_started_at
         )
 
         # Store dialogue only when the supplied conversation exists.
@@ -168,6 +183,28 @@ class QueryEngine:
                 role="assistant",
                 content=response,
             )
+        
+        total_request_seconds = (
+            perf_counter() - request_started_at
+        )
+
+        timing_debug_payload = {
+            **resolved_context.debug_payload,
+            "timings": {
+                "total_request_seconds": round(
+                    total_request_seconds,
+                    4,
+                ),
+                "context_resolution_seconds": round(
+                    context_resolution_seconds,
+                    4,
+                ),
+                "response_generation_seconds": round(
+                    response_generation_seconds,
+                    4,
+                ),
+            },
+        }
 
         debug = None
 
@@ -188,7 +225,7 @@ class QueryEngine:
                 ),
                 sources_count=len(resolved_context.sources),
                 sources=resolved_context.sources,
-                debug_payload=resolved_context.debug_payload,
+                debug_payload=timing_debug_payload,
             )
 
         return QueryResult(

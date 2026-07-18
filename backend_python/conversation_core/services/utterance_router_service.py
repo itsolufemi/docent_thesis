@@ -1,5 +1,6 @@
 import json
 import re
+from time import perf_counter
 
 from conversation_core.schemas.utterance_route_schemas import UtteranceRoute
 from conversation_core.services.llm_service import generate_llm_response
@@ -11,6 +12,17 @@ VALID_ROUTE_TYPES = {
     "call_to_action",
     "interruption",
 }
+
+
+def add_routing_time(
+    route: UtteranceRoute,
+    started_at: float,
+) -> UtteranceRoute:
+    route.routing_seconds = round(
+        perf_counter() - started_at,
+        4,
+    )
+    return route
 
 def is_non_linguistic_noise(
     text: str,
@@ -160,13 +172,21 @@ def normalise_route_payload(
 def route_utterance(
     text: str,
 ) -> UtteranceRoute:
+    started_at = perf_counter()
+
     if is_non_linguistic_noise(text):
-        return UtteranceRoute(
-            route_type="noise",
-            is_relevant=False,
-            should_ignore=True,
-            confidence=1.0,
-            reason="The input does not contain meaningful linguistic content.",
+        return add_routing_time(
+            UtteranceRoute(
+                route_type="noise",
+                is_relevant=False,
+                should_ignore=True,
+                confidence=1.0,
+                reason=(
+                    "The input does not contain meaningful linguistic "
+                    "content."
+                ),
+            ),
+            started_at,
         )
 
     prompt = build_utterance_route_prompt(text)
@@ -175,11 +195,17 @@ def route_utterance(
     try:
         payload = parse_utterance_route_json(raw_response)
     except json.JSONDecodeError:
-        return build_fallback_route(
-            reason=(
-                "The LLM did not return valid JSON, so the utterance was "
-                "treated as a response request."
+        return add_routing_time(
+            build_fallback_route(
+                reason=(
+                    "The LLM did not return valid JSON, so the utterance was "
+                    "treated as a response request."
+                ),
             ),
+            started_at,
         )
 
-    return normalise_route_payload(payload)
+    return add_routing_time(
+        normalise_route_payload(payload),
+        started_at,
+    )

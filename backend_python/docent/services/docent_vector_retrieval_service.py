@@ -1,4 +1,9 @@
-from extensions.retrieval.schemas.chunk_schemas import RetrievedChunk
+from time import perf_counter
+
+from extensions.retrieval.schemas.chunk_schemas import (
+    RetrievalTimings,
+    VectorRetrievalResult,
+)
 from extensions.retrieval.schemas.embedding_schemas import IndexedChunkEmbedding
 from extensions.retrieval.schemas.index_schemas import IndexedRetrievalChunk
 from extensions.retrieval.services.embedding_service import (
@@ -53,51 +58,104 @@ def retrieve_docent_chunks_by_vector_similarity(
     use_hybrid_scoring: bool = True,
     apply_confidence_gate: bool = True,
     min_confidence_score: float = DEFAULT_MIN_RETRIEVAL_CONFIDENCE,
-) -> list[RetrievedChunk]:
+) -> VectorRetrievalResult:
+    total_started_at = perf_counter()
+    timings = RetrievalTimings()
+
+    query_embedding_started_at = perf_counter()
     query_embedding = generate_embedding(query)
+    timings.query_embedding_seconds = round(
+        perf_counter() - query_embedding_started_at,
+        4,
+    )
 
     if not query_embedding:
-        return []
+        timings.total_seconds = round(
+            perf_counter() - total_started_at,
+            4,
+        )
+        return VectorRetrievalResult(
+            results=[],
+            timings=timings,
+        )
 
+    index_needs_rebuild = (
+        force_refresh
+        or _docent_indexed_chunks is None
+        or _docent_chunk_embeddings is None
+    )
+
+    vector_index_started_at = perf_counter()
     indexed_chunks, chunk_embeddings = get_docent_vector_index(
         force_refresh=force_refresh,
     )
+    timings.vector_index_seconds = round(
+        perf_counter() - vector_index_started_at,
+        4,
+    )
+    timings.vector_index_rebuilt = index_needs_rebuild
 
-    vector_results = retrieve_chunks_by_vector_similarity(
+    vector_similarity_started_at = perf_counter()
+    retrieved_chunks = retrieve_chunks_by_vector_similarity(
         query_embedding=query_embedding,
         indexed_chunks=indexed_chunks,
         chunk_embeddings=chunk_embeddings,
         limit=limit,
         min_score=min_score,
     )
+    timings.vector_similarity_seconds = round(
+        perf_counter() - vector_similarity_started_at,
+        4,
+    )
 
     if expand_parent_documents:
+        parent_expansion_started_at = perf_counter()
         all_chunks = [
             indexed_chunk.chunk
             for indexed_chunk in indexed_chunks
         ]
 
         retrieved_chunks = expand_retrieved_chunks_by_parent_document(
-            retrieved_chunks=vector_results,
+            retrieved_chunks=retrieved_chunks,
             all_chunks=all_chunks,
             limit=limit,
         )
-    else:
-        retrieved_chunks = vector_results
+        timings.parent_expansion_seconds = round(
+            perf_counter() - parent_expansion_started_at,
+            4,
+        )
 
     if use_hybrid_scoring:
+        hybrid_started_at = perf_counter()
         retrieved_chunks = rerank_retrieved_chunks_hybrid(
             query=query,
             retrieved_chunks=retrieved_chunks,
             limit=limit,
         )
+        timings.hybrid_reranking_seconds = round(
+            perf_counter() - hybrid_started_at,
+            4,
+        )
 
-    if not apply_confidence_gate:
-        return retrieved_chunks
+    if apply_confidence_gate:
+        confidence_started_at = perf_counter()
+        retrieved_chunks = filter_chunks_by_confidence(
+            retrieved_chunks=retrieved_chunks,
+            min_score=min_confidence_score,
+        )
+        timings.confidence_filter_seconds = round(
+            perf_counter() - confidence_started_at,
+            4,
+        )
 
-    return filter_chunks_by_confidence(
-        retrieved_chunks=retrieved_chunks,
-        min_score=min_confidence_score,
+    timings.total_seconds = round(
+        perf_counter() - total_started_at,
+        4,
+    )
+
+    return VectorRetrievalResult(
+        results=retrieved_chunks,
+        timings=timings,
     )
 
 def summarize_docent_vector_index(

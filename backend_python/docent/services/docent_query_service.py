@@ -50,6 +50,7 @@ def build_utterance_route_debug_payload(
         "utterance_route_reason": utterance_route.reason,
         "utterance_is_relevant": utterance_route.is_relevant,
         "utterance_should_ignore": utterance_route.should_ignore,
+        "utterance_routing_seconds": utterance_route.routing_seconds,
         "retrieval_skipped_by_utterance_route": retrieval_skipped_by_utterance_route,
     }
 
@@ -190,7 +191,7 @@ def docent_resolve_context(
                 },
             )
 
-    retrieved_chunks = retrieve_docent_chunks_by_vector_similarity(
+    vector_retrieval_result = retrieve_docent_chunks_by_vector_similarity(
         query=user_input,
         limit=8,
         expand_parent_documents=True,
@@ -198,6 +199,7 @@ def docent_resolve_context(
         apply_confidence_gate=True,
         min_confidence_score=0.45,
     )
+    retrieved_chunks = vector_retrieval_result.results
 
     if retrieved_chunks:
         return ResolvedContext(
@@ -220,6 +222,9 @@ def docent_resolve_context(
                 "confidence_gate_used": True,
                 "min_confidence_score": 0.45,
                 "retrieved_chunk_count": len(retrieved_chunks),
+                "vector_retrieval_timings": (
+                    vector_retrieval_result.timings.model_dump()
+                ),
             }
         )
 
@@ -248,6 +253,9 @@ def docent_resolve_context(
                 ),
                 "document_retrieval_used": True,
                 "retrieved_document_count": len(retrieved_documents),
+                "vector_retrieval_timings": (
+                    vector_retrieval_result.timings.model_dump()
+                ),
             },
         )
 
@@ -264,6 +272,9 @@ def docent_resolve_context(
             **build_utterance_route_debug_payload(
                 utterance_route=utterance_route,
                 retrieval_skipped_by_utterance_route=False,
+            ),
+            "vector_retrieval_timings": (
+                vector_retrieval_result.timings.model_dump()
             ),
         },
     )

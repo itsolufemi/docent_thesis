@@ -17,3 +17,4 @@ class UtteranceRoute(BaseModel):
     should_ignore: bool
     confidence: float
     reason: str
+    routing_seconds: float = 0.0
