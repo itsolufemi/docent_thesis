@@ -29,6 +29,7 @@ def create_query_router(
         response: Response,
         conversation_id: str | None = Cookie(
             default=None,
+            alias=CONVERSATION_COOKIE_NAME,
         ),
     ):
         result = active_query_engine.generate_response(

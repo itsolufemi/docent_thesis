@@ -1,14 +1,12 @@
 from fastapi import APIRouter, Cookie, HTTPException
 
 from conversation_core.memory.conversation_store import (
-    create_conversation,
     get_conversation,
     set_active_branch_subject,
 )
 
 from conversation_core.schemas.conversation_schemas import (
     ConversationState,
-    StartConversationResponse,
     SetCurrentSubjectRequest,
     SetCurrentSubjectResponse,
 )
@@ -17,15 +15,6 @@ router = APIRouter()
 
 CONVERSATION_COOKIE_NAME = "conversation_id"
 
-@router.post("/api/conversations/start", response_model=StartConversationResponse)
-def start_conversation():
-    state = create_conversation()
-
-    return StartConversationResponse(
-        conversation_id=state.conversation_id,
-        state=state
-    )
-
 @router.get(
     "/api/conversations/current",
     response_model=ConversationState,
@@ -33,6 +22,7 @@ def start_conversation():
 def read_current_conversation(
     conversation_id: str | None = Cookie(
         default=None,
+        alias=CONVERSATION_COOKIE_NAME,
     ),
 ):
     if conversation_id is None:
@@ -62,6 +52,7 @@ def update_active_branch_subject(
     request: SetCurrentSubjectRequest,
     conversation_id: str | None = Cookie(
         default=None,
+        alias=CONVERSATION_COOKIE_NAME,
     ),
 ):
     if conversation_id is None:
