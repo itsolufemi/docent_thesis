@@ -3,6 +3,7 @@ from time import perf_counter
 
 from conversation_core.memory.conversation_store import (
     add_dialogue_turn,
+    create_conversation,
     get_active_branch,
     get_conversation,
     get_recent_conversation_history,
@@ -98,45 +99,47 @@ class QueryEngine:
         Process one user query.
 
         The method:
-        1. Loads stored conversation context when a conversation ID exists.
+        1. Creates a conversation or loads its stored context.
         2. Resolves external/domain context.
         3. Builds the final prompt.
-        4. Generates a response, with tools available for stored conversations.
+        4. Generates a response with conversation tools available.
         5. Saves the user and assistant turns.
         """
         request_started_at = perf_counter()
 
-        conversation_state = None
+        conversation_created = False
         dialogue_history: list[DialogueTurn] = []
         active_branch: ConversationBranch | None = None
 
-        # Load conversation memory only when the request contains
-        # a valid conversation ID.
-        if conversation_id is not None:
+        if conversation_id is None:
+            conversation_state = create_conversation()
+            conversation_id = conversation_state.conversation_id
+            conversation_created = True
+        else:
             conversation_state = get_conversation(conversation_id)
 
-            if conversation_state is not None:
-                dialogue_history = get_recent_conversation_history(
-                    conversation_id=conversation_id,
+        if conversation_state is not None:
+            dialogue_history = get_recent_conversation_history(
+                conversation_id=conversation_id,
+            )
+
+            active_branch = get_active_branch(
+                conversation_id=conversation_id,
+            )
+
+            # Preserve compatibility with the existing resolver,
+            # which currently accepts one subject reference.
+            if (
+                subject_reference is None
+                and active_branch is not None
+                and active_branch.current_subjects
+            ):
+                current_subject = active_branch.current_subjects[0]
+
+                subject_reference = (
+                    current_subject.reference
+                    or current_subject.label
                 )
-
-                active_branch = get_active_branch(
-                    conversation_id=conversation_id,
-                )
-
-                # Preserve compatibility with the existing resolver,
-                # which currently accepts one subject reference.
-                if (
-                    subject_reference is None
-                    and active_branch is not None
-                    and active_branch.current_subjects
-                ):
-                    current_subject = active_branch.current_subjects[0]
-
-                    subject_reference = (
-                        current_subject.reference
-                        or current_subject.label
-                    )
 
         # Context resolution must happen for every request,
         # including requests without a stored conversation.
@@ -170,7 +173,7 @@ class QueryEngine:
             perf_counter() - response_generation_started_at
         )
 
-        # Store dialogue only when the supplied conversation exists.
+        # Store dialogue for newly created and existing conversations.
         if conversation_state is not None:
             add_dialogue_turn(
                 conversation_id=conversation_state.conversation_id,
@@ -190,6 +193,7 @@ class QueryEngine:
 
         timing_debug_payload = {
             **resolved_context.debug_payload,
+            "conversation_created": conversation_created,
             "timings": {
                 "total_request_seconds": round(
                     total_request_seconds,
