@@ -118,7 +118,7 @@ def update_branch_subjects(
 
     return state
 
-def set_current_subject(
+def set_active_branch_subject(
     conversation_id: str,
     subject_reference: str,
     subject_label: str | None = None,
@@ -128,8 +128,9 @@ def set_current_subject(
     if state is None:
         return None
 
-    tree = state.conversation_tree
-    active_branch = tree.branches.get(tree.active_branch_id)
+    active_branch = get_active_branch(
+        conversation_id
+    )
 
     if active_branch is None:
         return None

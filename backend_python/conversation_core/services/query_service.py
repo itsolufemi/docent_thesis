@@ -111,12 +111,17 @@ class QueryEngine:
         dialogue_history: list[DialogueTurn] = []
         active_branch: ConversationBranch | None = None
 
-        if conversation_id is None:
+        conversation_state = None
+
+        if conversation_id is not None:
+            conversation_state = get_conversation(
+                conversation_id
+            )
+
+        if conversation_state is None:
             conversation_state = create_conversation()
             conversation_id = conversation_state.conversation_id
             conversation_created = True
-        else:
-            conversation_state = get_conversation(conversation_id)
 
         if conversation_state is not None:
             dialogue_history = get_recent_conversation_history(

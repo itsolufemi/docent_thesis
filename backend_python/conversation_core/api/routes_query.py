@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Cookie, Response
 
 from conversation_core.schemas.query_schemas import (
     QueryRequest,
@@ -9,6 +9,8 @@ from conversation_core.services.query_service import (
     default_query_engine,
 )
 
+CONVERSATION_COOKIE_NAME = "conversation_id"
+
 
 def create_query_router(
     query_engine: QueryEngine | None = None,
@@ -18,14 +20,32 @@ def create_query_router(
 
     active_query_engine = query_engine or default_query_engine
 
-    @router.post(route_path, response_model=QueryResponse)
-    def query(request: QueryRequest):
+    @router.post(
+        route_path,
+        response_model=QueryResponse,
+    )
+    def query(
+        request: QueryRequest,
+        response: Response,
+        conversation_id: str | None = Cookie(
+            default=None,
+        ),
+    ):
         result = active_query_engine.generate_response(
             text=request.text,
-            conversation_id=request.conversation_id,
+            conversation_id=conversation_id,
             subject_reference=request.subject_reference,
             include_debug=request.debug,
         )
+
+        if result.conversation_id is not None:
+            response.set_cookie(
+                key=CONVERSATION_COOKIE_NAME,
+                value=result.conversation_id,
+                httponly=True,
+                samesite="lax",
+                secure=False,
+            )
 
         return QueryResponse(
             request=result.request,
