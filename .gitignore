@@ -5,6 +5,10 @@ backend_python/.env
 backend_python/venv/
 backend_python/x_bin/
 
+# Python generated files
+__pycache__/
+*.py[cod]
+
 # Generated Docent vector store
 backend_python/docent/data/vector_store/*.npy
 backend_python/docent/data/vector_store/*.json

@@ -8,6 +8,9 @@ from conversation_core.api.routes_health import router as health_router
 from conversation_core.api.routes_llm import router as llm_router
 from conversation_core.api.routes_query import create_query_router
 from conversation_core.api.routes_trp import router as trp_router
+from conversation_core.api.routes_turn_detection import (
+    router as turn_detection_router,
+)
 from conversation_core.api.routes_utterance_router import (
     router as utterance_router,
 )
@@ -53,3 +56,4 @@ app.include_router(docent_embeddings_router)
 app.include_router(docent_vector_router)
 app.include_router(utterance_router)
 app.include_router(trp_router)
+app.include_router(turn_detection_router)

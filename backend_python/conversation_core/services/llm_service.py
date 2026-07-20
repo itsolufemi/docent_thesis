@@ -67,7 +67,7 @@ def check_llm_status() -> dict:
 def generate_llm_response(
     prompt: str,
     model: str | None = None,
-    timeout: float = 30.0,
+    timeout: float = 120.0,
     options: dict[str, Any] | None = None,
 ) -> str:
     url = f"{settings.ollama_base_url}/api/generate"
