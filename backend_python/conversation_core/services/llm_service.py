@@ -64,17 +64,23 @@ def check_llm_status() -> dict:
             "message": f"error: {error}"
         }
 
-def generate_llm_response(prompt: str) -> str:
+def generate_llm_response(
+    prompt: str,
+    model: str | None = None,
+    timeout: float = 30.0,
+    options: dict[str, Any] | None = None,
+) -> str:
     url = f"{settings.ollama_base_url}/api/generate"
 
     payload = {
-        "model": settings.ollama_model,
+        "model": model or settings.ollama_model,
         "prompt": prompt,
-        "stream": False
+        "stream": False,
+        "options": options or {},
     }
 
     try:
-        response = httpx.post(url, json=payload, timeout=120.0)
+        response = httpx.post(url, json=payload, timeout=timeout)
         response.raise_for_status()
 
         data = response.json()
