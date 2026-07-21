@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from conversation_core.schemas.turn_detection_schemas import TurnDecisionType
+
 
 class TurnBufferState(BaseModel):
     conversation_id: str
@@ -20,7 +22,7 @@ class TurnBufferEvent(BaseModel):
 
 class TurnBufferResult(BaseModel):
     state: TurnBufferState
-    decision: str
+    decision: TurnDecisionType
     should_finalise_turn: bool
     finalised_utterance: str | None = None
     reason: str

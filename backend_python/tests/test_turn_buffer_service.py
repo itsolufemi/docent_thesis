@@ -9,6 +9,7 @@ if str(BACKEND_PYTHON_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_PYTHON_ROOT))
 
 from conversation_core.memory.turn_buffer_store import turn_buffer_store
+from conversation_core.schemas.conversation_schemas import DialogueTurn
 from conversation_core.schemas.turn_buffer_schemas import TurnBufferEvent
 from conversation_core.schemas.turn_detection_schemas import (
     TurnDetectionResult,
@@ -37,6 +38,59 @@ def detection_result(
 
 
 class TurnBufferServiceTest(unittest.TestCase):
+    @patch(
+        "conversation_core.services.turn_buffer_service."
+        "detect_turn_completion"
+    )
+    @patch(
+        "conversation_core.services.turn_buffer_service."
+        "get_recent_conversation_history"
+    )
+    def test_recent_conversation_history_is_passed_to_turn_detection(
+        self,
+        get_recent_history,
+        detect_turn,
+    ) -> None:
+        conversation_id = "contextual-turn"
+        turn_buffer_store.clear(conversation_id)
+        get_recent_history.return_value = [
+            DialogueTurn(
+                role="assistant",
+                content=(
+                    "Would you like to hear about its history or "
+                    "composition?"
+                ),
+            ),
+        ]
+        detect_turn.return_value = detection_result(
+            complete=True,
+            probability=0.95,
+        )
+
+        result = process_turn_event(
+            TurnBufferEvent(
+                conversation_id=conversation_id,
+                partial_utterance="Its history.",
+                is_speech_active=False,
+                silence_duration_ms=500,
+            )
+        )
+
+        self.assertEqual(result.decision, "finalise_turn")
+        get_recent_history.assert_called_once_with(
+            conversation_id=conversation_id,
+            limit=4,
+        )
+        detect_turn.assert_called_once_with(
+            partial_utterance="Its history.",
+            is_speech_active=False,
+            silence_duration_ms=500,
+            previous_turns=[
+                "assistant: Would you like to hear about its history or "
+                "composition?",
+            ],
+        )
+
     @patch(
         "conversation_core.services.turn_buffer_service."
         "detect_turn_completion"

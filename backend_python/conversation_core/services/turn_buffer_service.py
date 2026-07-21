@@ -1,3 +1,6 @@
+from conversation_core.memory.conversation_store import (
+    get_recent_conversation_history,
+)
 from conversation_core.memory.turn_buffer_store import turn_buffer_store
 from conversation_core.schemas.turn_buffer_schemas import (
     TurnBufferEvent,
@@ -93,10 +96,20 @@ def process_turn_event(
             ),
         )
 
+    recent_turns = get_recent_conversation_history(
+        conversation_id=event.conversation_id,
+        limit=4,
+    )
+    previous_turns = [
+        f"{turn.role}: {turn.content}"
+        for turn in recent_turns
+    ]
+
     detection = detect_turn_completion(
         partial_utterance=latest_transcript,
         is_speech_active=event.is_speech_active,
         silence_duration_ms=event.silence_duration_ms,
+        previous_turns=previous_turns,
     )
 
     if detection.should_call_trp:
