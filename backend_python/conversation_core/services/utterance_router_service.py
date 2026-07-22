@@ -2,6 +2,10 @@ import json
 import re
 from time import perf_counter
 
+from config import settings
+from conversation_core.schemas.classifier_domain_schemas import (
+    ClassifierDomainProfile,
+)
 from conversation_core.schemas.utterance_route_schemas import UtteranceRoute
 from conversation_core.services.llm_service import generate_llm_response
 
@@ -40,53 +44,155 @@ def is_non_linguistic_noise(
     return False
 
 
+def format_retrieval_policy(
+    domain_profile: ClassifierDomainProfile,
+) -> str:
+    policy = domain_profile.retrieval_policy
+
+    if policy is None:
+        return (
+            "No retrieval capability is available for the active "
+            "domain. Set requires_retrieval to false."
+        )
+
+    retrieve_for = "\n".join(
+        f"- {item}"
+        for item in policy.retrieve_for
+    )
+    do_not_retrieve_for = "\n".join(
+        f"- {item}"
+        for item in policy.do_not_retrieve_for
+    )
+
+    return f"""
+Retrieval capability:
+{policy.description}
+
+Set requires_retrieval to true for:
+{retrieve_for or "- No cases specified."}
+
+Set requires_retrieval to false for:
+{do_not_retrieve_for or "- No cases specified."}
+""".strip()
+
+
+def format_available_actions(
+    domain_profile: ClassifierDomainProfile,
+) -> str:
+    if not domain_profile.available_actions:
+        return (
+            "No user-facing actions are available for the active "
+            "domain. Do not use call_to_action."
+        )
+
+    formatted_actions: list[str] = []
+
+    for action in domain_profile.available_actions:
+        examples = "\n".join(
+            f"- {example}"
+            for example in action.example_requests
+        )
+
+        formatted_actions.append(
+            f"""
+Action name: {action.name}
+Description: {action.description}
+Example requests:
+{examples or "- No examples supplied."}
+""".strip()
+        )
+
+    return "\n\n".join(formatted_actions)
+
+
 def build_utterance_route_prompt(
     text: str,
+    domain_profile: ClassifierDomainProfile,
 ) -> str:
+    retrieval_policy = format_retrieval_policy(domain_profile)
+    available_actions = format_available_actions(domain_profile)
+
     return f"""
-You are a conversation-routing classifier for a general voice-led AI system.
+You are a fast utterance classifier for a general voice-led
+conversational AI engine.
 
-Your task is to classify the user's utterance into exactly one route type.
+Your task is classification only. Do not answer the user.
 
-Route types:
+ACTIVE DOMAIN
+
+Name:
+{domain_profile.domain_name}
+
+Description:
+{domain_profile.domain_description}
+
+ROUTE TYPES
 
 1. noise
-Use this when the input should not be treated as meaningful conversational input.
-This includes empty input, meaningless symbols, numbers without words, accidental transcription, background speech, or text that does not contain a meaningful linguistic utterance.
-For example: "&5", "!!!", "...", "123", or random non-word fragments should be classified as noise.
+
+Use when the input is not meaningful conversational language.
+Examples include empty input, meaningless symbols, accidental
+transcription and random non-word fragments.
 
 2. response_request
-Use this when the user is asking for a verbal response.
-This includes questions, greetings, acknowledgements, follow-up questions, requests for explanation, and normal conversational turns.
-Most meaningful utterances should default to this route unless they clearly require another route.
+
+Use for a meaningful conversational turn that expects a verbal
+response. This includes questions, greetings, acknowledgements,
+requests for explanation, follow-up turns and ordinary movement
+between subjects in an existing conversation.
+
+Moving to the next subject within an existing bounded conversation
+is normally a response_request. It is not automatically a
+call_to_action.
+
+Such next, previous or current-subject navigation should use existing
+conversation state and should not require retrieval unless the user
+also asks for new factual or interpretive information.
 
 3. call_to_action
-Use this only when the user is asking the system to perform an explicit user-facing operation that is supported by an available tool/action.
-If no available tool/action is provided, do not classify ordinary operational language as call_to_action. Treat it as response_request unless it is clearly an interruption.
+
+Use only when the user explicitly requests one of the user-facing
+actions supplied by the active domain.
+
+Do not invent actions.
 
 4. interruption
-Use this when the user is stopping, pausing, cutting into, or redirecting the system's current speaking or acting turn.
-Examples include "stop", "wait", "pause", "hold on", or "no, that's not what I meant".
 
-Important distinction:
-- A response_request may still cause internal state updates later.
-- A call_to_action means the user's main request is a user-facing operation.
-- Default to response_request when the input contains meaningful language but the exact intent is uncertain.
-- Do not default to response_request for non-linguistic symbols, numbers, or junk input.
-- Do not classify something as call_to_action merely because the user wants an answer.
-- Do not invent domain-specific route types.
+Use when the user is stopping, pausing, correcting, redirecting or
+cutting into the assistant's current speaking or acting turn.
 
-User utterance:
+RETRIEVAL POLICY
+
+{retrieval_policy}
+
+AVAILABLE USER-FACING ACTIONS
+
+{available_actions}
+
+CLASSIFICATION RULES
+
+- proposed_action must be one of the supplied action names or null.
+- If no supplied action matches, do not use call_to_action.
+- candidate_subjects should contain only subjects explicitly named
+  or clearly expressed in this utterance.
+- Candidate subjects are provisional extractions. They do not update
+  conversation state.
+- requires_retrieval means that the active domain's retrieval system
+  should be attempted. It does not guarantee that evidence will be
+  found.
+- Default meaningful but uncertain input to response_request.
+
+USER UTTERANCE
+
 {text}
 
-Return only a single JSON object.
-Do not include markdown.
-Do not include comments.
-Do not include explanatory text outside the JSON object.
+Return only one JSON object using this exact shape:
 
-The JSON object must use this exact shape:
 {{
   "route_type": "noise | response_request | call_to_action | interruption",
+  "requires_retrieval": false,
+  "proposed_action": null,
+  "candidate_subjects": [],
   "is_relevant": true,
   "should_ignore": false,
   "confidence": 0.0,
@@ -118,11 +224,16 @@ def parse_utterance_route_json(
         json_candidate = cleaned_response[start_index:end_index + 1]
 
         return json.loads(json_candidate)
+
+
 def build_fallback_route(
     reason: str,
 ) -> UtteranceRoute:
     return UtteranceRoute(
         route_type="response_request",
+        requires_retrieval=False,
+        proposed_action=None,
+        candidate_subjects=[],
         is_relevant=True,
         should_ignore=False,
         confidence=0.4,
@@ -130,8 +241,18 @@ def build_fallback_route(
     )
 
 
+def get_valid_action_names(
+    domain_profile: ClassifierDomainProfile,
+) -> set[str]:
+    return {
+        action.name
+        for action in domain_profile.available_actions
+    }
+
+
 def normalise_route_payload(
     payload: dict,
+    domain_profile: ClassifierDomainProfile,
 ) -> UtteranceRoute:
     route_type = payload.get("route_type")
 
@@ -140,12 +261,42 @@ def normalise_route_payload(
             reason="The LLM returned an invalid route type, so the utterance was treated as a response request.",
         )
 
+    valid_action_names = get_valid_action_names(domain_profile)
+    proposed_action = payload.get("proposed_action")
+
+    if proposed_action not in valid_action_names:
+        proposed_action = None
+
+    if route_type != "call_to_action":
+        proposed_action = None
+
+    if route_type == "call_to_action" and proposed_action is None:
+        route_type = "response_request"
+
+    requires_retrieval = bool(
+        payload.get("requires_retrieval", False)
+    )
+
+    raw_candidate_subjects = payload.get("candidate_subjects", [])
+
+    if not isinstance(raw_candidate_subjects, list):
+        raw_candidate_subjects = []
+
+    candidate_subjects = [
+        str(subject).strip()
+        for subject in raw_candidate_subjects
+        if str(subject).strip()
+    ]
+
     is_relevant = bool(payload.get("is_relevant", route_type != "noise"))
     should_ignore = bool(payload.get("should_ignore", route_type == "noise"))
 
     if route_type == "noise":
         is_relevant = False
         should_ignore = True
+        requires_retrieval = False
+        proposed_action = None
+        candidate_subjects = []
 
     confidence = payload.get("confidence", 0.5)
 
@@ -162,6 +313,9 @@ def normalise_route_payload(
 
     return UtteranceRoute(
         route_type=route_type,
+        requires_retrieval=requires_retrieval,
+        proposed_action=proposed_action,
+        candidate_subjects=candidate_subjects,
         is_relevant=is_relevant,
         should_ignore=should_ignore,
         confidence=confidence,
@@ -171,6 +325,7 @@ def normalise_route_payload(
 
 def route_utterance(
     text: str,
+    domain_profile: ClassifierDomainProfile,
 ) -> UtteranceRoute:
     started_at = perf_counter()
 
@@ -178,6 +333,9 @@ def route_utterance(
         return add_routing_time(
             UtteranceRoute(
                 route_type="noise",
+                requires_retrieval=False,
+                proposed_action=None,
+                candidate_subjects=[],
                 is_relevant=False,
                 should_ignore=True,
                 confidence=1.0,
@@ -189,8 +347,25 @@ def route_utterance(
             started_at,
         )
 
-    prompt = build_utterance_route_prompt(text)
-    raw_response = generate_llm_response(prompt)
+    if not settings.ollama_classifier_model:
+        raise ValueError(
+            "OLLAMA_CLASSIFIER_MODEL must be configured before "
+            "classifying utterances."
+        )
+
+    prompt = build_utterance_route_prompt(
+        text=text,
+        domain_profile=domain_profile,
+    )
+    raw_response = generate_llm_response(
+        prompt=prompt,
+        model=settings.ollama_classifier_model,
+        timeout=20.0,
+        options={
+            "temperature": 0,
+            "num_predict": 160,
+        },
+    )
 
     try:
         payload = parse_utterance_route_json(raw_response)
@@ -206,6 +381,9 @@ def route_utterance(
         )
 
     return add_routing_time(
-        normalise_route_payload(payload),
+        normalise_route_payload(
+            payload=payload,
+            domain_profile=domain_profile,
+        ),
         started_at,
     )

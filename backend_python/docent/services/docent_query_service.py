@@ -10,6 +10,7 @@ from conversation_core.services.prompt_service import (
     format_conversation_branch_for_prompt,
 )
 
+from docent.config.docent_classifier_profile import docent_classifier_profile
 from docent.services.artwork_service import get_painting_by_index
 from docent.services.docent_prompt_service import docent_build_prompt
 from docent.services.docent_retrieval_adapter import (
@@ -50,6 +51,11 @@ def build_utterance_route_debug_payload(
         "utterance_route_reason": utterance_route.reason,
         "utterance_is_relevant": utterance_route.is_relevant,
         "utterance_should_ignore": utterance_route.should_ignore,
+        "utterance_requires_retrieval": (
+            utterance_route.requires_retrieval
+        ),
+        "utterance_proposed_action": utterance_route.proposed_action,
+        "utterance_candidate_subjects": utterance_route.candidate_subjects,
         "utterance_routing_seconds": utterance_route.routing_seconds,
         "retrieval_skipped_by_utterance_route": retrieval_skipped_by_utterance_route,
     }
@@ -136,7 +142,10 @@ def docent_resolve_context(
     user_input: str,
 ) -> ResolvedContext:
     sources: list[QuerySource] = []
-    utterance_route = route_utterance(user_input)
+    utterance_route = route_utterance(
+        text=user_input,
+        domain_profile=docent_classifier_profile,
+    )
 
     route_handled_context = build_route_handled_context(utterance_route)
 

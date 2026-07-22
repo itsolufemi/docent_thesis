@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 UtteranceRouteType = Literal[
@@ -13,6 +13,9 @@ UtteranceRouteType = Literal[
 
 class UtteranceRoute(BaseModel):
     route_type: UtteranceRouteType
+    requires_retrieval: bool = False
+    proposed_action: str | None = None
+    candidate_subjects: list[str] = Field(default_factory=list)
     is_relevant: bool
     should_ignore: bool
     confidence: float
