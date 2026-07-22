@@ -39,6 +39,7 @@ NON_RETRIEVAL_CONTEXT_SOURCES = {
     "noise",
     "utterance_interruption",
     "utterance_call_to_action",
+    "utterance_without_retrieval",
 }
 
 

@@ -61,6 +61,17 @@ def build_utterance_route_debug_payload(
     }
 
 
+def build_utterance_route_prompt_payload(
+    utterance_route,
+) -> dict:
+    return {
+        "route_type": utterance_route.route_type,
+        "requires_retrieval": utterance_route.requires_retrieval,
+        "proposed_action": utterance_route.proposed_action,
+        "candidate_subjects": utterance_route.candidate_subjects,
+    }
+
+
 def build_route_handled_context(
     utterance_route,
 ) -> ResolvedContext | None:
@@ -70,7 +81,7 @@ def build_route_handled_context(
             subject_reference=None,
             sources=[],
             prompt_payload={
-                "route_type": utterance_route.route_type,
+                **build_utterance_route_prompt_payload(utterance_route),
                 "route_handled_without_retrieval": True,
                 "route_message": "The utterance was treated as noise.",
                 "artwork": None,
@@ -89,7 +100,7 @@ def build_route_handled_context(
             subject_reference=None,
             sources=[],
             prompt_payload={
-                "route_type": utterance_route.route_type,
+                **build_utterance_route_prompt_payload(utterance_route),
                 "route_handled_without_retrieval": True,
                 "route_message": (
                     "The utterance was classified as an interruption. "
@@ -105,19 +116,27 @@ def build_route_handled_context(
             ),
         )
 
-    if utterance_route.route_type == "call_to_action":
+    if not utterance_route.requires_retrieval:
+        route_message = (
+            "The classifier determined that external domain retrieval "
+            "is not required for this utterance."
+        )
+
+        if utterance_route.route_type == "call_to_action":
+            route_message = (
+                "The utterance requests a supported structural action. "
+                "No domain retrieval is required. Use the proposed action "
+                "and available conversation tools when appropriate."
+            )
+
         return ResolvedContext(
-            context_source="utterance_call_to_action",
+            context_source="utterance_without_retrieval",
             subject_reference=None,
             sources=[],
             prompt_payload={
-                "route_type": utterance_route.route_type,
+                **build_utterance_route_prompt_payload(utterance_route),
                 "route_handled_without_retrieval": True,
-                "route_message": (
-                    "The utterance was classified as a call to action. "
-                    "Use an available operational tool when the request "
-                    "requires a conversation-state change."
-                ),
+                "route_message": route_message,
                 "artwork": None,
                 "retrieved_chunks": [],
                 "retrieved_documents": [],
@@ -127,9 +146,8 @@ def build_route_handled_context(
                     utterance_route=utterance_route,
                     retrieval_skipped_by_utterance_route=True,
                 ),
-                "action_execution_available": True,
-                "action_execution_note": (
-                    "Operational conversation-tree tools are available."
+                "action_execution_available": (
+                    utterance_route.route_type == "call_to_action"
                 ),
             },
         )
@@ -171,6 +189,7 @@ def docent_resolve_context(
                     subject_reference=subject_reference,
                     sources=sources,
                     prompt_payload={
+                        **build_utterance_route_prompt_payload(utterance_route),
                         "artwork": artwork,
                         "retrieved_chunks": [],
                         "retrieved_documents": [],
@@ -189,7 +208,12 @@ def docent_resolve_context(
                 context_source="subject_not_found",
                 subject_reference=subject_reference,
                 sources=[],
-                prompt_payload={},
+                prompt_payload={
+                    **build_utterance_route_prompt_payload(utterance_route),
+                    "artwork": None,
+                    "retrieved_chunks": [],
+                    "retrieved_documents": [],
+                },
                 debug_payload={
                     **build_utterance_route_debug_payload(
                         utterance_route=utterance_route,
@@ -216,6 +240,7 @@ def docent_resolve_context(
             subject_reference=None,
             sources=build_sources_from_retrieved_chunks(retrieved_chunks),
             prompt_payload={
+                **build_utterance_route_prompt_payload(utterance_route),
                 "artwork": None,
                 "retrieved_chunks": retrieved_chunks,
                 "retrieved_documents": [],
@@ -251,6 +276,7 @@ def docent_resolve_context(
             subject_reference=None,
             sources=build_sources_from_retrieved_documents(retrieved_documents),
             prompt_payload={
+                **build_utterance_route_prompt_payload(utterance_route),
                 "artwork": None,
                 "retrieved_chunks": [],
                 "retrieved_documents": retrieved_documents,
@@ -273,6 +299,7 @@ def docent_resolve_context(
         subject_reference=None,
         sources=[],
         prompt_payload={
+            **build_utterance_route_prompt_payload(utterance_route),
             "artwork": None,
             "retrieved_chunks": [],
             "retrieved_documents": [],
@@ -300,6 +327,39 @@ def docent_build_prompt_from_context(
     )
 
     payload = resolved_context.prompt_payload
+    route_type = payload.get("route_type", "response_request")
+    proposed_action = payload.get("proposed_action")
+    candidate_subjects = payload.get("candidate_subjects", [])
+
+    classification_context = f"""
+    UTTERANCE CLASSIFICATION
+
+    Route type:
+    {route_type}
+
+    Proposed structural action:
+    {proposed_action or "None"}
+
+    Candidate subjects:
+    {candidate_subjects or "None"}
+    """.strip()
+
+    action_guidance = """
+    The proposed action is advisory classifier output.
+
+    Use a conversation-tree tool only when the user's request and the
+    current conversation state justify it.
+
+    For create_bounded_branch:
+    - use retrieved artwork evidence to form an ordered remaining-subject list;
+    - create the bounded branch with current_subjects empty;
+    - do not mark the first subject current until the conversation actually
+      begins discussing it.
+
+    For close_bounded_branch:
+    - close the active bounded branch only when the user clearly requests
+      its termination or it has completed.
+    """.strip()
 
     if payload.get("route_handled_without_retrieval"):
         return f"""
@@ -307,11 +367,11 @@ def docent_build_prompt_from_context(
 
     The user's utterance has already been classified by the conversation router.
 
-    Active conversation branch:
-    {branch_context}
+    {classification_context}
 
-    Route type:
-    {payload.get("route_type")}
+    ACTIVE CONVERSATION BRANCH
+
+    {branch_context}
 
     Routing note:
     {payload.get("route_message")}
@@ -326,11 +386,15 @@ def docent_build_prompt_from_context(
 
     Use conversation-tree tools only when the branch state genuinely needs to change.
 
+    {action_guidance}
+
     Do not invent artwork information.
     Do not use external context because none was retrieved.
     """.strip()
 
     user_input_with_branch_context = f"""
+    {classification_context}
+
     ACTIVE CONVERSATION BRANCH
 
     {branch_context}
@@ -346,6 +410,8 @@ def docent_build_prompt_from_context(
     - the user clearly asks to stop it.
 
     Use operational tools only when the conversation-tree state genuinely needs to change.
+
+    {action_guidance}
 
     USER UTTERANCE
 

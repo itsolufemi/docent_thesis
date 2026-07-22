@@ -250,6 +250,25 @@ def get_valid_action_names(
     }
 
 
+def normalise_boolean(
+    value,
+    default: bool = False,
+) -> bool:
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, str):
+        normalised = value.strip().lower()
+
+        if normalised == "true":
+            return True
+
+        if normalised == "false":
+            return False
+
+    return default
+
+
 def normalise_route_payload(
     payload: dict,
     domain_profile: ClassifierDomainProfile,
@@ -273,8 +292,8 @@ def normalise_route_payload(
     if route_type == "call_to_action" and proposed_action is None:
         route_type = "response_request"
 
-    requires_retrieval = bool(
-        payload.get("requires_retrieval", False)
+    requires_retrieval = normalise_boolean(
+        payload.get("requires_retrieval")
     )
 
     raw_candidate_subjects = payload.get("candidate_subjects", [])
