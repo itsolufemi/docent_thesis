@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+from conversation_core.schemas.query_schemas import QueryResponse
 from conversation_core.schemas.turn_detection_schemas import TurnDecisionType
 
 
@@ -20,9 +21,21 @@ class TurnBufferEvent(BaseModel):
     silence_duration_ms: int = Field(ge=0)
 
 
+class TurnBufferEventRequest(BaseModel):
+    partial_utterance: str
+    is_speech_active: bool
+    silence_duration_ms: int = Field(ge=0)
+    debug: bool = False
+
+
 class TurnBufferResult(BaseModel):
     state: TurnBufferState
     decision: TurnDecisionType
     should_finalise_turn: bool
     finalised_utterance: str | None = None
     reason: str
+
+
+class TurnProcessingResult(BaseModel):
+    turn: TurnBufferResult
+    query: QueryResponse | None = None

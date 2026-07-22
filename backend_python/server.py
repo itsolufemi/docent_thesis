@@ -9,7 +9,7 @@ from conversation_core.api.routes_llm import router as llm_router
 from conversation_core.api.routes_query import create_query_router
 from conversation_core.api.routes_trp import router as trp_router
 from conversation_core.api.routes_turn_buffer import (
-    router as turn_buffer_router,
+    create_turn_buffer_router,
 )
 from conversation_core.api.routes_turn_detection import (
     router as turn_detection_router,
@@ -45,6 +45,9 @@ app.add_middleware(
 )
 
 query_router = create_query_router(
+    query_engine=docent_query_engine,
+)
+turn_buffer_router = create_turn_buffer_router(
     query_engine=docent_query_engine,
 )
 
