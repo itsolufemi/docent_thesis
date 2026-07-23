@@ -20,6 +20,13 @@ export default function MainApp({
   panel,
   tourItinerary,
   setPanel,
+  testUtterance,
+  setTestUtterance,
+  submitTestUtterance,
+  turnRequestPending,
+  turnRequestError,
+  turnDecision,
+  latestTurnResult,
 }) {
   const [questionTranscript, setQuestionTranscript] = useState('');
   const [caption, setCaption] = useState('');
@@ -28,6 +35,25 @@ export default function MainApp({
     handleSetCaption: setCaption,
     handleSetQuestion_trans: setQuestionTranscript,
   });
+
+  React.useEffect(() => {
+    if (!latestTurnResult) {
+      return;
+    }
+
+    const finalisedUtterance =
+      latestTurnResult.turn?.finalised_utterance;
+
+    if (finalisedUtterance) {
+      setQuestionTranscript(finalisedUtterance);
+    }
+
+    const assistantResponse = latestTurnResult.query?.response;
+
+    if (assistantResponse) {
+      setCaption(assistantResponse);
+    }
+  }, [latestTurnResult]);
 
   return (
     <div className="main-app">
@@ -50,6 +76,53 @@ export default function MainApp({
           notifyPlaybackComplete={notifyPlaybackComplete}
         />
       </header>
+
+      <form
+        className="turn-test-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submitTestUtterance();
+        }}
+      >
+        <label htmlFor="turn-test-input">
+          Test the conversation engine
+        </label>
+
+        <div className="turn-test-controls">
+          <input
+            id="turn-test-input"
+            type="text"
+            value={testUtterance}
+            onChange={(event) => {
+              setTestUtterance(event.target.value);
+            }}
+            placeholder="Type an utterance"
+            disabled={turnRequestPending}
+          />
+
+          <button
+            type="submit"
+            disabled={
+              turnRequestPending ||
+              testUtterance.trim().length === 0
+            }
+          >
+            {turnRequestPending ? 'Sending…' : 'Send'}
+          </button>
+        </div>
+
+        {turnDecision && (
+          <p className="turn-test-status">
+            Turn decision: {turnDecision}
+          </p>
+        )}
+
+        {turnRequestError && (
+          <p className="turn-test-error">
+            {turnRequestError}
+          </p>
+        )}
+      </form>
 
       <section className="text-panel">
         <p className="question-box">

@@ -90,6 +90,46 @@ button:disabled {
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
+.turn-test-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: 0 20px;
+}
+
+.turn-test-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.turn-test-controls input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.turn-test-controls button {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
+
+.turn-test-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.turn-test-status,
+.turn-test-error {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.turn-test-error {
+  color: #a62a12;
+}
+
 .round-button,
 .player-button {
   display: inline-flex;
