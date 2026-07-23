@@ -8,6 +8,9 @@ from conversation_core.api.routes_health import router as health_router
 from conversation_core.api.routes_llm import router as llm_router
 from conversation_core.api.routes_query import create_query_router
 from conversation_core.api.routes_trp import router as trp_router
+from conversation_core.api.routes_transcription import (
+    create_transcription_router,
+)
 from conversation_core.api.routes_turn_buffer import (
     create_turn_buffer_router,
 )
@@ -50,6 +53,7 @@ query_router = create_query_router(
 turn_buffer_router = create_turn_buffer_router(
     query_engine=docent_query_engine,
 )
+transcription_router = create_transcription_router()
 
 app.include_router(health_router)
 app.include_router(query_router)
@@ -64,3 +68,4 @@ app.include_router(utterance_router)
 app.include_router(trp_router)
 app.include_router(turn_detection_router)
 app.include_router(turn_buffer_router)
+app.include_router(transcription_router)

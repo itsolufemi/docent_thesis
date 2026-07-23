@@ -18,6 +18,13 @@ class Settings():
     ollama_trp_model: str = os.getenv("OLLAMA_TRP_MODEL", "")
     ollama_classifier_model: str = os.getenv("OLLAMA_CLASSIFIER_MODEL", "")
 
+    whisper_model: str = os.getenv("WHISPER_MODEL", "base.en")
+    whisper_device: str = os.getenv("WHISPER_DEVICE", "cpu")
+    whisper_compute_type: str = os.getenv(
+        "WHISPER_COMPUTE_TYPE",
+        "int8",
+    )
+
     docent_vector_store_directory: Path = (
         backend_root / "docent" / "data" / "vector_store"
     )
