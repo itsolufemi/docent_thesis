@@ -12,21 +12,45 @@ from ..schemas.conversation_schemas import (
 
 conversations: dict[str, ConversationState] = {}
 
+
+def generate_branch_name(tree: ConversationTree) -> str:
+    return f"branch-{len(tree.branches) + 1}"
+
+
+def _add_active_branch(
+    tree: ConversationTree,
+    *,
+    branch_type: ConversationBranchType,
+    name: str | None = None,
+    current_subjects: list[ConversationSubject] | None = None,
+    remaining_subjects: list[ConversationSubject] | None = None,
+) -> ConversationBranch:
+    branch = ConversationBranch(
+        name=name or generate_branch_name(tree),
+        branch_type=branch_type,
+        status="active",
+        current_subjects=current_subjects or [],
+        remaining_subjects=remaining_subjects or [],
+    )
+
+    tree.branches[branch.branch_id] = branch
+    tree.active_branch_id = branch.branch_id
+
+    return branch
+
 def create_conversation() -> ConversationState:
     conversation_id = str(uuid4())
 
-    root_branch = ConversationBranch(
-        name="main",
+    initial_branch = ConversationBranch(
+        name="branch-1",
         branch_type="open",
-        parent_branch_id=None,
         status="active",
     )
 
     conversation_tree = ConversationTree(
-        root_branch_id=root_branch.branch_id,
-        active_branch_id=root_branch.branch_id,
+        active_branch_id=initial_branch.branch_id,
         branches={
-            root_branch.branch_id: root_branch,
+            initial_branch.branch_id: initial_branch,
         },
     )
 
@@ -56,8 +80,8 @@ def get_active_branch(
 
 def create_conversation_branch(
     conversation_id: str,
-    name: str,
     branch_type: ConversationBranchType,
+    name: str | None = None,
     current_subjects: list[ConversationSubject] | None = None,
     remaining_subjects: list[ConversationSubject] | None = None,
 ) -> ConversationState | None:
@@ -72,17 +96,13 @@ def create_conversation_branch(
     if active_branch is not None:
         active_branch.status = "closed"
 
-    branch = ConversationBranch(
-        parent_branch_id=tree.root_branch_id,
+    _add_active_branch(
+        tree,
         name=name,
         branch_type=branch_type,
-        status="active",
         current_subjects=current_subjects or [],
         remaining_subjects=remaining_subjects or [],
     )
-
-    tree.branches[branch.branch_id] = branch
-    tree.active_branch_id = branch.branch_id
 
     conversations[conversation_id] = state
 
@@ -153,6 +173,12 @@ def set_active_branch_subject(
 def close_active_branch(
     conversation_id: str,
 ) -> ConversationState | None:
+    return close_bounded_branch(conversation_id)
+
+
+def close_bounded_branch(
+    conversation_id: str,
+) -> ConversationState | None:
     state = get_conversation(conversation_id)
 
     if state is None:
@@ -164,7 +190,15 @@ def close_active_branch(
     if active_branch is None:
         return None
 
+    if active_branch.branch_type != "bounded":
+        raise ValueError("The active branch is not bounded.")
+
     active_branch.status = "closed"
+
+    _add_active_branch(
+        tree,
+        branch_type="open",
+    )
 
     conversations[conversation_id] = state
 

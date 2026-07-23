@@ -39,8 +39,6 @@ class ConversationBranch(BaseModel):
         default_factory=lambda: str(uuid4())
     )
 
-    parent_branch_id: str | None = None
-
     name: str
     branch_type: ConversationBranchType
 
@@ -63,11 +61,10 @@ class ConversationTree(BaseModel):
     """
     The structured focus state for one conversation.
 
-    Every conversation has one root branch, and one branch is active
-    at any given time.
+    Every branch belongs directly to the conversation, and exactly one
+    branch is active at any given time.
     """
 
-    root_branch_id: str
     active_branch_id: str
 
     branches: dict[str, ConversationBranch] = Field(

@@ -173,9 +173,16 @@ def handle_close_active_branch(
 
     branch_name = active_branch.name
 
-    state = close_active_branch(
-        context.conversation_id
-    )
+    try:
+        state = close_active_branch(
+            context.conversation_id
+        )
+    except ValueError as error:
+        return ToolExecutionResult(
+            tool_name="close_active_branch",
+            success=False,
+            message=str(error),
+        )
 
     if state is None:
         return ToolExecutionResult(
@@ -184,13 +191,25 @@ def handle_close_active_branch(
             message="The active branch could not be closed.",
         )
 
+    new_active_branch = get_active_branch(
+        context.conversation_id
+    )
+
     return ToolExecutionResult(
         tool_name="close_active_branch",
         success=True,
-        message=f"Closed the '{branch_name}' branch.",
+        message=(
+            f"Closed the '{branch_name}' bounded branch and "
+            "activated a new open branch."
+        ),
         data={
             "reason": arguments.reason,
             "closed_branch_id": active_branch.branch_id,
+            "active_branch": (
+                new_active_branch.model_dump()
+                if new_active_branch is not None
+                else None
+            ),
         },
     )
 
@@ -312,9 +331,9 @@ UPDATE_ACTIVE_BRANCH_DEFINITION = ToolDefinition(
 CLOSE_ACTIVE_BRANCH_DEFINITION = ToolDefinition(
     name="close_active_branch",
     description=(
-        "Close the active conversation branch only when its "
-        "bounded activity has been completed or the user has "
-        "clearly asked to stop it."
+        "Close the active bounded conversation branch when its "
+        "activity has been completed or the user has clearly asked "
+        "to stop it. A new open branch is activated automatically."
     ),
     parameters={
         "type": "object",
