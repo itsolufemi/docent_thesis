@@ -3,6 +3,7 @@ import StartScreen from './StartScreen';
 import MainApp from './MainApp';
 import { connectToServer, makeServerRequest } from './utils/server_functions';
 import { sendTurnBufferEvent } from '../api/conversationApi';
+import { AudioStreamClient } from '../api/audioStreamClient';
 
 export default function MainApplication() {
   const [loading, setLoading] = useState(true);
@@ -15,6 +16,9 @@ export default function MainApplication() {
   const [turnRequestPending, setTurnRequestPending] = useState(false);
   const [turnRequestError, setTurnRequestError] = useState('');
   const [latestTurnResult, setLatestTurnResult] = useState(null);
+  const [audioStreamStatus, setAudioStreamStatus] = useState('disconnected');
+  const [audioStreamSummary, setAudioStreamSummary] = useState(null);
+  const [audioStreamError, setAudioStreamError] = useState('');
 
   const recordingRef = useRef(null);
   const listenAudioContextRef = useRef(null);
@@ -28,6 +32,7 @@ export default function MainApplication() {
   const isPlaying = useRef(false);
   const speakAudioContextRef = useRef(null);
   const speakWorkletRef = useRef(null);
+  const audioStreamClientRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +83,66 @@ export default function MainApplication() {
     };
   }, []);
 
+  useEffect(() => {
+    const audioClient = new AudioStreamClient({
+      onOpen: () => {
+        setAudioStreamStatus('connected');
+        setAudioStreamError('');
+      },
+      onMessage: (message) => {
+        console.log('Audio stream message:', message);
+
+        switch (message.type) {
+          case 'audio_stream_started':
+            setAudioStreamStatus('streaming');
+            setAudioStreamSummary(null);
+            break;
+          case 'audio_stream_complete':
+            setAudioStreamStatus('connected');
+            setAudioStreamSummary(message.payload);
+            break;
+          case 'audio_stream_cancelled':
+            setAudioStreamStatus('connected');
+            break;
+          case 'audio_error':
+            setAudioStreamError(
+              message.payload?.detail ??
+              'Unknown audio-stream error.',
+            );
+            break;
+          default:
+            console.warn(
+              'Unknown audio stream event:',
+              message,
+            );
+        }
+      },
+      onError: () => {
+        setAudioStreamStatus('error');
+        setAudioStreamError(
+          'Could not connect to the FastAPI audio stream.',
+        );
+      },
+      onClose: () => {
+        setAudioStreamStatus('disconnected');
+      },
+    });
+
+    audioStreamClientRef.current = audioClient;
+
+    audioClient.connect().catch((error) => {
+      console.error(
+        'Audio WebSocket connection failed:',
+        error,
+      );
+    });
+
+    return () => {
+      audioClient.close();
+      audioStreamClientRef.current = null;
+    };
+  }, []);
+
   const handleStartClick = () => {
     setStarted(true);
     makeServerRequest('introduction');
@@ -93,7 +158,43 @@ export default function MainApplication() {
   };
 
   const sendChunkToServer = (chunk) => {
-    makeServerRequest('chunk', chunk);
+    const sent = audioStreamClientRef.current?.sendChunk(chunk);
+
+    if (!sent) {
+      console.warn(
+        'PCM chunk was not sent because the audio ' +
+        'WebSocket is not open.',
+      );
+    }
+  };
+
+  const startAudioStream = async () => {
+    const audioClient = audioStreamClientRef.current;
+
+    if (!audioClient) {
+      throw new Error('Audio stream client is unavailable.');
+    }
+
+    if (
+      !audioClient.socket ||
+      audioClient.socket.readyState !== WebSocket.OPEN
+    ) {
+      await audioClient.connect();
+    }
+
+    setAudioStreamError('');
+    audioClient.startStream({
+      sampleRate: 16000,
+      channels: 1,
+    });
+  };
+
+  const stopAudioStream = () => {
+    try {
+      audioStreamClientRef.current?.stopStream();
+    } catch (error) {
+      console.error('Could not stop audio stream:', error);
+    }
   };
 
   const notifyPlaybackComplete = () => {
@@ -184,6 +285,11 @@ export default function MainApplication() {
           turnRequestError={turnRequestError}
           turnDecision={turnDecision}
           latestTurnResult={latestTurnResult}
+          onAudioStreamStart={startAudioStream}
+          onAudioStreamStop={stopAudioStream}
+          audioStreamStatus={audioStreamStatus}
+          audioStreamSummary={audioStreamSummary}
+          audioStreamError={audioStreamError}
         />
       )}
     </div>

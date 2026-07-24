@@ -27,6 +27,11 @@ export default function MainApp({
   turnRequestError,
   turnDecision,
   latestTurnResult,
+  onAudioStreamStart,
+  onAudioStreamStop,
+  audioStreamStatus,
+  audioStreamSummary,
+  audioStreamError,
 }) {
   const [questionTranscript, setQuestionTranscript] = useState('');
   const [caption, setCaption] = useState('');
@@ -68,6 +73,8 @@ export default function MainApp({
           accumulatedAudioRef={accumulatedAudioRef}
           streamRef={streamRef}
           sendChunkToServer={sendChunkToServer}
+          onAudioStreamStart={onAudioStreamStart}
+          onAudioStreamStop={onAudioStreamStop}
         />
         <AudioPlayer
           speakAudioContextRef={speakAudioContextRef}
@@ -76,6 +83,32 @@ export default function MainApp({
           notifyPlaybackComplete={notifyPlaybackComplete}
         />
       </header>
+
+      <section className="audio-stream-debug">
+        <p>Audio stream: {audioStreamStatus}</p>
+
+        {audioStreamSummary && (
+          <>
+            <p>
+              Chunks: {audioStreamSummary.chunk_count}
+            </p>
+            <p>
+              Bytes: {audioStreamSummary.total_bytes}
+            </p>
+            <p>
+              Duration:{' '}
+              {audioStreamSummary.duration_seconds.toFixed(2)}{' '}
+              seconds
+            </p>
+          </>
+        )}
+
+        {audioStreamError && (
+          <p className="turn-test-error">
+            {audioStreamError}
+          </p>
+        )}
+      </section>
 
       <form
         className="turn-test-form"

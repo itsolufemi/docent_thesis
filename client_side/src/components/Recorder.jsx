@@ -1,5 +1,4 @@
 import React from 'react';
-import { ipv4 } from './utils/ipv4_module';
 import { micOff_chime, micOn_chime } from './AudioPlayer';
 
 function floatTo16BitPCM(float32Array) {
@@ -25,6 +24,8 @@ export default function Recorder({
   accumulatedAudioRef,
   streamRef,
   sendChunkToServer,
+  onAudioStreamStart,
+  onAudioStreamStop,
 }) {
   const startListening = async () => {
     micOn_chime();
@@ -36,8 +37,10 @@ export default function Recorder({
     });
     listenAudioContextRef.current = audioContext;
 
-    const url = `http://${ipv4}:5000/worklets/recorder.worklet.js`;
+    const url = '/worklets/recorder.worklet.js';
     await audioContext.audioWorklet.addModule(url);
+
+    await onAudioStreamStart?.();
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     streamRef.current = stream;
@@ -76,6 +79,8 @@ export default function Recorder({
       if (audioContext && audioContext.state !== 'closed') {
         await audioContext.close();
       }
+
+      onAudioStreamStop?.();
 
       accumulatedAudioRef.current = [];
       listenSourceRef.current = null;

@@ -99,6 +99,16 @@ button:disabled {
   padding: 0 20px;
 }
 
+.audio-stream-debug {
+  width: 100%;
+  padding: 0 20px 12px;
+}
+
+.audio-stream-debug p {
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+}
+
 .turn-test-controls {
   display: flex;
   gap: 0.5rem;

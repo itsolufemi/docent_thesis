@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from conversation_core.api.routes_audio_stream import (
+    router as audio_stream_router,
+)
 from conversation_core.api.routes_conversation import (
     router as conversation_router,
 )
@@ -69,3 +72,4 @@ app.include_router(trp_router)
 app.include_router(turn_detection_router)
 app.include_router(turn_buffer_router)
 app.include_router(transcription_router)
+app.include_router(audio_stream_router)
