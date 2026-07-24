@@ -28,38 +28,86 @@ export default function Recorder({
   onAudioStreamStop,
 }) {
   const startListening = async () => {
-    micOn_chime();
-    if (recordingRef.current === true) return;
+    if (recordingRef.current === true) {
+      return;
+    }
 
-    console.log('listening');
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)({
-      sampleRate: 16000,
-    });
-    listenAudioContextRef.current = audioContext;
+    let stream = null;
+    let backendStreamStarted = false;
 
-    const url = '/worklets/recorder.worklet.js';
-    await audioContext.audioWorklet.addModule(url);
+    try {
+      console.log('listening');
 
-    await onAudioStreamStart?.();
+      const audioContext = new (
+        window.AudioContext ||
+        window.webkitAudioContext
+      )({
+        sampleRate: 16000,
+      });
+      listenAudioContextRef.current = audioContext;
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    streamRef.current = stream;
+      await audioContext.audioWorklet.addModule(
+        '/worklets/recorder.worklet.js',
+      );
 
-    const source = audioContext.createMediaStreamSource(stream);
-    listenSourceRef.current = source;
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+      streamRef.current = stream;
 
-    const node = new AudioWorkletNode(audioContext, 'pcm-recorder');
-    listenWorkletNodeRef.current = node;
+      await onAudioStreamStart?.();
+      backendStreamStarted = true;
 
-    node.port.onmessage = (event) => {
-      const float32 = event.data;
-      accumulatedAudioRef.current.push(float32);
-      sendChunkToServer(floatTo16BitPCM(float32));
-    };
+      const source =
+        audioContext.createMediaStreamSource(stream);
+      listenSourceRef.current = source;
 
-    source.connect(node);
-    setRecording(true);
-    recordingRef.current = true;
+      const node =
+        new AudioWorkletNode(audioContext, 'pcm-recorder');
+      listenWorkletNodeRef.current = node;
+
+      node.port.onmessage = (event) => {
+        const float32 = event.data;
+        accumulatedAudioRef.current.push(float32);
+        sendChunkToServer(floatTo16BitPCM(float32));
+      };
+
+      source.connect(node);
+
+      setRecording(true);
+      recordingRef.current = true;
+      micOn_chime();
+    } catch (error) {
+      console.error('Could not start recording:', error);
+
+      if (backendStreamStarted) {
+        onAudioStreamStop?.();
+      }
+
+      stream?.getTracks().forEach((track) => {
+        track.stop();
+      });
+
+      listenSourceRef.current?.disconnect();
+      listenWorkletNodeRef.current?.disconnect();
+
+      const audioContext = listenAudioContextRef.current;
+
+      if (
+        audioContext &&
+        audioContext.state !== 'closed'
+      ) {
+        await audioContext.close();
+      }
+
+      recordingRef.current = false;
+      setRecording(false);
+      accumulatedAudioRef.current = [];
+      listenSourceRef.current = null;
+      listenWorkletNodeRef.current = null;
+      listenAudioContextRef.current = null;
+      streamRef.current = null;
+    }
   };
 
   const stopListening = async () => {
