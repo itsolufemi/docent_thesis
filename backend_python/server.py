@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from conversation_core.api.routes_audio_stream import (
-    router as audio_stream_router,
+    create_audio_stream_router,
 )
 from conversation_core.api.routes_conversation import (
     router as conversation_router,
@@ -57,6 +57,7 @@ turn_buffer_router = create_turn_buffer_router(
     query_engine=docent_query_engine,
 )
 transcription_router = create_transcription_router()
+audio_stream_router = create_audio_stream_router()
 
 app.include_router(health_router)
 app.include_router(query_router)

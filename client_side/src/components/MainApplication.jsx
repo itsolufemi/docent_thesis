@@ -19,6 +19,7 @@ export default function MainApplication() {
   const [audioStreamStatus, setAudioStreamStatus] = useState('disconnected');
   const [audioStreamSummary, setAudioStreamSummary] = useState(null);
   const [audioStreamError, setAudioStreamError] = useState('');
+  const [audioTranscript, setAudioTranscript] = useState('');
 
   const recordingRef = useRef(null);
   const listenAudioContextRef = useRef(null);
@@ -96,10 +97,21 @@ export default function MainApplication() {
           case 'audio_stream_started':
             setAudioStreamStatus('streaming');
             setAudioStreamSummary(null);
+            setAudioTranscript('');
             break;
           case 'audio_stream_complete':
             setAudioStreamStatus('connected');
             setAudioStreamSummary(message.payload);
+            break;
+          case 'transcription_started':
+            setAudioStreamStatus('transcribing');
+            break;
+          case 'audio_transcription':
+            setAudioStreamStatus('connected');
+            setAudioStreamSummary(message.payload.stream);
+            setAudioTranscript(
+              message.payload.transcription?.text ?? '',
+            );
             break;
           case 'audio_stream_cancelled':
             setAudioStreamStatus('connected');
@@ -290,6 +302,7 @@ export default function MainApplication() {
           audioStreamStatus={audioStreamStatus}
           audioStreamSummary={audioStreamSummary}
           audioStreamError={audioStreamError}
+          audioTranscript={audioTranscript}
         />
       )}
     </div>

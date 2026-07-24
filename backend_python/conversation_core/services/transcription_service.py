@@ -1,6 +1,7 @@
 from pathlib import Path
 from threading import Lock
 
+import numpy as np
 from faster_whisper import WhisperModel
 
 from config import settings
@@ -47,31 +48,17 @@ class TranscriptionService:
 
         return self._model
 
-    def transcribe_file(
+    def _transcribe_input(
         self,
-        audio_path: str | Path,
+        audio_input,
         *,
         language: str | None = "en",
     ) -> TranscriptionResponse:
-        path = Path(audio_path)
-
-        if not path.exists():
-            raise FileNotFoundError(
-                f"Audio file does not exist: {path}"
-            )
-
-        if not path.is_file():
-            raise ValueError(
-                f"Audio path is not a file: {path}"
-            )
-
         model = self._get_model()
 
-        # CTranslate2 inference is blocking. Serialising calls prevents
-        # concurrent local requests from competing for the same model.
         with self._transcription_lock:
             segment_generator, info = model.transcribe(
-                str(path),
+                audio_input,
                 language=language,
                 beam_size=1,
                 condition_on_previous_text=False,
@@ -95,28 +82,88 @@ class TranscriptionService:
             for segment in segments
         ).strip()
 
-        detected_language = getattr(
-            info,
-            "language",
-            language,
-        )
-        language_probability = getattr(
-            info,
-            "language_probability",
-            None,
-        )
-        duration_seconds = getattr(
-            info,
-            "duration",
-            None,
-        )
-
         return TranscriptionResponse(
             text=transcript,
-            language=detected_language,
-            language_probability=language_probability,
-            duration_seconds=duration_seconds,
+            language=getattr(
+                info,
+                "language",
+                language,
+            ),
+            language_probability=getattr(
+                info,
+                "language_probability",
+                None,
+            ),
+            duration_seconds=getattr(
+                info,
+                "duration",
+                None,
+            ),
             segments=segments,
+        )
+
+    def transcribe_file(
+        self,
+        audio_path: str | Path,
+        *,
+        language: str | None = "en",
+    ) -> TranscriptionResponse:
+        path = Path(audio_path)
+
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Audio file does not exist: {path}"
+            )
+
+        if not path.is_file():
+            raise ValueError(
+                f"Audio path is not a file: {path}"
+            )
+
+        return self._transcribe_input(
+            str(path),
+            language=language,
+        )
+
+    def transcribe_pcm16(
+        self,
+        pcm_bytes: bytes,
+        *,
+        sample_rate: int,
+        channels: int = 1,
+        language: str | None = "en",
+    ) -> TranscriptionResponse:
+        if not pcm_bytes:
+            raise ValueError("PCM audio buffer is empty.")
+
+        if sample_rate != 16_000:
+            raise ValueError(
+                "PCM transcription currently requires "
+                "a 16000 Hz sample rate."
+            )
+
+        if channels != 1:
+            raise ValueError(
+                "PCM transcription currently requires mono audio."
+            )
+
+        if len(pcm_bytes) % 2 != 0:
+            raise ValueError(
+                "PCM16 audio must contain an even number of bytes."
+            )
+
+        pcm_samples = np.frombuffer(
+            pcm_bytes,
+            dtype="<i2",
+        )
+        float_samples = (
+            pcm_samples.astype(np.float32)
+            / 32768.0
+        )
+
+        return self._transcribe_input(
+            float_samples,
+            language=language,
         )
 
 

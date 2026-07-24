@@ -32,6 +32,7 @@ export default function MainApp({
   audioStreamStatus,
   audioStreamSummary,
   audioStreamError,
+  audioTranscript,
 }) {
   const [questionTranscript, setQuestionTranscript] = useState('');
   const [caption, setCaption] = useState('');
@@ -101,6 +102,10 @@ export default function MainApp({
               seconds
             </p>
           </>
+        )}
+
+        {audioTranscript && (
+          <p>Transcript: {audioTranscript}</p>
         )}
 
         {audioStreamError && (

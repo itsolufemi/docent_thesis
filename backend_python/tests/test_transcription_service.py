@@ -5,6 +5,8 @@ from tempfile import NamedTemporaryFile
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import numpy as np
+
 BACKEND_PYTHON_ROOT = Path(__file__).resolve().parents[1]
 
 if str(BACKEND_PYTHON_ROOT) not in sys.path:
@@ -103,6 +105,98 @@ class TranscriptionServiceTest(unittest.TestCase):
             service.transcribe_file("missing-audio.wav")
 
         self.assertIsNone(service._model)
+
+    def test_transcribe_pcm16_normalises_audio(self) -> None:
+        service = TranscriptionService(
+            model_name="base.en",
+            device="cpu",
+            compute_type="int8",
+        )
+        fake_model = Mock()
+        fake_model.transcribe.return_value = (
+            iter(
+                [
+                    SimpleNamespace(
+                        start=0.0,
+                        end=1.0,
+                        text=" Test audio.",
+                    ),
+                ]
+            ),
+            SimpleNamespace(
+                language="en",
+                language_probability=0.99,
+                duration=1.0,
+            ),
+        )
+        service._model = fake_model
+        pcm_bytes = np.array(
+            [-32768, 0, 32767],
+            dtype="<i2",
+        ).tobytes()
+
+        result = service.transcribe_pcm16(
+            pcm_bytes,
+            sample_rate=16_000,
+            channels=1,
+        )
+
+        self.assertEqual(result.text, "Test audio.")
+
+        audio_argument = (
+            fake_model.transcribe.call_args.args[0]
+        )
+        self.assertEqual(audio_argument.dtype, np.float32)
+        self.assertAlmostEqual(float(audio_argument[0]), -1.0)
+        self.assertAlmostEqual(float(audio_argument[1]), 0.0)
+        self.assertAlmostEqual(
+            float(audio_argument[2]),
+            32767 / 32768,
+        )
+
+    def test_transcribe_pcm16_rejects_invalid_input(self) -> None:
+        service = TranscriptionService(
+            model_name="base.en",
+            device="cpu",
+            compute_type="int8",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "buffer is empty",
+        ):
+            service.transcribe_pcm16(
+                b"",
+                sample_rate=16_000,
+            )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "16000 Hz",
+        ):
+            service.transcribe_pcm16(
+                b"\x00\x00",
+                sample_rate=44_100,
+            )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "mono audio",
+        ):
+            service.transcribe_pcm16(
+                b"\x00\x00",
+                sample_rate=16_000,
+                channels=2,
+            )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "even number of bytes",
+        ):
+            service.transcribe_pcm16(
+                b"\x00",
+                sample_rate=16_000,
+            )
 
 
 if __name__ == "__main__":

@@ -1,5 +1,9 @@
 from pydantic import BaseModel, Field
 
+from conversation_core.schemas.transcription_schemas import (
+    TranscriptionResponse,
+)
+
 
 class AudioStreamSummary(BaseModel):
     event: str = "stream_complete"
@@ -12,3 +16,8 @@ class AudioStreamSummary(BaseModel):
     total_bytes: int = Field(ge=0)
     total_samples: int = Field(ge=0)
     duration_seconds: float = Field(ge=0)
+
+
+class AudioStreamTranscription(BaseModel):
+    stream: AudioStreamSummary
+    transcription: TranscriptionResponse
