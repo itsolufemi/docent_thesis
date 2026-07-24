@@ -5,6 +5,24 @@ import { connectToServer, makeServerRequest } from './utils/server_functions';
 import { sendTurnBufferEvent } from '../api/conversationApi';
 import { AudioStreamClient } from '../api/audioStreamClient';
 
+function appendTranscriptSegment(
+  existingTranscript,
+  newSegment,
+) {
+  const existing = existingTranscript.trim();
+  const incoming = newSegment.trim();
+
+  if (!incoming) {
+    return existing;
+  }
+
+  if (!existing) {
+    return incoming;
+  }
+
+  return `${existing} ${incoming}`;
+}
+
 export default function MainApplication() {
   const [loading, setLoading] = useState(true);
   const [started, setStarted] = useState(false);
@@ -20,6 +38,10 @@ export default function MainApplication() {
   const [audioStreamSummary, setAudioStreamSummary] = useState(null);
   const [audioStreamError, setAudioStreamError] = useState('');
   const [audioTranscript, setAudioTranscript] = useState('');
+  const [
+    accumulatedSpokenTranscript,
+    setAccumulatedSpokenTranscript,
+  ] = useState('');
 
   const recordingRef = useRef(null);
   const listenAudioContextRef = useRef(null);
@@ -34,6 +56,8 @@ export default function MainApplication() {
   const speakAudioContextRef = useRef(null);
   const speakWorkletRef = useRef(null);
   const audioStreamClientRef = useRef(null);
+  const spokenTurnTranscriptRef = useRef('');
+  const processTurnTranscriptRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +122,8 @@ export default function MainApplication() {
             setAudioStreamStatus('streaming');
             setAudioStreamSummary(null);
             setAudioTranscript('');
+            setAudioStreamError('');
+            setTurnRequestError('');
             break;
           case 'audio_stream_complete':
             setAudioStreamStatus('connected');
@@ -106,17 +132,54 @@ export default function MainApplication() {
           case 'transcription_started':
             setAudioStreamStatus('transcribing');
             break;
-          case 'audio_transcription':
+          case 'audio_transcription': {
             setAudioStreamStatus('connected');
             setAudioStreamSummary(message.payload.stream);
-            setAudioTranscript(
-              message.payload.transcription?.text ?? '',
+
+            const segmentTranscript =
+              message.payload.transcription?.text?.trim() ?? '';
+
+            setAudioTranscript(segmentTranscript);
+
+            if (!segmentTranscript) {
+              break;
+            }
+
+            const accumulatedTranscript =
+              appendTranscriptSegment(
+                spokenTurnTranscriptRef.current,
+                segmentTranscript,
+              );
+
+            spokenTurnTranscriptRef.current =
+              accumulatedTranscript;
+            setAccumulatedSpokenTranscript(
+              accumulatedTranscript,
             );
+
+            const processingPromise =
+              processTurnTranscriptRef.current?.(
+                accumulatedTranscript,
+              );
+
+            processingPromise?.then((result) => {
+              if (!result) {
+                return;
+              }
+
+              if (result.turn.should_finalise_turn) {
+                spokenTurnTranscriptRef.current = '';
+                setAccumulatedSpokenTranscript('');
+              }
+            });
+
             break;
+          }
           case 'audio_stream_cancelled':
             setAudioStreamStatus('connected');
             break;
           case 'audio_error':
+            setAudioStreamStatus('connected');
             setAudioStreamError(
               message.payload?.detail ??
               'Unknown audio-stream error.',
@@ -217,10 +280,15 @@ export default function MainApplication() {
     makeServerRequest('cancel', null);
   };
 
-  const submitTestUtterance = async () => {
-    const utterance = testUtterance.trim();
+  const processTurnTranscript = async (
+    utterance,
+    {
+      clearTypedInput = false,
+    } = {},
+  ) => {
+    const cleanedUtterance = utterance.trim();
 
-    if (!utterance || turnRequestPending) {
+    if (!cleanedUtterance || turnRequestPending) {
       return null;
     }
 
@@ -229,7 +297,7 @@ export default function MainApplication() {
 
     try {
       const result = await sendTurnBufferEvent({
-        partialUtterance: utterance,
+        partialUtterance: cleanedUtterance,
         isSpeechActive: false,
         silenceDurationMs: 500,
         debug: true,
@@ -238,7 +306,7 @@ export default function MainApplication() {
       setLatestTurnResult(result);
       setTurnDecision(result.turn.decision);
 
-      if (result.query) {
+      if (clearTypedInput && result.query) {
         setTestUtterance('');
       }
 
@@ -256,6 +324,20 @@ export default function MainApplication() {
     } finally {
       setTurnRequestPending(false);
     }
+  };
+
+  useEffect(() => {
+    processTurnTranscriptRef.current =
+      processTurnTranscript;
+  });
+
+  const submitTestUtterance = async () => {
+    return processTurnTranscript(
+      testUtterance,
+      {
+        clearTypedInput: true,
+      },
+    );
   };
 
   return (
@@ -303,6 +385,9 @@ export default function MainApplication() {
           audioStreamSummary={audioStreamSummary}
           audioStreamError={audioStreamError}
           audioTranscript={audioTranscript}
+          accumulatedSpokenTranscript={
+            accumulatedSpokenTranscript
+          }
         />
       )}
     </div>

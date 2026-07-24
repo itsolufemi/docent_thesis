@@ -33,6 +33,7 @@ export default function MainApp({
   audioStreamSummary,
   audioStreamError,
   audioTranscript,
+  accumulatedSpokenTranscript,
 }) {
   const [questionTranscript, setQuestionTranscript] = useState('');
   const [caption, setCaption] = useState('');
@@ -76,6 +77,7 @@ export default function MainApp({
           sendChunkToServer={sendChunkToServer}
           onAudioStreamStart={onAudioStreamStart}
           onAudioStreamStop={onAudioStreamStop}
+          disabled={turnRequestPending}
         />
         <AudioPlayer
           speakAudioContextRef={speakAudioContextRef}
@@ -106,6 +108,13 @@ export default function MainApp({
 
         {audioTranscript && (
           <p>Transcript: {audioTranscript}</p>
+        )}
+
+        {accumulatedSpokenTranscript && (
+          <p>
+            Current spoken turn:{' '}
+            {accumulatedSpokenTranscript}
+          </p>
         )}
 
         {audioStreamError && (

@@ -26,6 +26,7 @@ export default function Recorder({
   sendChunkToServer,
   onAudioStreamStart,
   onAudioStreamStop,
+  disabled,
 }) {
   const startListening = async () => {
     if (recordingRef.current === true) {
@@ -144,6 +145,7 @@ export default function Recorder({
     <button
       type="button"
       onClick={recording ? stopListening : startListening}
+      disabled={disabled && !recording}
       className={`player-button mic-button ${recording ? 'is-recording' : ''}`}
     >
       Mic
