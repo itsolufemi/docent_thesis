@@ -27,8 +27,9 @@ export default function MainApp({
   turnRequestError,
   turnDecision,
   latestTurnResult,
-  onAudioStreamStart,
-  onAudioStreamStop,
+  onAudioSegmentStart,
+  onAudioSegmentFinalise,
+  onAudioSegmentCancel,
   audioStreamStatus,
   audioStreamSummary,
   audioStreamError,
@@ -75,8 +76,11 @@ export default function MainApp({
           accumulatedAudioRef={accumulatedAudioRef}
           streamRef={streamRef}
           sendChunkToServer={sendChunkToServer}
-          onAudioStreamStart={onAudioStreamStart}
-          onAudioStreamStop={onAudioStreamStop}
+          onAudioSegmentStart={onAudioSegmentStart}
+          onAudioSegmentFinalise={
+            onAudioSegmentFinalise
+          }
+          onAudioSegmentCancel={onAudioSegmentCancel}
           disabled={turnRequestPending}
         />
         <AudioPlayer

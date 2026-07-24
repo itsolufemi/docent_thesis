@@ -19,5 +19,7 @@ class AudioStreamSummary(BaseModel):
 
 
 class AudioStreamTranscription(BaseModel):
+    segment_id: str
+    silence_duration_ms: int = Field(ge=0)
     stream: AudioStreamSummary
     transcription: TranscriptionResponse

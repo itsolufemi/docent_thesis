@@ -24,6 +24,8 @@ export class AudioStreamClient {
   } = {}) {
     this.socket = null;
     this.connectionPromise = null;
+    this.currentSegmentId = null;
+    this.nextSegmentNumber = 1;
 
     this.onOpen = onOpen;
     this.onMessage = onMessage;
@@ -64,6 +66,18 @@ export class AudioStreamClient {
 
         try {
           const message = JSON.parse(event.data);
+
+          if (
+            (
+              message.type === 'audio_error' ||
+              message.type === 'audio_segment_cancelled'
+            ) &&
+            message.payload?.segment_id ===
+              this.currentSegmentId
+          ) {
+            this.currentSegmentId = null;
+          }
+
           this.onMessage?.(message);
         } catch (error) {
           console.error(
@@ -110,18 +124,35 @@ export class AudioStreamClient {
     );
   }
 
-  startStream({
+  startSegment({
+    segmentId,
     sampleRate = 16000,
     channels = 1,
   } = {}) {
+    if (this.currentSegmentId) {
+      throw new Error(
+        'An audio segment is already active.',
+      );
+    }
+
+    const nextSegmentId =
+      segmentId ??
+      `segment-${this.nextSegmentNumber}`;
+
     this.sendControl(
-      'start_audio',
+      'start_segment',
       {
+        segment_id: nextSegmentId,
         sample_rate: sampleRate,
         channels,
         sample_format: 'pcm_s16le',
       },
     );
+
+    this.currentSegmentId = nextSegmentId;
+    this.nextSegmentNumber += 1;
+
+    return nextSegmentId;
   }
 
   sendChunk(chunk) {
@@ -129,6 +160,10 @@ export class AudioStreamClient {
       !this.socket ||
       this.socket.readyState !== WebSocket.OPEN
     ) {
+      return false;
+    }
+
+    if (!this.currentSegmentId) {
       return false;
     }
 
@@ -151,12 +186,45 @@ export class AudioStreamClient {
     );
   }
 
-  stopStream() {
-    this.sendControl('stop_audio');
+  finaliseSegment({
+    silenceDurationMs = 500,
+  } = {}) {
+    if (!this.currentSegmentId) {
+      throw new Error(
+        'No active audio segment exists.',
+      );
+    }
+
+    const segmentId = this.currentSegmentId;
+
+    this.sendControl(
+      'finalise_segment',
+      {
+        segment_id: segmentId,
+        silence_duration_ms: silenceDurationMs,
+      },
+    );
+
+    this.currentSegmentId = null;
+    return segmentId;
   }
 
-  cancelStream() {
-    this.sendControl('cancel_audio');
+  cancelSegment() {
+    if (!this.currentSegmentId) {
+      return null;
+    }
+
+    const segmentId = this.currentSegmentId;
+
+    this.sendControl(
+      'cancel_segment',
+      {
+        segment_id: segmentId,
+      },
+    );
+
+    this.currentSegmentId = null;
+    return segmentId;
   }
 
   close() {
@@ -167,5 +235,6 @@ export class AudioStreamClient {
     this.socket.close();
     this.socket = null;
     this.connectionPromise = null;
+    this.currentSegmentId = null;
   }
 }

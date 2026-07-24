@@ -24,8 +24,9 @@ export default function Recorder({
   accumulatedAudioRef,
   streamRef,
   sendChunkToServer,
-  onAudioStreamStart,
-  onAudioStreamStop,
+  onAudioSegmentStart,
+  onAudioSegmentFinalise,
+  onAudioSegmentCancel,
   disabled,
 }) {
   const startListening = async () => {
@@ -56,7 +57,7 @@ export default function Recorder({
       });
       streamRef.current = stream;
 
-      await onAudioStreamStart?.();
+      await onAudioSegmentStart?.();
       backendStreamStarted = true;
 
       const source =
@@ -82,7 +83,7 @@ export default function Recorder({
       console.error('Could not start recording:', error);
 
       if (backendStreamStarted) {
-        onAudioStreamStop?.();
+        onAudioSegmentCancel?.();
       }
 
       stream?.getTracks().forEach((track) => {
@@ -129,7 +130,7 @@ export default function Recorder({
         await audioContext.close();
       }
 
-      onAudioStreamStop?.();
+      onAudioSegmentFinalise?.();
 
       accumulatedAudioRef.current = [];
       listenSourceRef.current = null;

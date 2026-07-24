@@ -58,6 +58,11 @@ export default function MainApplication() {
   const audioStreamClientRef = useRef(null);
   const spokenTurnTranscriptRef = useRef('');
   const processTurnTranscriptRef = useRef(null);
+  const turnRequestPendingRef = useRef(false);
+  const pendingAudioSegmentIdsRef = useRef([]);
+  const completedAudioSegmentsRef = useRef(new Map());
+  const processingAudioSegmentsRef = useRef(false);
+  const processCompletedAudioSegmentsRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,7 +123,7 @@ export default function MainApplication() {
         console.log('Audio stream message:', message);
 
         switch (message.type) {
-          case 'audio_stream_started':
+          case 'audio_segment_started':
             setAudioStreamStatus('streaming');
             setAudioStreamSummary(null);
             setAudioTranscript('');
@@ -133,58 +138,62 @@ export default function MainApplication() {
             setAudioStreamStatus('transcribing');
             break;
           case 'audio_transcription': {
-            setAudioStreamStatus('connected');
-            setAudioStreamSummary(message.payload.stream);
+            const segmentId =
+              message.payload?.segment_id;
 
-            const segmentTranscript =
-              message.payload.transcription?.text?.trim() ?? '';
-
-            setAudioTranscript(segmentTranscript);
-
-            if (!segmentTranscript) {
+            if (!segmentId) {
+              setAudioStreamError(
+                'Transcription result had no segment ID.',
+              );
               break;
             }
 
-            const accumulatedTranscript =
-              appendTranscriptSegment(
-                spokenTurnTranscriptRef.current,
-                segmentTranscript,
-              );
-
-            spokenTurnTranscriptRef.current =
-              accumulatedTranscript;
-            setAccumulatedSpokenTranscript(
-              accumulatedTranscript,
+            completedAudioSegmentsRef.current.set(
+              segmentId,
+              message.payload,
             );
 
-            const processingPromise =
-              processTurnTranscriptRef.current?.(
-                accumulatedTranscript,
-              );
-
-            processingPromise?.then((result) => {
-              if (!result) {
-                return;
-              }
-
-              if (result.turn.should_finalise_turn) {
-                spokenTurnTranscriptRef.current = '';
-                setAccumulatedSpokenTranscript('');
-              }
-            });
+            processCompletedAudioSegmentsRef.current?.();
 
             break;
           }
-          case 'audio_stream_cancelled':
+          case 'audio_segment_cancelled': {
+            const segmentId =
+              message.payload?.segment_id;
+
+            pendingAudioSegmentIdsRef.current =
+              pendingAudioSegmentIdsRef.current.filter(
+                (pendingId) => pendingId !== segmentId,
+              );
+            completedAudioSegmentsRef.current.delete(
+              segmentId,
+            );
             setAudioStreamStatus('connected');
+            processCompletedAudioSegmentsRef.current?.();
             break;
-          case 'audio_error':
+          }
+          case 'audio_error': {
+            const segmentId =
+              message.payload?.segment_id;
+
+            if (segmentId) {
+              pendingAudioSegmentIdsRef.current =
+                pendingAudioSegmentIdsRef.current.filter(
+                  (pendingId) => pendingId !== segmentId,
+                );
+              completedAudioSegmentsRef.current.delete(
+                segmentId,
+              );
+              processCompletedAudioSegmentsRef.current?.();
+            }
+
             setAudioStreamStatus('connected');
             setAudioStreamError(
               message.payload?.detail ??
               'Unknown audio-stream error.',
             );
             break;
+          }
           default:
             console.warn(
               'Unknown audio stream event:',
@@ -243,7 +252,7 @@ export default function MainApplication() {
     }
   };
 
-  const startAudioStream = async () => {
+  const startAudioSegment = async () => {
     const audioClient = audioStreamClientRef.current;
 
     if (!audioClient) {
@@ -258,17 +267,37 @@ export default function MainApplication() {
     }
 
     setAudioStreamError('');
-    audioClient.startStream({
+    const segmentId = audioClient.startSegment({
       sampleRate: 16000,
       channels: 1,
     });
+
+    pendingAudioSegmentIdsRef.current.push(
+      segmentId,
+    );
   };
 
-  const stopAudioStream = () => {
+  const finaliseAudioSegment = () => {
     try {
-      audioStreamClientRef.current?.stopStream();
+      audioStreamClientRef.current?.finaliseSegment({
+        silenceDurationMs: 500,
+      });
     } catch (error) {
-      console.error('Could not stop audio stream:', error);
+      console.error(
+        'Could not finalise audio segment:',
+        error,
+      );
+    }
+  };
+
+  const cancelAudioSegment = () => {
+    try {
+      audioStreamClientRef.current?.cancelSegment();
+    } catch (error) {
+      console.error(
+        'Could not cancel audio segment:',
+        error,
+      );
     }
   };
 
@@ -288,10 +317,14 @@ export default function MainApplication() {
   ) => {
     const cleanedUtterance = utterance.trim();
 
-    if (!cleanedUtterance || turnRequestPending) {
+    if (
+      !cleanedUtterance ||
+      turnRequestPendingRef.current
+    ) {
       return null;
     }
 
+    turnRequestPendingRef.current = true;
     setTurnRequestPending(true);
     setTurnRequestError('');
 
@@ -322,13 +355,87 @@ export default function MainApplication() {
 
       return null;
     } finally {
+      turnRequestPendingRef.current = false;
       setTurnRequestPending(false);
+      processCompletedAudioSegmentsRef.current?.();
+    }
+  };
+
+  const processCompletedAudioSegments = async () => {
+    if (processingAudioSegmentsRef.current) {
+      return;
+    }
+
+    processingAudioSegmentsRef.current = true;
+
+    try {
+      while (
+        pendingAudioSegmentIdsRef.current.length > 0
+      ) {
+        if (turnRequestPendingRef.current) {
+          break;
+        }
+
+        const segmentId =
+          pendingAudioSegmentIdsRef.current[0];
+        const segmentPayload =
+          completedAudioSegmentsRef.current.get(
+            segmentId,
+          );
+
+        if (!segmentPayload) {
+          break;
+        }
+
+        pendingAudioSegmentIdsRef.current.shift();
+        completedAudioSegmentsRef.current.delete(
+          segmentId,
+        );
+
+        setAudioStreamStatus('connected');
+        setAudioStreamSummary(segmentPayload.stream);
+
+        const segmentTranscript =
+          segmentPayload.transcription?.text?.trim() ?? '';
+
+        setAudioTranscript(segmentTranscript);
+
+        if (!segmentTranscript) {
+          continue;
+        }
+
+        const accumulatedTranscript =
+          appendTranscriptSegment(
+            spokenTurnTranscriptRef.current,
+            segmentTranscript,
+          );
+
+        spokenTurnTranscriptRef.current =
+          accumulatedTranscript;
+        setAccumulatedSpokenTranscript(
+          accumulatedTranscript,
+        );
+
+        const result =
+          await processTurnTranscriptRef.current?.(
+            accumulatedTranscript,
+          );
+
+        if (result?.turn.should_finalise_turn) {
+          spokenTurnTranscriptRef.current = '';
+          setAccumulatedSpokenTranscript('');
+        }
+      }
+    } finally {
+      processingAudioSegmentsRef.current = false;
     }
   };
 
   useEffect(() => {
     processTurnTranscriptRef.current =
       processTurnTranscript;
+    processCompletedAudioSegmentsRef.current =
+      processCompletedAudioSegments;
   });
 
   const submitTestUtterance = async () => {
@@ -379,8 +486,11 @@ export default function MainApplication() {
           turnRequestError={turnRequestError}
           turnDecision={turnDecision}
           latestTurnResult={latestTurnResult}
-          onAudioStreamStart={startAudioStream}
-          onAudioStreamStop={stopAudioStream}
+          onAudioSegmentStart={startAudioSegment}
+          onAudioSegmentFinalise={
+            finaliseAudioSegment
+          }
+          onAudioSegmentCancel={cancelAudioSegment}
           audioStreamStatus={audioStreamStatus}
           audioStreamSummary={audioStreamSummary}
           audioStreamError={audioStreamError}
