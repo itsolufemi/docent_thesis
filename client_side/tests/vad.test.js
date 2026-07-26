@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-import { calculateRms } from '../src/audio/vadMath.js';
+import {
+  calculateRemainingSilenceMs,
+  calculateRms,
+} from '../src/audio/vadMath.js';
 
 
 const SAMPLE_RATE = 16_000;
@@ -94,6 +97,44 @@ test('calculateRms handles silence and constant energy', () => {
     ) < 1e-6,
   );
 });
+
+
+test(
+  'remaining silence accounts for processing time',
+  () => {
+    const timing = {
+      initialSilenceMs: 600,
+      forcedFinalisationSilenceMs: 1_800,
+    };
+
+    assert.equal(
+      calculateRemainingSilenceMs({
+        ...timing,
+        speechEndedAtMs: null,
+        nowMs: 5_000,
+      }),
+      1_200,
+    );
+
+    assert.equal(
+      calculateRemainingSilenceMs({
+        ...timing,
+        speechEndedAtMs: 4_000,
+        nowMs: 5_500,
+      }),
+      300,
+    );
+
+    assert.equal(
+      calculateRemainingSilenceMs({
+        ...timing,
+        speechEndedAtMs: 3_000,
+        nowMs: 5_500,
+      }),
+      0,
+    );
+  },
+);
 
 
 test(

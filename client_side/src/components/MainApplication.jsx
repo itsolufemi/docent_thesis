@@ -4,12 +4,10 @@ import MainApp from './MainApp';
 import { connectToServer, makeServerRequest } from './utils/server_functions';
 import { sendTurnBufferEvent } from '../api/conversationApi';
 import { AudioStreamClient } from '../api/audioStreamClient';
+import { calculateRemainingSilenceMs } from '../audio/vadMath';
 
 const FORCED_FINALISATION_SILENCE_MS = 1800;
 const INITIAL_VAD_SILENCE_MS = 600;
-const FORCED_FINALISATION_DELAY_MS =
-  FORCED_FINALISATION_SILENCE_MS -
-  INITIAL_VAD_SILENCE_MS;
 
 function appendTranscriptSegment(
   existingTranscript,
@@ -70,6 +68,7 @@ export default function MainApplication() {
   const processingAudioSegmentsRef = useRef(false);
   const processCompletedAudioSegmentsRef = useRef(null);
   const vadSpeechActiveRef = useRef(false);
+  const vadSpeechEndedAtRef = useRef(null);
   const awaitingSpeechContinuationRef = useRef(false);
   const silenceReevaluationTimerRef = useRef(null);
 
@@ -85,18 +84,37 @@ export default function MainApplication() {
 
   const handleVadSpeechStart = () => {
     vadSpeechActiveRef.current = true;
+    vadSpeechEndedAtRef.current = null;
     awaitingSpeechContinuationRef.current = false;
     clearSilenceReevaluationTimer();
   };
 
-  const handleVadSpeechEnd = () => {
+  const handleVadSpeechEnd = (
+    silenceDurationMs = INITIAL_VAD_SILENCE_MS,
+  ) => {
     vadSpeechActiveRef.current = false;
+    vadSpeechEndedAtRef.current =
+      performance.now() -
+      Math.max(0, silenceDurationMs);
   };
 
   const scheduleSilenceReevaluation = (
     transcript,
   ) => {
     clearSilenceReevaluationTimer();
+
+    const speechEndedAt =
+      vadSpeechEndedAtRef.current;
+
+    const remainingSilenceMs =
+      calculateRemainingSilenceMs({
+        speechEndedAtMs: speechEndedAt,
+        nowMs: performance.now(),
+        initialSilenceMs:
+          INITIAL_VAD_SILENCE_MS,
+        forcedFinalisationSilenceMs:
+          FORCED_FINALISATION_SILENCE_MS,
+      });
 
     silenceReevaluationTimerRef.current =
       window.setTimeout(async () => {
@@ -131,12 +149,13 @@ export default function MainApplication() {
           spokenTurnTranscriptRef.current = '';
           setAccumulatedSpokenTranscript('');
         }
-      }, FORCED_FINALISATION_DELAY_MS);
+      }, remainingSilenceMs);
   };
 
   useEffect(() => {
     if (!recording) {
       vadSpeechActiveRef.current = false;
+      vadSpeechEndedAtRef.current = null;
       awaitingSpeechContinuationRef.current =
         false;
       clearSilenceReevaluationTimer();

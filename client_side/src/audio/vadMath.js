@@ -18,3 +18,25 @@ export function calculateRms(samples) {
     sumOfSquares / samples.length,
   );
 }
+
+
+export function calculateRemainingSilenceMs({
+  speechEndedAtMs,
+  nowMs,
+  initialSilenceMs,
+  forcedFinalisationSilenceMs,
+}) {
+  const elapsedSinceSpeechEndMs =
+    speechEndedAtMs === null
+      ? initialSilenceMs
+      : Math.max(
+          0,
+          nowMs - speechEndedAtMs,
+        );
+
+  return Math.max(
+    0,
+    forcedFinalisationSilenceMs -
+      elapsedSinceSpeechEndMs,
+  );
+}
