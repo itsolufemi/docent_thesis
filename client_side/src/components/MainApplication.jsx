@@ -275,12 +275,16 @@ export default function MainApplication() {
     pendingAudioSegmentIdsRef.current.push(
       segmentId,
     );
+
+    return segmentId;
   };
 
-  const finaliseAudioSegment = () => {
+  const finaliseAudioSegment = (
+    silenceDurationMs = 600,
+  ) => {
     try {
       audioStreamClientRef.current?.finaliseSegment({
-        silenceDurationMs: 500,
+        silenceDurationMs,
       });
     } catch (error) {
       console.error(

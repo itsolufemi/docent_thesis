@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { micOff_chime, micOn_chime } from './AudioPlayer';
 
 function floatTo16BitPCM(float32Array) {
@@ -27,15 +27,88 @@ export default function Recorder({
   onAudioSegmentStart,
   onAudioSegmentFinalise,
   onAudioSegmentCancel,
-  disabled,
 }) {
+  const segmentActiveRef = useRef(false);
+  const workletMessageChainRef =
+    useRef(Promise.resolve());
+
+  const handleWorkletMessage = async (
+    message,
+  ) => {
+    switch (message.type) {
+      case 'speech_start': {
+        if (segmentActiveRef.current) {
+          return;
+        }
+
+        await onAudioSegmentStart?.();
+
+        segmentActiveRef.current = true;
+
+        const preRollFrames =
+          message.preRollFrames ?? [];
+
+        for (const frame of preRollFrames) {
+          const float32 =
+            frame instanceof Float32Array
+              ? frame
+              : new Float32Array(frame);
+
+          sendChunkToServer(
+            floatTo16BitPCM(float32),
+          );
+        }
+
+        return;
+      }
+
+      case 'audio_frame': {
+        if (!segmentActiveRef.current) {
+          return;
+        }
+
+        const float32 =
+          message.samples instanceof Float32Array
+            ? message.samples
+            : new Float32Array(
+                message.samples,
+              );
+
+        sendChunkToServer(
+          floatTo16BitPCM(float32),
+        );
+
+        return;
+      }
+
+      case 'speech_end': {
+        if (!segmentActiveRef.current) {
+          return;
+        }
+
+        segmentActiveRef.current = false;
+
+        onAudioSegmentFinalise?.(
+          message.silenceDurationMs ?? 600,
+        );
+
+        return;
+      }
+
+      default:
+        console.warn(
+          'Unknown recorder worklet message:',
+          message,
+        );
+    }
+  };
+
   const startListening = async () => {
     if (recordingRef.current === true) {
       return;
     }
 
     let stream = null;
-    let backendStreamStarted = false;
 
     try {
       console.log('listening');
@@ -57,9 +130,6 @@ export default function Recorder({
       });
       streamRef.current = stream;
 
-      await onAudioSegmentStart?.();
-      backendStreamStarted = true;
-
       const source =
         audioContext.createMediaStreamSource(stream);
       listenSourceRef.current = source;
@@ -69,9 +139,24 @@ export default function Recorder({
       listenWorkletNodeRef.current = node;
 
       node.port.onmessage = (event) => {
-        const float32 = event.data;
-        accumulatedAudioRef.current.push(float32);
-        sendChunkToServer(floatTo16BitPCM(float32));
+        workletMessageChainRef.current =
+          workletMessageChainRef.current
+            .then(() => {
+              return handleWorkletMessage(
+                event.data,
+              );
+            })
+            .catch((error) => {
+              console.error(
+                'Could not process recorder message:',
+                error,
+              );
+
+              if (segmentActiveRef.current) {
+                segmentActiveRef.current = false;
+                onAudioSegmentCancel?.();
+              }
+            });
       };
 
       source.connect(node);
@@ -82,7 +167,8 @@ export default function Recorder({
     } catch (error) {
       console.error('Could not start recording:', error);
 
-      if (backendStreamStarted) {
+      if (segmentActiveRef.current) {
+        segmentActiveRef.current = false;
         onAudioSegmentCancel?.();
       }
 
@@ -109,6 +195,8 @@ export default function Recorder({
       listenWorkletNodeRef.current = null;
       listenAudioContextRef.current = null;
       streamRef.current = null;
+      workletMessageChainRef.current =
+        Promise.resolve();
     }
   };
 
@@ -121,24 +209,45 @@ export default function Recorder({
     setRecording(false);
 
     try {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current
+        ?.getTracks()
+        .forEach((track) => {
+          track.stop();
+        });
+
       listenSourceRef.current?.disconnect();
       listenWorkletNodeRef.current?.disconnect();
 
-      const audioContext = listenAudioContextRef.current;
-      if (audioContext && audioContext.state !== 'closed') {
-        await audioContext.close();
+      await workletMessageChainRef.current;
+
+      if (segmentActiveRef.current) {
+        segmentActiveRef.current = false;
+        onAudioSegmentFinalise?.(0);
       }
 
-      onAudioSegmentFinalise?.();
+      const audioContext =
+        listenAudioContextRef.current;
+
+      if (
+        audioContext &&
+        audioContext.state !== 'closed'
+      ) {
+        await audioContext.close();
+      }
 
       accumulatedAudioRef.current = [];
       listenSourceRef.current = null;
       listenWorkletNodeRef.current = null;
       listenAudioContextRef.current = null;
       streamRef.current = null;
+
+      workletMessageChainRef.current =
+        Promise.resolve();
     } catch (error) {
-      console.error('Error stopping recording:', error);
+      console.error(
+        'Error stopping recording:',
+        error,
+      );
     }
   };
 
@@ -146,7 +255,6 @@ export default function Recorder({
     <button
       type="button"
       onClick={recording ? stopListening : startListening}
-      disabled={disabled && !recording}
       className={`player-button mic-button ${recording ? 'is-recording' : ''}`}
     >
       Mic

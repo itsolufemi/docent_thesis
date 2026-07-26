@@ -81,7 +81,6 @@ export default function MainApp({
             onAudioSegmentFinalise
           }
           onAudioSegmentCancel={onAudioSegmentCancel}
-          disabled={turnRequestPending}
         />
         <AudioPlayer
           speakAudioContextRef={speakAudioContextRef}
