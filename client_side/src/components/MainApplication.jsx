@@ -5,6 +5,12 @@ import { connectToServer, makeServerRequest } from './utils/server_functions';
 import { sendTurnBufferEvent } from '../api/conversationApi';
 import { AudioStreamClient } from '../api/audioStreamClient';
 
+const FORCED_FINALISATION_SILENCE_MS = 1800;
+const INITIAL_VAD_SILENCE_MS = 600;
+const FORCED_FINALISATION_DELAY_MS =
+  FORCED_FINALISATION_SILENCE_MS -
+  INITIAL_VAD_SILENCE_MS;
+
 function appendTranscriptSegment(
   existingTranscript,
   newSegment,
@@ -63,6 +69,85 @@ export default function MainApplication() {
   const completedAudioSegmentsRef = useRef(new Map());
   const processingAudioSegmentsRef = useRef(false);
   const processCompletedAudioSegmentsRef = useRef(null);
+  const vadSpeechActiveRef = useRef(false);
+  const awaitingSpeechContinuationRef = useRef(false);
+  const silenceReevaluationTimerRef = useRef(null);
+
+  const clearSilenceReevaluationTimer = () => {
+    if (silenceReevaluationTimerRef.current) {
+      window.clearTimeout(
+        silenceReevaluationTimerRef.current,
+      );
+
+      silenceReevaluationTimerRef.current = null;
+    }
+  };
+
+  const handleVadSpeechStart = () => {
+    vadSpeechActiveRef.current = true;
+    awaitingSpeechContinuationRef.current = false;
+    clearSilenceReevaluationTimer();
+  };
+
+  const handleVadSpeechEnd = () => {
+    vadSpeechActiveRef.current = false;
+  };
+
+  const scheduleSilenceReevaluation = (
+    transcript,
+  ) => {
+    clearSilenceReevaluationTimer();
+
+    silenceReevaluationTimerRef.current =
+      window.setTimeout(async () => {
+        silenceReevaluationTimerRef.current = null;
+
+        if (
+          vadSpeechActiveRef.current ||
+          !awaitingSpeechContinuationRef.current ||
+          !recordingRef.current
+        ) {
+          return;
+        }
+
+        if (turnRequestPendingRef.current) {
+          scheduleSilenceReevaluation(transcript);
+          return;
+        }
+
+        const result =
+          await processTurnTranscriptRef.current?.(
+            transcript,
+            {
+              silenceDurationMs:
+                FORCED_FINALISATION_SILENCE_MS,
+            },
+          );
+
+        if (result?.turn.should_finalise_turn) {
+          clearSilenceReevaluationTimer();
+          awaitingSpeechContinuationRef.current =
+            false;
+          spokenTurnTranscriptRef.current = '';
+          setAccumulatedSpokenTranscript('');
+        }
+      }, FORCED_FINALISATION_DELAY_MS);
+  };
+
+  useEffect(() => {
+    if (!recording) {
+      vadSpeechActiveRef.current = false;
+      awaitingSpeechContinuationRef.current =
+        false;
+      clearSilenceReevaluationTimer();
+    }
+  }, [recording]);
+
+  useEffect(() => {
+    return () => {
+      clearSilenceReevaluationTimer();
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +253,9 @@ export default function MainApplication() {
             completedAudioSegmentsRef.current.delete(
               segmentId,
             );
+            clearSilenceReevaluationTimer();
+            awaitingSpeechContinuationRef.current =
+              false;
             setAudioStreamStatus('connected');
             processCompletedAudioSegmentsRef.current?.();
             break;
@@ -184,6 +272,9 @@ export default function MainApplication() {
               completedAudioSegmentsRef.current.delete(
                 segmentId,
               );
+              clearSilenceReevaluationTimer();
+              awaitingSpeechContinuationRef.current =
+                false;
               processCompletedAudioSegmentsRef.current?.();
             }
 
@@ -295,6 +386,9 @@ export default function MainApplication() {
   };
 
   const cancelAudioSegment = () => {
+    clearSilenceReevaluationTimer();
+    awaitingSpeechContinuationRef.current = false;
+
     try {
       audioStreamClientRef.current?.cancelSegment();
     } catch (error) {
@@ -317,6 +411,7 @@ export default function MainApplication() {
     utterance,
     {
       clearTypedInput = false,
+      silenceDurationMs = INITIAL_VAD_SILENCE_MS,
     } = {},
   ) => {
     const cleanedUtterance = utterance.trim();
@@ -332,11 +427,17 @@ export default function MainApplication() {
     setTurnRequestPending(true);
     setTurnRequestError('');
 
+    if (clearTypedInput) {
+      clearSilenceReevaluationTimer();
+      awaitingSpeechContinuationRef.current =
+        false;
+    }
+
     try {
       const result = await sendTurnBufferEvent({
         partialUtterance: cleanedUtterance,
         isSpeechActive: false,
-        silenceDurationMs: 500,
+        silenceDurationMs,
         debug: true,
       });
 
@@ -401,6 +502,9 @@ export default function MainApplication() {
 
         const segmentTranscript =
           segmentPayload.transcription?.text?.trim() ?? '';
+        const silenceDurationMs =
+          segmentPayload.silence_duration_ms ??
+          INITIAL_VAD_SILENCE_MS;
 
         setAudioTranscript(segmentTranscript);
 
@@ -423,11 +527,29 @@ export default function MainApplication() {
         const result =
           await processTurnTranscriptRef.current?.(
             accumulatedTranscript,
+            {
+              silenceDurationMs,
+            },
           );
 
         if (result?.turn.should_finalise_turn) {
+          clearSilenceReevaluationTimer();
+          awaitingSpeechContinuationRef.current =
+            false;
           spokenTurnTranscriptRef.current = '';
           setAccumulatedSpokenTranscript('');
+        } else if (
+          result?.turn.decision ===
+          'await_more_speech'
+        ) {
+          awaitingSpeechContinuationRef.current =
+            recordingRef.current;
+
+          if (recordingRef.current) {
+            scheduleSilenceReevaluation(
+              accumulatedTranscript,
+            );
+          }
         }
       }
     } finally {
@@ -495,6 +617,8 @@ export default function MainApplication() {
             finaliseAudioSegment
           }
           onAudioSegmentCancel={cancelAudioSegment}
+          onVadSpeechStart={handleVadSpeechStart}
+          onVadSpeechEnd={handleVadSpeechEnd}
           audioStreamStatus={audioStreamStatus}
           audioStreamSummary={audioStreamSummary}
           audioStreamError={audioStreamError}

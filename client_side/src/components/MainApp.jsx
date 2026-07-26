@@ -30,6 +30,8 @@ export default function MainApp({
   onAudioSegmentStart,
   onAudioSegmentFinalise,
   onAudioSegmentCancel,
+  onVadSpeechStart,
+  onVadSpeechEnd,
   audioStreamStatus,
   audioStreamSummary,
   audioStreamError,
@@ -81,6 +83,8 @@ export default function MainApp({
             onAudioSegmentFinalise
           }
           onAudioSegmentCancel={onAudioSegmentCancel}
+          onVadSpeechStart={onVadSpeechStart}
+          onVadSpeechEnd={onVadSpeechEnd}
         />
         <AudioPlayer
           speakAudioContextRef={speakAudioContextRef}

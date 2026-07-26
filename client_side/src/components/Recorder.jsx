@@ -27,6 +27,8 @@ export default function Recorder({
   onAudioSegmentStart,
   onAudioSegmentFinalise,
   onAudioSegmentCancel,
+  onVadSpeechStart,
+  onVadSpeechEnd,
 }) {
   const segmentActiveRef = useRef(false);
   const workletMessageChainRef =
@@ -41,6 +43,7 @@ export default function Recorder({
           return;
         }
 
+        onVadSpeechStart?.();
         await onAudioSegmentStart?.();
 
         segmentActiveRef.current = true;
@@ -82,6 +85,10 @@ export default function Recorder({
       }
 
       case 'speech_end': {
+        onVadSpeechEnd?.(
+          message.silenceDurationMs ?? 600,
+        );
+
         if (!segmentActiveRef.current) {
           return;
         }
@@ -152,6 +159,8 @@ export default function Recorder({
                 error,
               );
 
+              onVadSpeechEnd?.(0);
+
               if (segmentActiveRef.current) {
                 segmentActiveRef.current = false;
                 onAudioSegmentCancel?.();
@@ -169,6 +178,7 @@ export default function Recorder({
 
       if (segmentActiveRef.current) {
         segmentActiveRef.current = false;
+        onVadSpeechEnd?.(0);
         onAudioSegmentCancel?.();
       }
 
@@ -222,6 +232,7 @@ export default function Recorder({
 
       if (segmentActiveRef.current) {
         segmentActiveRef.current = false;
+        onVadSpeechEnd?.(0);
         onAudioSegmentFinalise?.(0);
       }
 

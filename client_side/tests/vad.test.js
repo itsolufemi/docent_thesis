@@ -120,7 +120,7 @@ test(
     processFrames(
       processor,
       {
-        amplitude: 0.02,
+        amplitude: 0.03,
         frameCount: 5,
       },
     );
@@ -143,7 +143,7 @@ test(
     processFrames(
       processor,
       {
-        amplitude: 0.02,
+        amplitude: 0.03,
         frameCount: 1,
       },
     );
@@ -190,7 +190,7 @@ test(
     processFrames(
       processor,
       {
-        amplitude: 0.02,
+        amplitude: 0.03,
         frameCount: 5,
       },
     );
