@@ -5,6 +5,7 @@ import { connectToServer, makeServerRequest } from './utils/server_functions';
 import { sendTurnBufferEvent } from '../api/conversationApi';
 import { AudioStreamClient } from '../api/audioStreamClient';
 import { synthesiseSpeech } from '../api/ttsApi';
+import { TtsStreamClient } from '../api/ttsStreamClient';
 import { calculateRemainingSilenceMs } from '../audio/vadMath';
 
 const FORCED_FINALISATION_SILENCE_MS = 1800;
@@ -72,6 +73,9 @@ export default function MainApplication() {
   const isPlaying = useRef(false);
   const speakAudioContextRef = useRef(null);
   const ttsAbortControllerRef = useRef(null);
+  const ttsPlayerNodeRef = useRef(null);
+  const ttsStreamClientRef = useRef(null);
+  const activeTtsStreamIdRef = useRef(null);
   const audioStreamClientRef = useRef(null);
   const spokenTurnTranscriptRef = useRef('');
   const processTurnTranscriptRef = useRef(null);
@@ -191,6 +195,16 @@ export default function MainApplication() {
         }
 
         currentAudio.current = null;
+      }
+
+      ttsStreamClientRef.current?.close();
+      ttsStreamClientRef.current = null;
+
+      if (ttsPlayerNodeRef.current) {
+        ttsPlayerNodeRef.current.port.onmessage =
+          null;
+        ttsPlayerNodeRef.current.disconnect();
+        ttsPlayerNodeRef.current = null;
       }
 
       const audioContext =
@@ -468,6 +482,15 @@ export default function MainApplication() {
     ttsAbortControllerRef.current?.abort();
     ttsAbortControllerRef.current = null;
 
+    ttsStreamClientRef.current?.close();
+    ttsStreamClientRef.current = null;
+
+    activeTtsStreamIdRef.current = null;
+
+    ttsPlayerNodeRef.current?.port.postMessage({
+      type: 'flush',
+    });
+
     if (currentAudio.current) {
       const source = currentAudio.current;
 
@@ -483,6 +506,209 @@ export default function MainApplication() {
 
     isPlaying.current = false;
     setAssistantAudioStatus('idle');
+  };
+
+  const ensureTtsPlayer = async () => {
+    let audioContext =
+      speakAudioContextRef.current;
+
+    if (
+      !audioContext ||
+      audioContext.state === 'closed'
+    ) {
+      audioContext = new (
+        window.AudioContext ||
+        window.webkitAudioContext
+      )({
+        sampleRate: 24000,
+      });
+
+      speakAudioContextRef.current =
+        audioContext;
+    }
+
+    if (
+      audioContext.state === 'suspended'
+    ) {
+      await audioContext.resume();
+    }
+
+    if (!ttsPlayerNodeRef.current) {
+      await audioContext.audioWorklet.addModule(
+        '/worklets/tts-pcm-player.worklet.js',
+      );
+
+      const playerNode =
+        new AudioWorkletNode(
+          audioContext,
+          'tts-pcm-player',
+          {
+            outputChannelCount: [1],
+          },
+        );
+
+      playerNode.connect(
+        audioContext.destination,
+      );
+
+      playerNode.port.onmessage = (
+        event,
+      ) => {
+        switch (event.data?.type) {
+          case 'playback_started':
+            isPlaying.current = true;
+            setAssistantAudioStatus(
+              'playing',
+            );
+            break;
+
+          case 'playback_complete':
+            isPlaying.current = false;
+            activeTtsStreamIdRef.current =
+              null;
+            setAssistantAudioStatus(
+              'idle',
+            );
+            notifyPlaybackComplete();
+            break;
+
+          case 'playback_flushed':
+            isPlaying.current = false;
+            break;
+
+          default:
+            break;
+        }
+      };
+
+      ttsPlayerNodeRef.current =
+        playerNode;
+    }
+
+    return ttsPlayerNodeRef.current;
+  };
+
+  const streamAssistantResponse = async (
+    responseText,
+  ) => {
+    const cleanedText = responseText?.trim();
+
+    if (!cleanedText) {
+      return;
+    }
+
+    stopAssistantAudio();
+
+    setAssistantAudioStatus(
+      'synthesising',
+    );
+    setAssistantAudioError('');
+    setLatestTtsMetadata(null);
+
+    try {
+      const playerNode =
+        await ensureTtsPlayer();
+
+      const ttsClient =
+        new TtsStreamClient({
+          onStarted: (metadata) => {
+            activeTtsStreamIdRef.current =
+              metadata.stream_id;
+
+            setLatestTtsMetadata({
+              voice:
+                metadata.voice_name,
+              language:
+                metadata.language_code,
+              sampleRate:
+                metadata.sample_rate,
+              characterCount:
+                metadata.character_count,
+              generationSeconds: 0,
+            });
+          },
+
+          onAudioChunk: ({
+            samples,
+          }) => {
+            playerNode.port.postMessage(
+              {
+                type: 'enqueue',
+                samples,
+              },
+              [samples.buffer],
+            );
+          },
+
+          onComplete: (metadata) => {
+            setLatestTtsMetadata(
+              (current) => ({
+                ...current,
+                generationSeconds:
+                  metadata
+                  .generation_seconds,
+                chunkCount:
+                  metadata.chunk_count,
+                audioBytes:
+                  metadata.audio_bytes,
+              }),
+            );
+
+            playerNode.port.postMessage({
+              type: 'complete',
+            });
+          },
+
+          onError: (error) => {
+            console.error(
+              'Streaming TTS failed:',
+              error,
+            );
+
+            playerNode.port.postMessage({
+              type: 'flush',
+            });
+
+            setAssistantAudioStatus(
+              'error',
+            );
+            setAssistantAudioError(
+              error.message,
+            );
+          },
+
+          onClose: () => {
+            if (
+              ttsStreamClientRef.current ===
+              ttsClient
+            ) {
+              ttsStreamClientRef.current =
+                null;
+            }
+          },
+        });
+
+      ttsStreamClientRef.current =
+        ttsClient;
+
+      await ttsClient.connect({
+        text: cleanedText,
+      });
+    } catch (error) {
+      console.error(
+        'Could not start TTS stream:',
+        error,
+      );
+
+      setAssistantAudioStatus(
+        'error',
+      );
+      setAssistantAudioError(
+        error instanceof Error
+          ? error.message
+          : 'Could not start TTS stream.',
+      );
+    }
   };
 
   const playAssistantResponse = async (
@@ -651,7 +877,7 @@ export default function MainApplication() {
         result.turn.should_finalise_turn &&
         result.query?.response
       ) {
-        void playAssistantResponse(
+        void streamAssistantResponse(
           result.query.response,
         );
       }

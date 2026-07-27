@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from threading import Lock
 from time import perf_counter
@@ -131,6 +132,91 @@ class GoogleTextToSpeechService:
             generation_seconds=generation_seconds,
             character_count=len(cleaned_text),
         )
+
+    def stream_synthesise(
+        self,
+        text: str,
+        *,
+        voice_name: str | None = None,
+        language_code: str | None = None,
+    ) -> Iterator[bytes]:
+        cleaned_text = text.strip()
+
+        if not cleaned_text:
+            raise ValueError(
+                "Text-to-speech input cannot be empty."
+            )
+
+        selected_voice = (
+            voice_name
+            or self.default_voice_name
+        )
+        selected_language = (
+            language_code
+            or self.default_language_code
+        )
+
+        client = self._get_client()
+
+        streaming_config = (
+            texttospeech.StreamingSynthesizeConfig(
+                voice=(
+                    texttospeech
+                    .VoiceSelectionParams(
+                        language_code=(
+                            selected_language
+                        ),
+                        name=selected_voice,
+                    )
+                ),
+                streaming_audio_config=(
+                    texttospeech
+                    .StreamingAudioConfig(
+                        audio_encoding=(
+                            texttospeech
+                            .AudioEncoding
+                            .PCM
+                        ),
+                        sample_rate_hertz=(
+                            self.sample_rate
+                        ),
+                    )
+                ),
+            )
+        )
+        config_request = (
+            texttospeech
+            .StreamingSynthesizeRequest(
+                streaming_config=(
+                    streaming_config
+                )
+            )
+        )
+        input_request = (
+            texttospeech
+            .StreamingSynthesizeRequest(
+                input=(
+                    texttospeech
+                    .StreamingSynthesisInput(
+                        text=cleaned_text,
+                    )
+                )
+            )
+        )
+
+        def request_generator():
+            yield config_request
+            yield input_request
+
+        responses = client.streaming_synthesize(
+            request_generator()
+        )
+
+        for response in responses:
+            audio_content = response.audio_content
+
+            if audio_content:
+                yield bytes(audio_content)
 
 
 google_tts_service = GoogleTextToSpeechService()
