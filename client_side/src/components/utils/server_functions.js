@@ -41,7 +41,7 @@ const cancel_res = () => {
     //setters.handleSetAsstResponding(false); // set assistant responding to false
     setters.setAudioQueue([]); // clear the audio queue
     //captionFunctions.handleSetCaption(''); // reset the caption
-    audioFunctions.stopAudio(); // stop the audio playing
+    audioFunctions.stopAudio?.(); // stop legacy audio if configured
     sendtoServer('cancel', {}); // Send cancel request to server
 }
 
@@ -99,7 +99,7 @@ const connectToServer = (import_setters) => { // 1. connection to server and han
                 
                 case 'audio_stream_complete': // server message indicating that all audio chunks have been streamed to client
                     console.log('server message: audio stream complete');
-                    audioFunctions.msg_audioStreamComplete(); // notify the audio player of last stream has ended so that it can monitor the end of playback and reset the audio system accordingly
+                    audioFunctions.msg_audioStreamComplete?.(); // notify legacy audio if configured
                     break;
                 
                 case 'reset_caption': // server indicates to reset the caption for new response

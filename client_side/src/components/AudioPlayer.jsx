@@ -1,67 +1,50 @@
-import React, { useEffect } from 'react';
-import { setAudioFunctionsinServer } from './utils/server_functions';
-import { ipv4 } from './utils/ipv4_module';
+import React from 'react';
+import { chimes } from './utils/lib/chimes';
 
-console.log('using AudioPlayer.js');
 
 export default function AudioPlayer({
-  speakAudioContextRef,
-  speakWorkletRef,
-  notifyPlaybackComplete,
-  stopRun,
+  stopAssistantAudio,
+  assistantAudioStatus,
 }) {
-  useEffect(() => {
-    if (!speakAudioContextRef.current) return;
-
-    async function setupAudioWorklet() {
-      const url = `http://${ipv4}:5000/worklets/pcm-player.worklet.js`;
-      await speakAudioContextRef.current.audioWorklet.addModule(url);
-      const node = new AudioWorkletNode(speakAudioContextRef.current, 'pcm-player');
-      node.connect(speakAudioContextRef.current.destination);
-      speakWorkletRef.current = node;
-
-      node.port.onmessage = (event) => {
-        if (event.data.type === 'playback_complete') {
-          console.log('playback complete message received in AudioPlayer');
-          notifyPlaybackComplete();
-        }
-      };
-
-      setAudioFunctionsinServer({
-        enqueuePCM: (pcm16) => {
-          speakWorkletRef.current?.port.postMessage(pcm16);
-        },
-        msg_audioStreamComplete: () => {
-          speakWorkletRef.current?.port.postMessage({ end: true });
-        },
-        stopAudio: () => {
-          speakWorkletRef.current?.port.postMessage({ flush: true });
-        },
-      });
-    }
-
-    setupAudioWorklet();
-  }, [notifyPlaybackComplete, speakAudioContextRef, speakWorkletRef]);
-
-  const handlePause = () => {
-    console.log('Pause button clicked');
-    stopRun();
-    speakWorkletRef.current?.port.postMessage({ flush: true });
-  };
+  const canStop =
+    assistantAudioStatus ===
+      'synthesising' ||
+    assistantAudioStatus ===
+      'playing';
 
   return (
-    <button type="button" onClick={handlePause} className="player-button stop-button">
+    <button
+      type="button"
+      onClick={stopAssistantAudio}
+      disabled={!canStop}
+      className="player-button stop-button"
+      aria-label="Stop assistant speech"
+    >
       ■
     </button>
   );
 }
 
+
+function playChime(audioData) {
+  const audio = new Audio(
+    `data:audio/wav;base64,${audioData}`,
+  );
+
+  audio.play().catch((error) => {
+    console.warn(
+      'Could not play microphone chime:',
+      error,
+    );
+  });
+}
+
+
 export const micOn_chime = () => {
-  const audio = new Audio(`http://${ipv4}:5000/chimes/on.wav`);
-  audio.play().catch((err) => console.warn('chime-on error:', err));
+  playChime(chimes.start);
 };
 
+
 export const micOff_chime = () => {
-  const audio = new Audio(`http://${ipv4}:5000/chimes/off.wav`);
-  audio.play().catch((err) => console.warn('chime-off error:', err));
+  playChime(chimes.stop);
 };

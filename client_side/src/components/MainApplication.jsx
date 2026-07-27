@@ -4,6 +4,7 @@ import MainApp from './MainApp';
 import { connectToServer, makeServerRequest } from './utils/server_functions';
 import { sendTurnBufferEvent } from '../api/conversationApi';
 import { AudioStreamClient } from '../api/audioStreamClient';
+import { synthesiseSpeech } from '../api/ttsApi';
 import { calculateRemainingSilenceMs } from '../audio/vadMath';
 
 const FORCED_FINALISATION_SILENCE_MS = 1800;
@@ -46,6 +47,18 @@ export default function MainApplication() {
     accumulatedSpokenTranscript,
     setAccumulatedSpokenTranscript,
   ] = useState('');
+  const [
+    assistantAudioStatus,
+    setAssistantAudioStatus,
+  ] = useState('idle');
+  const [
+    assistantAudioError,
+    setAssistantAudioError,
+  ] = useState('');
+  const [
+    latestTtsMetadata,
+    setLatestTtsMetadata,
+  ] = useState(null);
 
   const recordingRef = useRef(null);
   const listenAudioContextRef = useRef(null);
@@ -58,7 +71,7 @@ export default function MainApplication() {
   const currentAudio = useRef(null);
   const isPlaying = useRef(false);
   const speakAudioContextRef = useRef(null);
-  const speakWorkletRef = useRef(null);
+  const ttsAbortControllerRef = useRef(null);
   const audioStreamClientRef = useRef(null);
   const spokenTurnTranscriptRef = useRef('');
   const processTurnTranscriptRef = useRef(null);
@@ -165,6 +178,35 @@ export default function MainApplication() {
   useEffect(() => {
     return () => {
       clearSilenceReevaluationTimer();
+
+      ttsAbortControllerRef.current?.abort();
+
+      if (currentAudio.current) {
+        currentAudio.current.onended = null;
+
+        try {
+          currentAudio.current.stop();
+        } catch {
+          // The source may already have ended.
+        }
+
+        currentAudio.current = null;
+      }
+
+      const audioContext =
+        speakAudioContextRef.current;
+
+      if (
+        audioContext &&
+        audioContext.state !== 'closed'
+      ) {
+        audioContext.close().catch((error) => {
+          console.warn(
+            'Could not close assistant audio context:',
+            error,
+          );
+        });
+      }
     };
   }, []);
 
@@ -422,8 +464,150 @@ export default function MainApplication() {
     makeServerRequest('playback_complete', null);
   };
 
-  const stopRun = () => {
-    makeServerRequest('cancel', null);
+  const stopAssistantAudio = () => {
+    ttsAbortControllerRef.current?.abort();
+    ttsAbortControllerRef.current = null;
+
+    if (currentAudio.current) {
+      const source = currentAudio.current;
+
+      currentAudio.current = null;
+      source.onended = null;
+
+      try {
+        source.stop();
+      } catch {
+        // The source may already have ended.
+      }
+    }
+
+    isPlaying.current = false;
+    setAssistantAudioStatus('idle');
+  };
+
+  const playAssistantResponse = async (
+    responseText,
+  ) => {
+    const cleanedText = responseText?.trim();
+
+    if (!cleanedText) {
+      return;
+    }
+
+    ttsAbortControllerRef.current?.abort();
+
+    const abortController =
+      new AbortController();
+
+    ttsAbortControllerRef.current =
+      abortController;
+
+    setAssistantAudioStatus('synthesising');
+    setAssistantAudioError('');
+
+    try {
+      let audioContext =
+        speakAudioContextRef.current;
+
+      if (
+        !audioContext ||
+        audioContext.state === 'closed'
+      ) {
+        audioContext = new (
+          window.AudioContext ||
+          window.webkitAudioContext
+        )();
+
+        speakAudioContextRef.current =
+          audioContext;
+      }
+
+      if (
+        audioContext.state === 'suspended'
+      ) {
+        await audioContext.resume();
+      }
+
+      const {
+        audioData,
+        metadata,
+      } = await synthesiseSpeech({
+        text: cleanedText,
+        signal: abortController.signal,
+      });
+
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      const decodedAudio =
+        await audioContext.decodeAudioData(
+          audioData.slice(0),
+        );
+
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      currentAudio.current?.stop();
+
+      const source =
+        audioContext.createBufferSource();
+
+      source.buffer = decodedAudio;
+      source.connect(
+        audioContext.destination,
+      );
+
+      source.onended = () => {
+        if (
+          currentAudio.current === source
+        ) {
+          currentAudio.current = null;
+          isPlaying.current = false;
+          setAssistantAudioStatus('idle');
+          notifyPlaybackComplete();
+        }
+      };
+
+      currentAudio.current = source;
+      isPlaying.current = true;
+
+      setLatestTtsMetadata(metadata);
+      setAssistantAudioStatus('playing');
+
+      source.start();
+    } catch (error) {
+      if (
+        error instanceof DOMException &&
+        error.name === 'AbortError'
+      ) {
+        return;
+      }
+
+      console.error(
+        'Assistant speech playback failed:',
+        error,
+      );
+
+      isPlaying.current = false;
+      currentAudio.current = null;
+
+      setAssistantAudioStatus('error');
+      setAssistantAudioError(
+        error instanceof Error
+          ? error.message
+          : 'Assistant speech playback failed.',
+      );
+    } finally {
+      if (
+        ttsAbortControllerRef.current ===
+        abortController
+      ) {
+        ttsAbortControllerRef.current =
+          null;
+      }
+    }
   };
 
   const processTurnTranscript = async (
@@ -462,6 +646,15 @@ export default function MainApplication() {
 
       setLatestTurnResult(result);
       setTurnDecision(result.turn.decision);
+
+      if (
+        result.turn.should_finalise_turn &&
+        result.query?.response
+      ) {
+        await playAssistantResponse(
+          result.query.response,
+        );
+      }
 
       if (clearTypedInput && result.query) {
         setTestUtterance('');
@@ -613,14 +806,22 @@ export default function MainApplication() {
             isPlaying.current = status;
           }}
           isPlaying={isPlaying}
-          notifyPlaybackComplete={notifyPlaybackComplete}
-          speakAudioContextRef={speakAudioContextRef}
-          speakWorkletRef={speakWorkletRef}
           currentAudio={currentAudio}
           setCurrentAudio={(audio) => {
             currentAudio.current = audio;
           }}
-          stopRun={stopRun}
+          stopAssistantAudio={
+            stopAssistantAudio
+          }
+          assistantAudioStatus={
+            assistantAudioStatus
+          }
+          assistantAudioError={
+            assistantAudioError
+          }
+          latestTtsMetadata={
+            latestTtsMetadata
+          }
           panel={panel}
           tourItinerary={tourItinerary}
           setPanel={setPanel}

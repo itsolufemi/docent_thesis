@@ -13,10 +13,10 @@ export default function MainApp({
   accumulatedAudioRef,
   streamRef,
   sendChunkToServer,
-  notifyPlaybackComplete,
-  speakAudioContextRef,
-  speakWorkletRef,
-  stopRun,
+  stopAssistantAudio,
+  assistantAudioStatus,
+  assistantAudioError,
+  latestTtsMetadata,
   panel,
   tourItinerary,
   setPanel,
@@ -87,15 +87,34 @@ export default function MainApp({
           onVadSpeechEnd={onVadSpeechEnd}
         />
         <AudioPlayer
-          speakAudioContextRef={speakAudioContextRef}
-          speakWorkletRef={speakWorkletRef}
-          stopRun={stopRun}
-          notifyPlaybackComplete={notifyPlaybackComplete}
+          stopAssistantAudio={
+            stopAssistantAudio
+          }
+          assistantAudioStatus={
+            assistantAudioStatus
+          }
         />
       </header>
 
       <section className="audio-stream-debug">
         <p>Audio stream: {audioStreamStatus}</p>
+        <p>
+          Assistant audio: {assistantAudioStatus}
+        </p>
+
+        {latestTtsMetadata && (
+          <p>
+            TTS: {latestTtsMetadata.voice},{' '}
+            {latestTtsMetadata.generationSeconds.toFixed(2)}{' '}
+            seconds
+          </p>
+        )}
+
+        {assistantAudioError && (
+          <p className="turn-test-error">
+            {assistantAudioError}
+          </p>
+        )}
 
         {audioStreamSummary && (
           <>
