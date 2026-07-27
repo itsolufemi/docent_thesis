@@ -651,7 +651,7 @@ export default function MainApplication() {
         result.turn.should_finalise_turn &&
         result.query?.response
       ) {
-        await playAssistantResponse(
+        void playAssistantResponse(
           result.query.response,
         );
       }
