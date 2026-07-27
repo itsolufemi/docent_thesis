@@ -1,0 +1,136 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from threading import Lock
+from time import perf_counter
+
+from google.cloud import texttospeech
+
+
+DEFAULT_LANGUAGE_CODE = "en-GB"
+DEFAULT_VOICE_NAME = "en-GB-Chirp3-HD-Aoede"
+DEFAULT_SAMPLE_RATE = 24_000
+
+
+@dataclass(frozen=True)
+class SynthesisedSpeech:
+    audio: bytes
+    text: str
+    voice_name: str
+    language_code: str
+    sample_rate: int
+    generation_seconds: float
+    character_count: int
+
+
+class GoogleTextToSpeechService:
+    def __init__(
+        self,
+        *,
+        default_voice_name: str = (
+            DEFAULT_VOICE_NAME
+        ),
+        default_language_code: str = (
+            DEFAULT_LANGUAGE_CODE
+        ),
+        sample_rate: int = DEFAULT_SAMPLE_RATE,
+    ) -> None:
+        self.default_voice_name = default_voice_name
+        self.default_language_code = (
+            default_language_code
+        )
+        self.sample_rate = sample_rate
+
+        self._client: (
+            texttospeech.TextToSpeechClient
+            | None
+        ) = None
+        self._client_lock = Lock()
+
+    def _get_client(
+        self,
+    ) -> texttospeech.TextToSpeechClient:
+        if self._client is not None:
+            return self._client
+
+        with self._client_lock:
+            if self._client is None:
+                self._client = (
+                    texttospeech
+                    .TextToSpeechClient()
+                )
+
+        return self._client
+
+    def synthesise(
+        self,
+        text: str,
+        *,
+        voice_name: str | None = None,
+        language_code: str | None = None,
+    ) -> SynthesisedSpeech:
+        cleaned_text = text.strip()
+
+        if not cleaned_text:
+            raise ValueError(
+                "Text-to-speech input cannot be empty."
+            )
+
+        selected_voice = (
+            voice_name
+            or self.default_voice_name
+        )
+        selected_language = (
+            language_code
+            or self.default_language_code
+        )
+
+        client = self._get_client()
+
+        synthesis_input = (
+            texttospeech.SynthesisInput(
+                text=cleaned_text,
+            )
+        )
+        voice = (
+            texttospeech.VoiceSelectionParams(
+                language_code=selected_language,
+                name=selected_voice,
+            )
+        )
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=(
+                texttospeech.AudioEncoding.LINEAR16
+            ),
+            sample_rate_hertz=self.sample_rate,
+        )
+
+        started_at = perf_counter()
+
+        response = client.synthesize_speech(
+            input=synthesis_input,
+            voice=voice,
+            audio_config=audio_config,
+        )
+
+        generation_seconds = (
+            perf_counter() - started_at
+        )
+
+        if not response.audio_content:
+            raise RuntimeError(
+                "Google Cloud returned no audio."
+            )
+
+        return SynthesisedSpeech(
+            audio=response.audio_content,
+            text=cleaned_text,
+            voice_name=selected_voice,
+            language_code=selected_language,
+            sample_rate=self.sample_rate,
+            generation_seconds=generation_seconds,
+            character_count=len(cleaned_text),
+        )
+
+
+google_tts_service = GoogleTextToSpeechService()
