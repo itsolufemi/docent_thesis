@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from time import perf_counter
 from uuid import uuid4
 
 from fastapi import APIRouter, WebSocket
@@ -16,6 +17,9 @@ from conversation_core.memory.conversation_store import (
 )
 from conversation_core.schemas.turn_buffer_schemas import (
     TurnBufferEvent,
+)
+from conversation_core.schemas.llm_stream_schemas import (
+    LLMStreamEvent,
 )
 from conversation_core.schemas.utterance_route_schemas import (
     UtteranceRoute,
@@ -43,6 +47,55 @@ def _conversation_cookie_header(
         "HttpOnly; Path=/; SameSite=lax"
     )
     return b"set-cookie", cookie.encode("latin-1")
+
+
+def build_stream_websocket_message(
+    *,
+    request_id: str,
+    event: LLMStreamEvent,
+) -> dict:
+    if event.event_type == "response_started":
+        return {
+            "type": "response_started",
+            "request_id": request_id,
+            "payload": {},
+        }
+
+    if event.event_type == "content_delta":
+        return {
+            "type": "response_delta",
+            "request_id": request_id,
+            "payload": {
+                "text": event.text,
+            },
+        }
+
+    if event.event_type == "tool_call":
+        return {
+            "type": "tool_call_started",
+            "request_id": request_id,
+            "payload": {
+                "tool_calls": event.tool_calls,
+            },
+        }
+
+    if event.event_type == "tool_result":
+        return {
+            "type": "tool_call_complete",
+            "request_id": request_id,
+            "payload": {
+                "tool_name": event.tool_name,
+                "result": event.tool_result,
+            },
+        }
+
+    return {
+        "type": "response_complete",
+        "request_id": request_id,
+        "payload": {
+            "response": event.text,
+        },
+    }
 
 
 async def process_streamed_turn_event(
@@ -139,16 +192,90 @@ async def process_streamed_turn_event(
             }
         )
 
-        query_result = await asyncio.to_thread(
-            query_engine.generate_response,
-            text=finalised_utterance,
-            conversation_id=conversation_id,
-            subject_reference=None,
-            utterance_route=utterance_route,
-            include_debug=bool(
-                payload.get("debug", False)
-            ),
+        stream_queue: asyncio.Queue[
+            LLMStreamEvent | None
+        ] = asyncio.Queue()
+        event_loop = asyncio.get_running_loop()
+
+        def handle_stream_event(
+            event: LLMStreamEvent,
+        ) -> None:
+            event_loop.call_soon_threadsafe(
+                stream_queue.put_nowait,
+                event,
+            )
+
+        async def run_query():
+            try:
+                return await asyncio.to_thread(
+                    query_engine
+                    .generate_streaming_response,
+                    text=finalised_utterance,
+                    conversation_id=conversation_id,
+                    subject_reference=None,
+                    utterance_route=utterance_route,
+                    include_debug=bool(
+                        payload.get(
+                            "debug",
+                            False,
+                        )
+                    ),
+                    on_stream_event=(
+                        handle_stream_event
+                    ),
+                )
+            finally:
+                await stream_queue.put(None)
+
+        query_started_at = perf_counter()
+        first_delta_sent = False
+        query_task = asyncio.create_task(
+            run_query()
         )
+
+        try:
+            while True:
+                stream_event = (
+                    await stream_queue.get()
+                )
+
+                if stream_event is None:
+                    break
+
+                if (
+                    stream_event.event_type
+                    == "content_delta"
+                    and not first_delta_sent
+                ):
+                    first_delta_sent = True
+
+                    await websocket.send_json(
+                        {
+                            "type": (
+                                "response_first_delta"
+                            ),
+                            "request_id": request_id,
+                            "payload": {
+                                "seconds": round(
+                                    perf_counter()
+                                    - query_started_at,
+                                    4,
+                                ),
+                            },
+                        }
+                    )
+
+                await websocket.send_json(
+                    build_stream_websocket_message(
+                        request_id=request_id,
+                        event=stream_event,
+                    )
+                )
+
+            query_result = await query_task
+        finally:
+            if not query_task.done():
+                query_task.cancel()
 
         await websocket.send_json(
             {
@@ -159,16 +286,21 @@ async def process_streamed_turn_event(
                 ),
             }
         )
+    except WebSocketDisconnect:
+        return
     except Exception as error:
-        await websocket.send_json(
-            {
-                "type": "turn_error",
-                "request_id": request_id,
-                "payload": {
-                    "detail": str(error),
-                },
-            }
-        )
+        try:
+            await websocket.send_json(
+                {
+                    "type": "turn_error",
+                    "request_id": request_id,
+                    "payload": {
+                        "detail": str(error),
+                    },
+                }
+            )
+        except (WebSocketDisconnect, RuntimeError):
+            return
 
 
 def create_turn_buffer_stream_router(

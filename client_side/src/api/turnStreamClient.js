@@ -21,6 +21,12 @@ export class TurnStreamClient {
     onTurnEvaluated,
     onUtteranceClassified,
     onQueryStarted,
+    onResponseStarted,
+    onResponseFirstDelta,
+    onResponseDelta,
+    onToolCallStarted,
+    onToolCallComplete,
+    onResponseComplete,
     onQueryComplete,
     onError,
     onClose,
@@ -33,6 +39,18 @@ export class TurnStreamClient {
       onUtteranceClassified;
     this.onQueryStarted =
       onQueryStarted;
+    this.onResponseStarted =
+      onResponseStarted;
+    this.onResponseFirstDelta =
+      onResponseFirstDelta;
+    this.onResponseDelta =
+      onResponseDelta;
+    this.onToolCallStarted =
+      onToolCallStarted;
+    this.onToolCallComplete =
+      onToolCallComplete;
+    this.onResponseComplete =
+      onResponseComplete;
     this.onQueryComplete =
       onQueryComplete;
     this.onError = onError;
@@ -126,6 +144,54 @@ export class TurnStreamClient {
 
       case 'query_started':
         this.onQueryStarted?.({
+          requestId:
+            message.request_id,
+          payload,
+        });
+        break;
+
+      case 'response_started':
+        this.onResponseStarted?.({
+          requestId:
+            message.request_id,
+          payload,
+        });
+        break;
+
+      case 'response_first_delta':
+        this.onResponseFirstDelta?.({
+          requestId:
+            message.request_id,
+          payload,
+        });
+        break;
+
+      case 'response_delta':
+        this.onResponseDelta?.({
+          requestId:
+            message.request_id,
+          payload,
+        });
+        break;
+
+      case 'tool_call_started':
+        this.onToolCallStarted?.({
+          requestId:
+            message.request_id,
+          payload,
+        });
+        break;
+
+      case 'tool_call_complete':
+        this.onToolCallComplete?.({
+          requestId:
+            message.request_id,
+          payload,
+        });
+        break;
+
+      case 'response_complete':
+        this.onResponseComplete?.({
           requestId:
             message.request_id,
           payload,

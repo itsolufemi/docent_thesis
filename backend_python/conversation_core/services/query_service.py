@@ -13,6 +13,9 @@ from conversation_core.schemas.conversation_schemas import (
     DialogueTurn,
     ConversationBranch,
 )
+from conversation_core.schemas.llm_stream_schemas import (
+    LLMStreamEvent,
+)
 from conversation_core.schemas.prompt_schemas import (
     PromptProfile,
     PromptSection,
@@ -28,6 +31,7 @@ from conversation_core.schemas.utterance_route_schemas import (
 from conversation_core.services.llm_service import (
     generate_llm_response,
     generate_tool_aware_llm_response,
+    stream_tool_aware_llm_response,
 )
 from conversation_core.services.prompt_service import (
     build_prompt,
@@ -64,6 +68,11 @@ PromptBuilder = Callable[
 ResponseGenerator = Callable[
     [str, str | None],
     str,
+]
+
+LLMStreamCallback = Callable[
+    [LLMStreamEvent],
+    None,
 ]
 
 def default_response_generator(
@@ -248,6 +257,220 @@ class QueryEngine:
             response=response,
             conversation_id=conversation_id,
             subject_reference=resolved_context.subject_reference,
+            sources=resolved_context.sources,
+            debug=debug,
+        )
+
+    def generate_streaming_response(
+        self,
+        text: str,
+        conversation_id: str | None = None,
+        subject_reference: str | None = None,
+        utterance_route: UtteranceRoute | None = None,
+        include_debug: bool = False,
+        on_stream_event: LLMStreamCallback | None = None,
+    ) -> QueryResult:
+        request_started_at = perf_counter()
+
+        conversation_created = False
+        dialogue_history: list[DialogueTurn] = []
+        active_branch: ConversationBranch | None = None
+        conversation_state = None
+
+        if conversation_id is not None:
+            conversation_state = get_conversation(
+                conversation_id
+            )
+
+        if conversation_state is None:
+            conversation_state = create_conversation()
+            conversation_id = conversation_state.conversation_id
+            conversation_created = True
+
+        if conversation_state is not None:
+            dialogue_history = get_recent_conversation_history(
+                conversation_id=conversation_id,
+            )
+            active_branch = get_active_branch(
+                conversation_id=conversation_id,
+            )
+
+            if (
+                subject_reference is None
+                and active_branch is not None
+                and active_branch.current_subjects
+            ):
+                current_subject = (
+                    active_branch.current_subjects[0]
+                )
+                subject_reference = (
+                    current_subject.reference
+                    or current_subject.label
+                )
+
+        context_resolution_started_at = perf_counter()
+
+        resolved_context = self.subject_resolver(
+            subject_reference,
+            text,
+            utterance_route,
+        )
+
+        context_resolution_seconds = (
+            perf_counter()
+            - context_resolution_started_at
+        )
+
+        prompt = self.prompt_builder(
+            text,
+            dialogue_history,
+            resolved_context,
+            active_branch,
+        )
+
+        response_generation_started_at = perf_counter()
+
+        if conversation_id is None:
+            response = generate_llm_response(
+                prompt
+            )
+
+            if on_stream_event is not None:
+                on_stream_event(
+                    LLMStreamEvent(
+                        event_type="response_started",
+                    )
+                )
+                on_stream_event(
+                    LLMStreamEvent(
+                        event_type="content_delta",
+                        text=response,
+                    )
+                )
+                on_stream_event(
+                    LLMStreamEvent(
+                        event_type="response_complete",
+                        text=response,
+                        done=True,
+                    )
+                )
+        else:
+            response_parts: list[str] = []
+            buffer_for_tool_decision = (
+                utterance_route is not None
+                and utterance_route.route_type
+                == "call_to_action"
+            )
+
+            for stream_event in (
+                stream_tool_aware_llm_response(
+                    prompt=prompt,
+                    conversation_id=conversation_id,
+                    buffer_for_tool_decision=(
+                        buffer_for_tool_decision
+                    ),
+                )
+            ):
+                if (
+                    stream_event.event_type
+                    == "content_delta"
+                ):
+                    response_parts.append(
+                        stream_event.text
+                    )
+
+                if on_stream_event is not None:
+                    on_stream_event(
+                        stream_event
+                    )
+
+            response = "".join(
+                response_parts
+            ).strip()
+
+        response_generation_seconds = (
+            perf_counter()
+            - response_generation_started_at
+        )
+
+        if conversation_state is not None:
+            add_dialogue_turn(
+                conversation_id=(
+                    conversation_state.conversation_id
+                ),
+                role="user",
+                content=text,
+            )
+            add_dialogue_turn(
+                conversation_id=(
+                    conversation_state.conversation_id
+                ),
+                role="assistant",
+                content=response,
+            )
+
+        total_request_seconds = (
+            perf_counter() - request_started_at
+        )
+
+        timing_debug_payload = {
+            **resolved_context.debug_payload,
+            "conversation_created": conversation_created,
+            "timings": {
+                "total_request_seconds": round(
+                    total_request_seconds,
+                    4,
+                ),
+                "context_resolution_seconds": round(
+                    context_resolution_seconds,
+                    4,
+                ),
+                "response_generation_seconds": round(
+                    response_generation_seconds,
+                    4,
+                ),
+            },
+        }
+
+        debug = None
+
+        if include_debug:
+            debug = QueryDebugInfo(
+                conversation_found=(
+                    conversation_state is not None
+                ),
+                subject_reference=(
+                    resolved_context.subject_reference
+                ),
+                context_source=(
+                    resolved_context.context_source
+                ),
+                context_used=bool(
+                    resolved_context.sources
+                    or resolved_context.prompt_payload
+                ),
+                dialogue_turns_used=len(
+                    dialogue_history
+                ),
+                prompt=prompt,
+                retrieval_used=(
+                    resolved_context.context_source
+                    not in NON_RETRIEVAL_CONTEXT_SOURCES
+                ),
+                sources_count=len(
+                    resolved_context.sources
+                ),
+                sources=resolved_context.sources,
+                debug_payload=timing_debug_payload,
+            )
+
+        return QueryResult(
+            request=text,
+            response=response,
+            conversation_id=conversation_id,
+            subject_reference=(
+                resolved_context.subject_reference
+            ),
             sources=resolved_context.sources,
             debug=debug,
         )

@@ -1,10 +1,14 @@
 import httpx
 import json
 
+from collections.abc import Iterator
 from typing import Any
 
 from config import settings
 
+from conversation_core.schemas.llm_stream_schemas import (
+    LLMStreamEvent,
+)
 from conversation_core.schemas.tool_schemas import (
     ToolCall,
     ToolExecutionContext,
@@ -167,6 +171,243 @@ def send_ollama_chat_request(
     response.raise_for_status()
 
     return response.json()
+
+
+def stream_ollama_chat_request(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
+) -> Iterator[dict[str, Any]]:
+    url = (
+        f"{settings.ollama_base_url}"
+        "/api/chat"
+    )
+
+    payload: dict[str, Any] = {
+        "model": settings.ollama_model,
+        "messages": messages,
+        "stream": True,
+    }
+
+    if tools:
+        payload["tools"] = tools
+
+    with httpx.stream(
+        method="POST",
+        url=url,
+        json=payload,
+        timeout=120.0,
+    ) as response:
+        response.raise_for_status()
+
+        for line in response.iter_lines():
+            if not line:
+                continue
+
+            try:
+                chunk = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            yield chunk
+
+
+def stream_tool_aware_llm_response(
+    prompt: str,
+    conversation_id: str,
+    *,
+    buffer_for_tool_decision: bool,
+    max_tool_rounds: int = 5,
+) -> Iterator[LLMStreamEvent]:
+    messages: list[dict[str, Any]] = [
+        {
+            "role": "user",
+            "content": prompt,
+        }
+    ]
+    tools = build_ollama_tool_definitions()
+    execution_context = ToolExecutionContext(
+        conversation_id=conversation_id
+    )
+    tool_has_executed = False
+
+    yield LLMStreamEvent(
+        event_type="response_started",
+    )
+
+    try:
+        for _ in range(max_tool_rounds):
+            round_content_parts: list[str] = []
+            round_tool_calls: list[ToolCall] = []
+            buffer_current_round = (
+                buffer_for_tool_decision
+                and not tool_has_executed
+            )
+
+            for chunk in stream_ollama_chat_request(
+                messages=messages,
+                tools=tools,
+            ):
+                response_message = (
+                    chunk.get("message") or {}
+                )
+                content_delta = (
+                    response_message.get("content")
+                    or ""
+                )
+                raw_tool_calls = (
+                    response_message.get(
+                        "tool_calls"
+                    )
+                    or []
+                )
+
+                if content_delta:
+                    round_content_parts.append(
+                        content_delta
+                    )
+
+                    if not buffer_current_round:
+                        yield LLMStreamEvent(
+                            event_type="content_delta",
+                            text=content_delta,
+                        )
+
+                if raw_tool_calls:
+                    round_tool_calls.extend(
+                        parse_ollama_tool_calls(
+                            response_message
+                        )
+                    )
+
+                if chunk.get("done"):
+                    break
+
+            complete_round_content = "".join(
+                round_content_parts
+            ).strip()
+
+            if round_tool_calls:
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": (
+                            complete_round_content
+                        ),
+                        "tool_calls": [
+                            {
+                                "type": "function",
+                                "function": {
+                                    "name": (
+                                        tool_call.name
+                                    ),
+                                    "arguments": (
+                                        tool_call.arguments
+                                    ),
+                                },
+                            }
+                            for tool_call
+                            in round_tool_calls
+                        ],
+                    }
+                )
+
+                for tool_call in round_tool_calls:
+                    yield LLMStreamEvent(
+                        event_type="tool_call",
+                        tool_calls=[
+                            tool_call.model_dump(
+                                mode="json"
+                            )
+                        ],
+                    )
+
+                    execution_result = (
+                        core_tool_registry.execute(
+                            tool_call=tool_call,
+                            context=execution_context,
+                        )
+                    )
+                    result_payload = (
+                        execution_result.model_dump(
+                            mode="json"
+                        )
+                    )
+
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_name": (
+                                tool_call.name
+                            ),
+                            "content": (
+                                execution_result
+                                .model_dump_json()
+                            ),
+                        }
+                    )
+
+                    yield LLMStreamEvent(
+                        event_type="tool_result",
+                        tool_name=tool_call.name,
+                        tool_result=result_payload,
+                    )
+
+                tool_has_executed = True
+                continue
+
+            if (
+                complete_round_content
+                and buffer_current_round
+            ):
+                yield LLMStreamEvent(
+                    event_type="content_delta",
+                    text=complete_round_content,
+                )
+
+            yield LLMStreamEvent(
+                event_type="response_complete",
+                text=complete_round_content,
+                done=True,
+            )
+            return
+
+        limit_message = (
+            "I could not complete the operation "
+            "because the tool-calling limit "
+            "was reached."
+        )
+
+        yield LLMStreamEvent(
+            event_type="content_delta",
+            text=limit_message,
+        )
+        yield LLMStreamEvent(
+            event_type="response_complete",
+            text=limit_message,
+            done=True,
+        )
+    except httpx.ConnectError:
+        error_message = "error: couldn't connect the llm"
+    except httpx.HTTPStatusError as error:
+        error_message = (
+            f"ollama error: {error.response.status_code} - "
+            f"{error.response.text}"
+        )
+    except Exception as error:
+        error_message = f"error: {error}"
+    else:
+        return
+
+    yield LLMStreamEvent(
+        event_type="content_delta",
+        text=error_message,
+    )
+    yield LLMStreamEvent(
+        event_type="response_complete",
+        text=error_message,
+        done=True,
+    )
+
 
 def generate_tool_aware_llm_response(
     prompt: str,

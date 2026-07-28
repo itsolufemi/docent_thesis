@@ -27,6 +27,7 @@ export default function MainApp({
   turnRequestError,
   turnDecision,
   latestTurnResult,
+  streamedAssistantResponse,
   onAudioSegmentStart,
   onAudioSegmentFinalise,
   onAudioSegmentCancel,
@@ -64,6 +65,18 @@ export default function MainApp({
       setCaption(assistantResponse);
     }
   }, [latestTurnResult]);
+
+  React.useEffect(() => {
+    if (
+      streamedAssistantResponse === null
+    ) {
+      return;
+    }
+
+    setCaption(
+      streamedAssistantResponse,
+    );
+  }, [streamedAssistantResponse]);
 
   return (
     <div className="main-app">

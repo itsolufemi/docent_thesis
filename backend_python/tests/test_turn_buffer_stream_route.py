@@ -1,7 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -16,6 +16,9 @@ from conversation_core.api.routes_turn_buffer_stream import (
     create_turn_buffer_stream_router,
 )
 from conversation_core.schemas.query_schemas import QueryResult
+from conversation_core.schemas.llm_stream_schemas import (
+    LLMStreamEvent,
+)
 from conversation_core.schemas.turn_buffer_schemas import (
     TurnBufferResult,
     TurnBufferState,
@@ -60,12 +63,40 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
             return_value=utterance_route,
         )
         query_engine = Mock()
-        query_engine.generate_response.return_value = (
-            QueryResult(
+
+        def generate_streaming_response(
+            *,
+            on_stream_event,
+            **_,
+        ):
+            for event in (
+                LLMStreamEvent(
+                    event_type="response_started",
+                ),
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text="It was ",
+                ),
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text="painted around 1767.",
+                ),
+                LLMStreamEvent(
+                    event_type="response_complete",
+                    text="It was painted around 1767.",
+                    done=True,
+                ),
+            ):
+                on_stream_event(event)
+
+            return QueryResult(
                 request="Wait, when was it painted?",
                 response="It was painted around 1767.",
                 conversation_id="conversation-test",
             )
+
+        query_engine.generate_streaming_response.side_effect = (
+            generate_streaming_response
         )
 
         app = FastAPI()
@@ -103,7 +134,7 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
 
                 messages = [
                     websocket.receive_json()
-                    for _ in range(4)
+                    for _ in range(9)
                 ]
 
         self.assertEqual(
@@ -116,6 +147,11 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
                 "turn_evaluated",
                 "utterance_classified",
                 "query_started",
+                "response_started",
+                "response_first_delta",
+                "response_delta",
+                "response_delta",
+                "response_complete",
                 "query_complete",
             ],
         )
@@ -127,12 +163,22 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
             "Wait, when was it painted?",
             True,
         )
-        query_engine.generate_response.assert_called_once_with(
+        query_engine.generate_streaming_response.assert_called_once_with(
             text="Wait, when was it painted?",
             conversation_id=conversation_id,
             subject_reference=None,
             utterance_route=utterance_route,
             include_debug=True,
+            on_stream_event=ANY,
+        )
+        streamed_text = "".join(
+            message["payload"]["text"]
+            for message in messages
+            if message["type"] == "response_delta"
+        )
+        self.assertEqual(
+            streamed_text,
+            messages[-1]["payload"]["response"],
         )
 
     def test_invalid_message_type_returns_turn_error(

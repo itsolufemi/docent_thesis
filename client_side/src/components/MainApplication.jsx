@@ -45,6 +45,10 @@ export default function MainApplication() {
   const [turnRequestPending, setTurnRequestPending] = useState(false);
   const [turnRequestError, setTurnRequestError] = useState('');
   const [latestTurnResult, setLatestTurnResult] = useState(null);
+  const [
+    streamedAssistantResponse,
+    setStreamedAssistantResponse,
+  ] = useState(null);
   const [audioStreamStatus, setAudioStreamStatus] = useState('disconnected');
   const [audioStreamSummary, setAudioStreamSummary] = useState(null);
   const [audioStreamError, setAudioStreamError] = useState('');
@@ -90,6 +94,8 @@ export default function MainApplication() {
   const turnStreamConnectionPromiseRef =
     useRef(null);
   const pendingTurnRequestsRef =
+    useRef(new Map());
+  const streamedResponsesRef =
     useRef(new Map());
   const spokenTurnTranscriptRef = useRef('');
   const processTurnTranscriptRef = useRef(null);
@@ -319,6 +325,7 @@ export default function MainApplication() {
       }
 
       pendingTurnRequestsRef.current.clear();
+      streamedResponsesRef.current.clear();
 
       if (currentAudio.current) {
         currentAudio.current.onended = null;
@@ -768,6 +775,85 @@ export default function MainApplication() {
         setTurnRequestPending(true);
       },
 
+      onResponseStarted: ({
+        requestId,
+      }) => {
+        streamedResponsesRef.current.set(
+          requestId,
+          '',
+        );
+        setStreamedAssistantResponse('');
+      },
+
+      onResponseFirstDelta: ({
+        payload,
+      }) => {
+        console.log(
+          'LLM first delta timing:',
+          payload,
+        );
+      },
+
+      onResponseDelta: ({
+        requestId,
+        payload,
+      }) => {
+        const delta = payload.text ?? '';
+        const existingText =
+          streamedResponsesRef.current.get(
+            requestId,
+          ) ?? '';
+        const updatedText =
+          `${existingText}${delta}`;
+
+        streamedResponsesRef.current.set(
+          requestId,
+          updatedText,
+        );
+        setStreamedAssistantResponse(
+          updatedText,
+        );
+      },
+
+      onToolCallStarted: ({
+        payload,
+      }) => {
+        console.log(
+          'Tool call started:',
+          payload,
+        );
+      },
+
+      onToolCallComplete: ({
+        payload,
+      }) => {
+        console.log(
+          'Tool call complete:',
+          payload,
+        );
+      },
+
+      onResponseComplete: ({
+        requestId,
+        payload,
+      }) => {
+        const streamedText =
+          streamedResponsesRef.current.get(
+            requestId,
+          ) ?? '';
+        const completedText =
+          payload.response ??
+          streamedText;
+
+        streamedResponsesRef.current.set(
+          requestId,
+          completedText,
+        );
+        setStreamedAssistantResponse(
+          completedText,
+        );
+      },
+
       onQueryComplete: ({
         requestId,
         payload,
@@ -782,9 +868,27 @@ export default function MainApplication() {
           pendingTurnRequestsRef.current.get(
             requestId,
           );
+        const streamedText =
+          streamedResponsesRef.current.get(
+            requestId,
+          ) ?? '';
+
+        console.log({
+          streamedText,
+          finalText: payload.response,
+          equal:
+            streamedText.trim() ===
+            (payload.response ?? '').trim(),
+        });
 
         pendingTurnRequestsRef.current.delete(
           requestId,
+        );
+        streamedResponsesRef.current.delete(
+          requestId,
+        );
+        setStreamedAssistantResponse(
+          payload.response ?? streamedText,
         );
 
         pendingRequest?.resolve({
@@ -1483,6 +1587,9 @@ export default function MainApplication() {
           turnRequestError={turnRequestError}
           turnDecision={turnDecision}
           latestTurnResult={latestTurnResult}
+          streamedAssistantResponse={
+            streamedAssistantResponse
+          }
           onAudioSegmentStart={startAudioSegment}
           onAudioSegmentFinalise={
             finaliseAudioSegment
