@@ -10,6 +10,11 @@ import { calculateRemainingSilenceMs } from '../audio/vadMath';
 
 const FORCED_FINALISATION_SILENCE_MS = 1800;
 const INITIAL_VAD_SILENCE_MS = 600;
+const BARGE_IN_CONFIRMATION_MS = 200;
+const ASSISTANT_DUCK_GAIN = 0.3;
+const ASSISTANT_NORMAL_GAIN = 1.0;
+const DUCK_RAMP_SECONDS = 0.08;
+const RESTORE_RAMP_SECONDS = 0.12;
 
 function appendTranscriptSegment(
   existingTranscript,
@@ -76,6 +81,10 @@ export default function MainApplication() {
   const ttsPlayerNodeRef = useRef(null);
   const ttsStreamClientRef = useRef(null);
   const activeTtsStreamIdRef = useRef(null);
+  const assistantGainNodeRef = useRef(null);
+  const duckingTimerRef = useRef(null);
+  const assistantIsDuckedRef = useRef(false);
+  const assistantAudioStatusRef = useRef('idle');
   const audioStreamClientRef = useRef(null);
   const spokenTurnTranscriptRef = useRef('');
   const processTurnTranscriptRef = useRef(null);
@@ -88,6 +97,72 @@ export default function MainApplication() {
   const vadSpeechEndedAtRef = useRef(null);
   const awaitingSpeechContinuationRef = useRef(false);
   const silenceReevaluationTimerRef = useRef(null);
+
+  const setAssistantGain = (
+    targetGain,
+    rampSeconds,
+  ) => {
+    const audioContext =
+      speakAudioContextRef.current;
+    const gainNode =
+      assistantGainNodeRef.current;
+
+    if (
+      !audioContext ||
+      !gainNode ||
+      audioContext.state === 'closed'
+    ) {
+      return;
+    }
+
+    const now = audioContext.currentTime;
+    const gain = gainNode.gain;
+
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(
+      gain.value,
+      now,
+    );
+    gain.linearRampToValueAtTime(
+      targetGain,
+      now + rampSeconds,
+    );
+  };
+
+  const duckAssistantAudio = () => {
+    if (assistantIsDuckedRef.current) {
+      return;
+    }
+
+    assistantIsDuckedRef.current = true;
+    setAssistantGain(
+      ASSISTANT_DUCK_GAIN,
+      DUCK_RAMP_SECONDS,
+    );
+  };
+
+  const restoreAssistantAudio = () => {
+    if (!assistantIsDuckedRef.current) {
+      return;
+    }
+
+    assistantIsDuckedRef.current = false;
+    setAssistantGain(
+      ASSISTANT_NORMAL_GAIN,
+      RESTORE_RAMP_SECONDS,
+    );
+  };
+
+  const clearDuckingTimer = () => {
+    if (!duckingTimerRef.current) {
+      return;
+    }
+
+    window.clearTimeout(
+      duckingTimerRef.current,
+    );
+    duckingTimerRef.current = null;
+  };
 
   const clearSilenceReevaluationTimer = () => {
     if (silenceReevaluationTimerRef.current) {
@@ -104,6 +179,36 @@ export default function MainApplication() {
     vadSpeechEndedAtRef.current = null;
     awaitingSpeechContinuationRef.current = false;
     clearSilenceReevaluationTimer();
+    clearDuckingTimer();
+
+    const assistantIsActive =
+      assistantAudioStatusRef.current ===
+        'synthesising' ||
+      assistantAudioStatusRef.current ===
+        'playing';
+
+    if (!assistantIsActive) {
+      return;
+    }
+
+    duckingTimerRef.current =
+      window.setTimeout(() => {
+        duckingTimerRef.current = null;
+
+        if (!vadSpeechActiveRef.current) {
+          return;
+        }
+
+        const assistantStillActive =
+          assistantAudioStatusRef.current ===
+            'synthesising' ||
+          assistantAudioStatusRef.current ===
+            'playing';
+
+        if (assistantStillActive) {
+          duckAssistantAudio();
+        }
+      }, BARGE_IN_CONFIRMATION_MS);
   };
 
   const handleVadSpeechEnd = (
@@ -113,6 +218,7 @@ export default function MainApplication() {
     vadSpeechEndedAtRef.current =
       performance.now() -
       Math.max(0, silenceDurationMs);
+    clearDuckingTimer();
   };
 
   const scheduleSilenceReevaluation = (
@@ -176,12 +282,19 @@ export default function MainApplication() {
       awaitingSpeechContinuationRef.current =
         false;
       clearSilenceReevaluationTimer();
+      clearDuckingTimer();
     }
   }, [recording]);
 
   useEffect(() => {
+    assistantAudioStatusRef.current =
+      assistantAudioStatus;
+  }, [assistantAudioStatus]);
+
+  useEffect(() => {
     return () => {
       clearSilenceReevaluationTimer();
+      clearDuckingTimer();
 
       ttsAbortControllerRef.current?.abort();
 
@@ -205,6 +318,11 @@ export default function MainApplication() {
           null;
         ttsPlayerNodeRef.current.disconnect();
         ttsPlayerNodeRef.current = null;
+      }
+
+      if (assistantGainNodeRef.current) {
+        assistantGainNodeRef.current.disconnect();
+        assistantGainNodeRef.current = null;
       }
 
       const audioContext =
@@ -479,6 +597,8 @@ export default function MainApplication() {
   };
 
   const stopAssistantAudio = () => {
+    clearDuckingTimer();
+
     ttsAbortControllerRef.current?.abort();
     ttsAbortControllerRef.current = null;
 
@@ -505,6 +625,7 @@ export default function MainApplication() {
     }
 
     isPlaying.current = false;
+    restoreAssistantAudio();
     setAssistantAudioStatus('idle');
   };
 
@@ -547,9 +668,24 @@ export default function MainApplication() {
           },
         );
 
-      playerNode.connect(
-        audioContext.destination,
-      );
+      let gainNode =
+        assistantGainNodeRef.current;
+
+      if (!gainNode) {
+        gainNode =
+          audioContext.createGain();
+        gainNode.gain.value =
+          assistantIsDuckedRef.current
+            ? ASSISTANT_DUCK_GAIN
+            : ASSISTANT_NORMAL_GAIN;
+        gainNode.connect(
+          audioContext.destination,
+        );
+        assistantGainNodeRef.current =
+          gainNode;
+      }
+
+      playerNode.connect(gainNode);
 
       playerNode.port.onmessage = (
         event,
@@ -566,6 +702,7 @@ export default function MainApplication() {
             isPlaying.current = false;
             activeTtsStreamIdRef.current =
               null;
+            restoreAssistantAudio();
             setAssistantAudioStatus(
               'idle',
             );
@@ -574,6 +711,7 @@ export default function MainApplication() {
 
           case 'playback_flushed':
             isPlaying.current = false;
+            restoreAssistantAudio();
             break;
 
           default:
@@ -598,6 +736,7 @@ export default function MainApplication() {
     }
 
     stopAssistantAudio();
+    restoreAssistantAudio();
 
     setAssistantAudioStatus(
       'synthesising',
