@@ -21,6 +21,9 @@ from conversation_core.schemas.query_schemas import (
 from conversation_core.services.query_service import (
     QueryEngine,
 )
+from conversation_core.services.cancellation import (
+    CancellationToken,
+)
 
 
 def resolve_context(
@@ -112,6 +115,38 @@ class QueryStreamingServiceTest(unittest.TestCase):
             history[1].content,
             "A streamed answer.",
         )
+
+    def test_cancelled_response_stores_only_user_turn(
+        self,
+    ) -> None:
+        token = CancellationToken()
+        token.cancel()
+        observed_events = []
+        engine = QueryEngine(
+            subject_resolver=resolve_context,
+            prompt_builder=build_prompt,
+        )
+
+        result = engine.generate_streaming_response(
+            text="Interrupted question",
+            on_stream_event=observed_events.append,
+            cancellation_token=token,
+        )
+
+        self.assertEqual(result.response, "")
+        self.assertEqual(
+            [
+                event.event_type
+                for event in observed_events
+            ],
+            ["response_cancelled"],
+        )
+
+        history = get_recent_conversation_history(
+            conversation_id=result.conversation_id,
+        )
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0].role, "user")
 
 
 if __name__ == "__main__":

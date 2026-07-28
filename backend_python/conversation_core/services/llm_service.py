@@ -9,6 +9,9 @@ from config import settings
 from conversation_core.schemas.llm_stream_schemas import (
     LLMStreamEvent,
 )
+from conversation_core.services.cancellation import (
+    CancellationToken,
+)
 from conversation_core.schemas.tool_schemas import (
     ToolCall,
     ToolExecutionContext,
@@ -176,6 +179,7 @@ def send_ollama_chat_request(
 def stream_ollama_chat_request(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
+    cancellation_token: CancellationToken | None = None,
 ) -> Iterator[dict[str, Any]]:
     url = (
         f"{settings.ollama_base_url}"
@@ -191,6 +195,12 @@ def stream_ollama_chat_request(
     if tools:
         payload["tools"] = tools
 
+    if (
+        cancellation_token is not None
+        and cancellation_token.is_cancelled
+    ):
+        return
+
     with httpx.stream(
         method="POST",
         url=url,
@@ -200,6 +210,13 @@ def stream_ollama_chat_request(
         response.raise_for_status()
 
         for line in response.iter_lines():
+            if (
+                cancellation_token is not None
+                and cancellation_token.is_cancelled
+            ):
+                response.close()
+                return
+
             if not line:
                 continue
 
@@ -216,6 +233,7 @@ def stream_tool_aware_llm_response(
     conversation_id: str,
     *,
     buffer_for_tool_decision: bool,
+    cancellation_token: CancellationToken | None = None,
     max_tool_rounds: int = 5,
 ) -> Iterator[LLMStreamEvent]:
     messages: list[dict[str, Any]] = [
@@ -230,12 +248,32 @@ def stream_tool_aware_llm_response(
     )
     tool_has_executed = False
 
+    if (
+        cancellation_token is not None
+        and cancellation_token.is_cancelled
+    ):
+        yield LLMStreamEvent(
+            event_type="response_cancelled",
+            done=True,
+        )
+        return
+
     yield LLMStreamEvent(
         event_type="response_started",
     )
 
     try:
         for _ in range(max_tool_rounds):
+            if (
+                cancellation_token is not None
+                and cancellation_token.is_cancelled
+            ):
+                yield LLMStreamEvent(
+                    event_type="response_cancelled",
+                    done=True,
+                )
+                return
+
             round_content_parts: list[str] = []
             round_tool_calls: list[ToolCall] = []
             buffer_current_round = (
@@ -246,6 +284,9 @@ def stream_tool_aware_llm_response(
             for chunk in stream_ollama_chat_request(
                 messages=messages,
                 tools=tools,
+                cancellation_token=(
+                    cancellation_token
+                ),
             ):
                 response_message = (
                     chunk.get("message") or {}
@@ -282,6 +323,16 @@ def stream_tool_aware_llm_response(
                 if chunk.get("done"):
                     break
 
+            if (
+                cancellation_token is not None
+                and cancellation_token.is_cancelled
+            ):
+                yield LLMStreamEvent(
+                    event_type="response_cancelled",
+                    done=True,
+                )
+                return
+
             complete_round_content = "".join(
                 round_content_parts
             ).strip()
@@ -312,6 +363,18 @@ def stream_tool_aware_llm_response(
                 )
 
                 for tool_call in round_tool_calls:
+                    if (
+                        cancellation_token is not None
+                        and cancellation_token.is_cancelled
+                    ):
+                        yield LLMStreamEvent(
+                            event_type=(
+                                "response_cancelled"
+                            ),
+                            done=True,
+                        )
+                        return
+
                     yield LLMStreamEvent(
                         event_type="tool_call",
                         tool_calls=[
@@ -327,6 +390,19 @@ def stream_tool_aware_llm_response(
                             context=execution_context,
                         )
                     )
+
+                    if (
+                        cancellation_token is not None
+                        and cancellation_token.is_cancelled
+                    ):
+                        yield LLMStreamEvent(
+                            event_type=(
+                                "response_cancelled"
+                            ),
+                            done=True,
+                        )
+                        return
+
                     result_payload = (
                         execution_result.model_dump(
                             mode="json"
@@ -371,6 +447,16 @@ def stream_tool_aware_llm_response(
             )
             return
 
+        if (
+            cancellation_token is not None
+            and cancellation_token.is_cancelled
+        ):
+            yield LLMStreamEvent(
+                event_type="response_cancelled",
+                done=True,
+            )
+            return
+
         limit_message = (
             "I could not complete the operation "
             "because the tool-calling limit "
@@ -396,6 +482,16 @@ def stream_tool_aware_llm_response(
     except Exception as error:
         error_message = f"error: {error}"
     else:
+        return
+
+    if (
+        cancellation_token is not None
+        and cancellation_token.is_cancelled
+    ):
+        yield LLMStreamEvent(
+            event_type="response_cancelled",
+            done=True,
+        )
         return
 
     yield LLMStreamEvent(

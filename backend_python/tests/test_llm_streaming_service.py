@@ -12,9 +12,32 @@ if str(BACKEND_PYTHON_ROOT) not in sys.path:
 from conversation_core.services.llm_service import (
     stream_tool_aware_llm_response,
 )
+from conversation_core.services.cancellation import (
+    CancellationToken,
+)
 
 
 class LlmStreamingServiceTest(unittest.TestCase):
+    def test_pre_cancelled_response_emits_only_cancelled(
+        self,
+    ) -> None:
+        token = CancellationToken()
+        token.cancel()
+
+        events = list(
+            stream_tool_aware_llm_response(
+                prompt="Tell me more.",
+                conversation_id="conversation-cancel",
+                buffer_for_tool_decision=False,
+                cancellation_token=token,
+            )
+        )
+
+        self.assertEqual(
+            [event.event_type for event in events],
+            ["response_cancelled"],
+        )
+
     @patch(
         "conversation_core.services.llm_service."
         "stream_ollama_chat_request"

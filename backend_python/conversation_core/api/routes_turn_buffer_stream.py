@@ -28,6 +28,9 @@ from conversation_core.services.query_service import (
     QueryEngine,
     default_query_engine,
 )
+from conversation_core.services.cancellation import (
+    CancellationToken,
+)
 from conversation_core.services.turn_buffer_service import (
     process_turn_event,
 )
@@ -89,6 +92,13 @@ def build_stream_websocket_message(
             },
         }
 
+    if event.event_type == "response_cancelled":
+        return {
+            "type": "turn_cancelled",
+            "request_id": request_id,
+            "payload": {},
+        }
+
     return {
         "type": "response_complete",
         "request_id": request_id,
@@ -106,7 +116,15 @@ async def process_streamed_turn_event(
     payload: dict,
     query_engine: QueryEngine,
     utterance_classifier: UtteranceClassifier | None,
+    cancellation_token: CancellationToken,
+    send_lock: asyncio.Lock,
 ) -> None:
+    async def send_message(
+        message: dict,
+    ) -> None:
+        async with send_lock:
+            await websocket.send_json(message)
+
     try:
         event = TurnBufferEvent(
             conversation_id=conversation_id,
@@ -141,7 +159,7 @@ async def process_streamed_turn_event(
             event,
         )
 
-        await websocket.send_json(
+        await send_message(
             {
                 "type": "turn_evaluated",
                 "request_id": request_id,
@@ -170,7 +188,7 @@ async def process_streamed_turn_event(
                 event.assistant_was_speaking,
             )
 
-            await websocket.send_json(
+            await send_message(
                 {
                     "type": "utterance_classified",
                     "request_id": request_id,
@@ -182,7 +200,7 @@ async def process_streamed_turn_event(
                 }
             )
 
-        await websocket.send_json(
+        await send_message(
             {
                 "type": "query_started",
                 "request_id": request_id,
@@ -223,12 +241,16 @@ async def process_streamed_turn_event(
                     on_stream_event=(
                         handle_stream_event
                     ),
+                    cancellation_token=(
+                        cancellation_token
+                    ),
                 )
             finally:
                 await stream_queue.put(None)
 
         query_started_at = perf_counter()
         first_delta_sent = False
+        cancellation_event_sent = False
         query_task = asyncio.create_task(
             run_query()
         )
@@ -249,7 +271,7 @@ async def process_streamed_turn_event(
                 ):
                     first_delta_sent = True
 
-                    await websocket.send_json(
+                    await send_message(
                         {
                             "type": (
                                 "response_first_delta"
@@ -265,11 +287,21 @@ async def process_streamed_turn_event(
                         }
                     )
 
-                await websocket.send_json(
+                stream_message = (
                     build_stream_websocket_message(
                         request_id=request_id,
                         event=stream_event,
                     )
+                )
+
+                if (
+                    stream_event.event_type
+                    == "response_cancelled"
+                ):
+                    cancellation_event_sent = True
+
+                await send_message(
+                    stream_message
                 )
 
             query_result = await query_task
@@ -277,7 +309,18 @@ async def process_streamed_turn_event(
             if not query_task.done():
                 query_task.cancel()
 
-        await websocket.send_json(
+        if cancellation_token.is_cancelled:
+            if not cancellation_event_sent:
+                await send_message(
+                    {
+                        "type": "turn_cancelled",
+                        "request_id": request_id,
+                        "payload": {},
+                    }
+                )
+            return
+
+        await send_message(
             {
                 "type": "query_complete",
                 "request_id": request_id,
@@ -290,7 +333,7 @@ async def process_streamed_turn_event(
         return
     except Exception as error:
         try:
-            await websocket.send_json(
+            await send_message(
                 {
                     "type": "turn_error",
                     "request_id": request_id,
@@ -344,7 +387,23 @@ def create_turn_buffer_stream_router(
             headers=accept_headers,
         )
 
-        await websocket.send_json(
+        send_lock = asyncio.Lock()
+        active_turn_tasks: dict[
+            str,
+            asyncio.Task[None],
+        ] = {}
+        cancellation_tokens: dict[
+            str,
+            CancellationToken,
+        ] = {}
+
+        async def send_message(
+            message: dict,
+        ) -> None:
+            async with send_lock:
+                await websocket.send_json(message)
+
+        await send_message(
             {
                 "type": "turn_stream_ready",
                 "payload": {
@@ -356,9 +415,59 @@ def create_turn_buffer_stream_router(
         try:
             while True:
                 message = await websocket.receive_json()
+                message_type = message.get("type")
 
-                if message.get("type") != "turn_event":
-                    await websocket.send_json(
+                if message_type == "cancel_turn":
+                    request_id_value = message.get(
+                        "request_id"
+                    )
+
+                    if (
+                        not isinstance(
+                            request_id_value,
+                            str,
+                        )
+                        or not request_id_value
+                    ):
+                        await send_message(
+                            {
+                                "type": "turn_error",
+                                "request_id": None,
+                                "payload": {
+                                    "detail": (
+                                        "cancel_turn requires "
+                                        "a request_id."
+                                    ),
+                                },
+                            }
+                        )
+                        continue
+
+                    cancellation_token = (
+                        cancellation_tokens.get(
+                            request_id_value
+                        )
+                    )
+
+                    if cancellation_token is not None:
+                        cancellation_token.cancel()
+                    else:
+                        await send_message(
+                            {
+                                "type": "turn_cancelled",
+                                "request_id": (
+                                    request_id_value
+                                ),
+                                "payload": {
+                                    "already_complete": True,
+                                },
+                            }
+                        )
+
+                    continue
+
+                if message_type != "turn_event":
+                    await send_message(
                         {
                             "type": "turn_error",
                             "request_id": message.get(
@@ -383,17 +492,74 @@ def create_turn_buffer_stream_router(
                 if not isinstance(payload, dict):
                     payload = {}
 
-                await process_streamed_turn_event(
-                    websocket=websocket,
-                    request_id=str(request_id),
-                    conversation_id=conversation_id,
-                    payload=payload,
-                    query_engine=active_query_engine,
-                    utterance_classifier=(
-                        utterance_classifier
+                request_id = str(request_id)
+                cancellation_token = (
+                    CancellationToken()
+                )
+                cancellation_tokens[request_id] = (
+                    cancellation_token
+                )
+
+                task = asyncio.create_task(
+                    process_streamed_turn_event(
+                        websocket=websocket,
+                        request_id=request_id,
+                        conversation_id=(
+                            conversation_id
+                        ),
+                        payload=payload,
+                        query_engine=(
+                            active_query_engine
+                        ),
+                        utterance_classifier=(
+                            utterance_classifier
+                        ),
+                        cancellation_token=(
+                            cancellation_token
+                        ),
+                        send_lock=send_lock,
+                    )
+                )
+                active_turn_tasks[request_id] = task
+
+                def remove_completed_task(
+                    completed_task: asyncio.Task[None],
+                    *,
+                    completed_request_id: str = (
+                        request_id
                     ),
+                ) -> None:
+                    active_turn_tasks.pop(
+                        completed_request_id,
+                        None,
+                    )
+                    cancellation_tokens.pop(
+                        completed_request_id,
+                        None,
+                    )
+
+                    if not completed_task.cancelled():
+                        completed_task.exception()
+
+                task.add_done_callback(
+                    remove_completed_task
                 )
         except WebSocketDisconnect:
-            return
+            pass
+        finally:
+            for token in cancellation_tokens.values():
+                token.cancel()
+
+            for task in active_turn_tasks.values():
+                task.cancel()
+
+            if active_turn_tasks:
+                await asyncio.gather(
+                    *active_turn_tasks.values(),
+                    return_exceptions=True,
+                )
+
+            cancellation_tokens.clear()
+            active_turn_tasks.clear()
 
     return router

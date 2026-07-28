@@ -131,6 +131,10 @@ export default function MainApplication() {
     useRef(new Map());
   const activeProgressiveResponseRef =
     useRef(null);
+  const cancelledProgressiveResponsesRef =
+    useRef(new Set());
+  const activeTtsClientsByRequestRef =
+    useRef(new Map());
   const spokenTurnTranscriptRef = useRef('');
   const processTurnTranscriptRef = useRef(null);
   const turnRequestPendingRef = useRef(false);
@@ -365,6 +369,21 @@ export default function MainApplication() {
       progressiveTtsQueuesRef.current.clear();
       activeProgressiveResponseRef.current =
         null;
+      cancelledProgressiveResponsesRef.current
+        .clear();
+
+      for (
+        const clients
+        of activeTtsClientsByRequestRef
+          .current
+          .values()
+      ) {
+        for (const client of [...clients]) {
+          client.close();
+        }
+      }
+
+      activeTtsClientsByRequestRef.current.clear();
 
       if (currentAudio.current) {
         currentAudio.current.onended = null;
@@ -697,6 +716,89 @@ export default function MainApplication() {
     setAssistantAudioStatus('idle');
   };
 
+  const isProgressiveResponseCancelled = (
+    requestId,
+  ) =>
+    cancelledProgressiveResponsesRef.current.has(
+      requestId,
+    );
+
+  const removeTtsClientForRequest = (
+    requestId,
+    client,
+  ) => {
+    if (!requestId) {
+      return;
+    }
+
+    const clients =
+      activeTtsClientsByRequestRef.current.get(
+        requestId,
+      );
+
+    if (!clients) {
+      return;
+    }
+
+    clients.delete(client);
+
+    if (clients.size === 0) {
+      activeTtsClientsByRequestRef.current.delete(
+        requestId,
+      );
+    }
+  };
+
+  const cancelProgressiveTtsResponse = (
+    requestId,
+  ) => {
+    if (!requestId) {
+      return;
+    }
+
+    cancelledProgressiveResponsesRef.current.add(
+      requestId,
+    );
+
+    const clients =
+      activeTtsClientsByRequestRef.current.get(
+        requestId,
+      );
+
+    for (const client of [...(clients ?? [])]) {
+      client.close();
+    }
+
+    activeTtsClientsByRequestRef.current.delete(
+      requestId,
+    );
+    responseSentenceBuffersRef.current.delete(
+      requestId,
+    );
+    progressiveTtsQueuesRef.current.delete(
+      requestId,
+    );
+    spokenResponseTextRef.current.delete(
+      requestId,
+    );
+
+    const cancellingActiveResponse = (
+      activeProgressiveResponseRef.current
+        ?.requestId === requestId
+    );
+
+    if (cancellingActiveResponse) {
+      activeProgressiveResponseRef.current
+        .cancelled = true;
+      activeProgressiveResponseRef.current =
+        null;
+    }
+
+    if (cancellingActiveResponse) {
+      stopAssistantAudio();
+    }
+  };
+
   const rejectPendingTurnRequests = (
     error,
   ) => {
@@ -792,6 +894,22 @@ export default function MainApplication() {
           payload.floor_intent;
 
         if (floorIntent === 'take_floor') {
+          const activeResponse =
+            activeProgressiveResponseRef.current;
+
+          if (activeResponse) {
+            activeResponse.cancelled = true;
+
+            turnStreamClientRef.current
+              ?.cancelTurn(
+                activeResponse.requestId,
+              );
+
+            cancelProgressiveTtsResponse(
+              activeResponse.requestId,
+            );
+          }
+
           stopAssistantAudio();
           return;
         }
@@ -805,18 +923,61 @@ export default function MainApplication() {
       },
 
       onQueryStarted: ({
+        requestId,
         payload,
       }) => {
         console.log(
           'Turn query started:',
           payload,
         );
-        setTurnRequestPending(true);
+
+        if (
+          !isProgressiveResponseCancelled(
+            requestId,
+          )
+        ) {
+          activeProgressiveResponseRef.current = {
+            requestId,
+            llmComplete: false,
+            synthesisComplete: false,
+            playbackComplete: true,
+            cancelled: false,
+          };
+        }
+
+        const pendingRequest =
+          pendingTurnRequestsRef.current.get(
+            requestId,
+          );
+
+        if (
+          pendingRequest &&
+          !pendingRequest.released
+        ) {
+          pendingRequest.released = true;
+          pendingRequest.resolve({
+            turn: pendingRequest.turn,
+            utterance_route:
+              pendingRequest.route,
+            query: null,
+            query_pending: true,
+          });
+        }
+
+        setTurnRequestPending(false);
       },
 
       onResponseStarted: ({
         requestId,
       }) => {
+        if (
+          isProgressiveResponseCancelled(
+            requestId,
+          )
+        ) {
+          return;
+        }
+
         stopAssistantAudio();
 
         streamedResponsesRef.current.set(
@@ -840,13 +1001,23 @@ export default function MainApplication() {
           llmComplete: false,
           synthesisComplete: false,
           playbackComplete: true,
+          cancelled: false,
         };
         setStreamedAssistantResponse('');
       },
 
       onResponseFirstDelta: ({
+        requestId,
         payload,
       }) => {
+        if (
+          isProgressiveResponseCancelled(
+            requestId,
+          )
+        ) {
+          return;
+        }
+
         console.log(
           'LLM first delta timing:',
           payload,
@@ -857,6 +1028,14 @@ export default function MainApplication() {
         requestId,
         payload,
       }) => {
+        if (
+          isProgressiveResponseCancelled(
+            requestId,
+          )
+        ) {
+          return;
+        }
+
         const delta = payload.text ?? '';
         const existingText =
           streamedResponsesRef.current.get(
@@ -916,8 +1095,17 @@ export default function MainApplication() {
       },
 
       onToolCallStarted: ({
+        requestId,
         payload,
       }) => {
+        if (
+          isProgressiveResponseCancelled(
+            requestId,
+          )
+        ) {
+          return;
+        }
+
         console.log(
           'Tool call started:',
           payload,
@@ -925,8 +1113,17 @@ export default function MainApplication() {
       },
 
       onToolCallComplete: ({
+        requestId,
         payload,
       }) => {
+        if (
+          isProgressiveResponseCancelled(
+            requestId,
+          )
+        ) {
+          return;
+        }
+
         console.log(
           'Tool call complete:',
           payload,
@@ -937,6 +1134,14 @@ export default function MainApplication() {
         requestId,
         payload,
       }) => {
+        if (
+          isProgressiveResponseCancelled(
+            requestId,
+          )
+        ) {
+          return;
+        }
+
         const streamedText =
           streamedResponsesRef.current.get(
             requestId,
@@ -980,10 +1185,55 @@ export default function MainApplication() {
         }
       },
 
+      onTurnCancelled: ({
+        requestId,
+      }) => {
+        cancelledProgressiveResponsesRef
+          .current
+          .add(requestId);
+
+        const pendingRequest =
+          pendingTurnRequestsRef.current.get(
+            requestId,
+          );
+
+        if (
+          pendingRequest &&
+          !pendingRequest.released
+        ) {
+          pendingRequest.released = true;
+          pendingRequest.resolve({
+            turn: pendingRequest.turn,
+            utterance_route:
+              pendingRequest.route,
+            query: null,
+            cancelled: true,
+          });
+        }
+
+        pendingTurnRequestsRef.current.delete(
+          requestId,
+        );
+        cancelProgressiveTtsResponse(
+          requestId,
+        );
+      },
+
       onQueryComplete: ({
         requestId,
         payload,
       }) => {
+        if (
+          isProgressiveResponseCancelled(
+            requestId,
+          )
+        ) {
+          pendingTurnRequestsRef.current.delete(
+            requestId,
+          );
+          return;
+        }
+
         console.log(
           'Turn query complete:',
           payload,
@@ -1032,12 +1282,25 @@ export default function MainApplication() {
           requestId,
         );
 
-        pendingRequest?.resolve({
-          turn: pendingRequest.turn,
-          utterance_route:
-            pendingRequest.route,
-          query: payload,
-        });
+        if (pendingRequest) {
+          const completedResult = {
+            turn: pendingRequest.turn,
+            utterance_route:
+              pendingRequest.route,
+            query: payload,
+          };
+
+          setLatestTurnResult(
+            completedResult,
+          );
+          setTurnDecision(
+            pendingRequest.turn?.decision ??
+            '',
+          );
+          pendingRequest.resolve(
+            completedResult,
+          );
+        }
       },
 
       onError: (
@@ -1143,6 +1406,7 @@ export default function MainApplication() {
             reject,
             turn: null,
             route: null,
+            released: false,
           },
         );
       },
@@ -1322,6 +1586,15 @@ export default function MainApplication() {
       return null;
     }
 
+    if (
+      requestId &&
+      isProgressiveResponseCancelled(
+        requestId,
+      )
+    ) {
+      return null;
+    }
+
     if (replace) {
       stopAssistantAudio();
     }
@@ -1335,6 +1608,15 @@ export default function MainApplication() {
     try {
       const playerNode =
         await ensureTtsPlayer();
+
+      if (
+        requestId &&
+        isProgressiveResponseCancelled(
+          requestId,
+        )
+      ) {
+        return null;
+      }
 
       return await new Promise(
         (resolve, reject) => {
@@ -1361,6 +1643,16 @@ export default function MainApplication() {
           const ttsClient =
             new TtsStreamClient({
               onStarted: (metadata) => {
+                if (
+                  requestId &&
+                  isProgressiveResponseCancelled(
+                    requestId,
+                  )
+                ) {
+                  ttsClient.close();
+                  return;
+                }
+
                 activeTtsStreamIdRef.current =
                   metadata.stream_id;
 
@@ -1381,6 +1673,15 @@ export default function MainApplication() {
               onAudioChunk: ({
                 samples,
               }) => {
+                if (
+                  requestId &&
+                  isProgressiveResponseCancelled(
+                    requestId,
+                  )
+                ) {
+                  return;
+                }
+
                 playerNode.port.postMessage(
                   {
                     type: 'enqueue',
@@ -1391,6 +1692,11 @@ export default function MainApplication() {
               },
 
               onComplete: (metadata) => {
+                removeTtsClientForRequest(
+                  requestId,
+                  ttsClient,
+                );
+
                 setLatestTtsMetadata(
                   (current) => ({
                     ...current,
@@ -1412,6 +1718,11 @@ export default function MainApplication() {
               },
 
               onError: (error) => {
+                removeTtsClientForRequest(
+                  requestId,
+                  ttsClient,
+                );
+
                 console.error(
                   'Streaming TTS failed:',
                   error,
@@ -1431,6 +1742,11 @@ export default function MainApplication() {
               },
 
               onClose: () => {
+                removeTtsClientForRequest(
+                  requestId,
+                  ttsClient,
+                );
+
                 if (
                   ttsStreamClientRef.current ===
                   ttsClient
@@ -1449,6 +1765,25 @@ export default function MainApplication() {
               },
             });
 
+          if (requestId) {
+            let requestClients =
+              activeTtsClientsByRequestRef
+                .current
+                .get(requestId);
+
+            if (!requestClients) {
+              requestClients = new Set();
+              activeTtsClientsByRequestRef
+                .current
+                .set(
+                  requestId,
+                  requestClients,
+                );
+            }
+
+            requestClients.add(ttsClient);
+          }
+
           ttsStreamClientRef.current =
             ttsClient;
 
@@ -1458,6 +1793,15 @@ export default function MainApplication() {
         },
       );
     } catch (error) {
+      if (
+        requestId &&
+        isProgressiveResponseCancelled(
+          requestId,
+        )
+      ) {
+        return null;
+      }
+
       console.error(
         'Could not start TTS stream:',
         error,
@@ -1499,6 +1843,14 @@ export default function MainApplication() {
     const updatedQueue =
       existingQueue
         .then(async () => {
+          if (
+            isProgressiveResponseCancelled(
+              requestId,
+            )
+          ) {
+            return;
+          }
+
           const activeResponse =
             activeProgressiveResponseRef.current;
 
@@ -1517,6 +1869,24 @@ export default function MainApplication() {
               requestId,
             },
           );
+
+          if (
+            isProgressiveResponseCancelled(
+              requestId,
+            )
+          ) {
+            const clients =
+              activeTtsClientsByRequestRef
+                .current
+                .get(requestId);
+
+            for (
+              const client
+              of [...(clients ?? [])]
+            ) {
+              client.close();
+            }
+          }
         })
         .catch((error) => {
           console.error(
@@ -1742,7 +2112,10 @@ export default function MainApplication() {
       setLatestTurnResult(result);
       setTurnDecision(result.turn.decision);
 
-      if (clearTypedInput && result.query) {
+      if (
+        clearTypedInput &&
+        result.turn.should_finalise_turn
+      ) {
         setTestUtterance('');
       }
 

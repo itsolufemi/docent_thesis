@@ -9,6 +9,7 @@ LLMStreamEventType = Literal[
     "tool_call",
     "tool_result",
     "response_complete",
+    "response_cancelled",
 ]
 
 

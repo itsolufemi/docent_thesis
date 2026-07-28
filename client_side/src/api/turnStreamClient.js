@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
+  import.meta.env?.VITE_API_BASE_URL ??
   'http://127.0.0.1:8000';
 
 
@@ -27,6 +27,7 @@ export class TurnStreamClient {
     onToolCallStarted,
     onToolCallComplete,
     onResponseComplete,
+    onTurnCancelled,
     onQueryComplete,
     onError,
     onClose,
@@ -51,6 +52,8 @@ export class TurnStreamClient {
       onToolCallComplete;
     this.onResponseComplete =
       onResponseComplete;
+    this.onTurnCancelled =
+      onTurnCancelled;
     this.onQueryComplete =
       onQueryComplete;
     this.onError = onError;
@@ -198,6 +201,14 @@ export class TurnStreamClient {
         });
         break;
 
+      case 'turn_cancelled':
+        this.onTurnCancelled?.({
+          requestId:
+            message.request_id,
+          payload,
+        });
+        break;
+
       case 'query_complete':
         this.onQueryComplete?.({
           requestId:
@@ -259,6 +270,25 @@ export class TurnStreamClient {
     );
 
     return requestId;
+  }
+
+  cancelTurn(requestId) {
+    if (
+      !requestId ||
+      this.socket?.readyState !==
+        WebSocket.OPEN
+    ) {
+      return false;
+    }
+
+    this.socket.send(
+      JSON.stringify({
+        type: 'cancel_turn',
+        request_id: requestId,
+      }),
+    );
+
+    return true;
   }
 
   close() {

@@ -33,6 +33,9 @@ from conversation_core.services.llm_service import (
     generate_tool_aware_llm_response,
     stream_tool_aware_llm_response,
 )
+from conversation_core.services.cancellation import (
+    CancellationToken,
+)
 from conversation_core.services.prompt_service import (
     build_prompt,
     format_conversation_branch_for_prompt,
@@ -269,6 +272,7 @@ class QueryEngine:
         utterance_route: UtteranceRoute | None = None,
         include_debug: bool = False,
         on_stream_event: LLMStreamCallback | None = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> QueryResult:
         request_started_at = perf_counter()
 
@@ -328,14 +332,57 @@ class QueryEngine:
             active_branch,
         )
 
+        if conversation_state is not None:
+            add_dialogue_turn(
+                conversation_id=(
+                    conversation_state.conversation_id
+                ),
+                role="user",
+                content=text,
+            )
+
         response_generation_started_at = perf_counter()
 
-        if conversation_id is None:
+        response_cancelled = (
+            cancellation_token is not None
+            and cancellation_token.is_cancelled
+        )
+
+        if response_cancelled:
+            response = ""
+
+            if on_stream_event is not None:
+                on_stream_event(
+                    LLMStreamEvent(
+                        event_type=(
+                            "response_cancelled"
+                        ),
+                        done=True,
+                    )
+                )
+        elif conversation_id is None:
             response = generate_llm_response(
                 prompt
             )
 
-            if on_stream_event is not None:
+            response_cancelled = (
+                cancellation_token is not None
+                and cancellation_token.is_cancelled
+            )
+
+            if (
+                on_stream_event is not None
+                and response_cancelled
+            ):
+                on_stream_event(
+                    LLMStreamEvent(
+                        event_type=(
+                            "response_cancelled"
+                        ),
+                        done=True,
+                    )
+                )
+            elif on_stream_event is not None:
                 on_stream_event(
                     LLMStreamEvent(
                         event_type="response_started",
@@ -369,6 +416,9 @@ class QueryEngine:
                     buffer_for_tool_decision=(
                         buffer_for_tool_decision
                     ),
+                    cancellation_token=(
+                        cancellation_token
+                    ),
                 )
             ):
                 if (
@@ -379,6 +429,12 @@ class QueryEngine:
                         stream_event.text
                     )
 
+                if (
+                    stream_event.event_type
+                    == "response_cancelled"
+                ):
+                    response_cancelled = True
+
                 if on_stream_event is not None:
                     on_stream_event(
                         stream_event
@@ -388,26 +444,29 @@ class QueryEngine:
                 response_parts
             ).strip()
 
+        response_cancelled = (
+            response_cancelled
+            or (
+                cancellation_token is not None
+                and cancellation_token.is_cancelled
+            )
+        )
+
         response_generation_seconds = (
             perf_counter()
             - response_generation_started_at
         )
 
         if conversation_state is not None:
-            add_dialogue_turn(
-                conversation_id=(
-                    conversation_state.conversation_id
-                ),
-                role="user",
-                content=text,
-            )
-            add_dialogue_turn(
-                conversation_id=(
-                    conversation_state.conversation_id
-                ),
-                role="assistant",
-                content=response,
-            )
+            if not response_cancelled:
+                add_dialogue_turn(
+                    conversation_id=(
+                        conversation_state
+                        .conversation_id
+                    ),
+                    role="assistant",
+                    content=response,
+                )
 
         total_request_seconds = (
             perf_counter() - request_started_at
