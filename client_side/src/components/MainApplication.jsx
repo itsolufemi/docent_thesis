@@ -7,6 +7,9 @@ import { synthesiseSpeech } from '../api/ttsApi';
 import { TtsStreamClient } from '../api/ttsStreamClient';
 import { TurnStreamClient } from '../api/turnStreamClient';
 import { calculateRemainingSilenceMs } from '../audio/vadMath';
+import {
+  extractSpeakableSentences,
+} from '../audio/sentenceBuffer';
 
 const FORCED_FINALISATION_SILENCE_MS = 1800;
 const INITIAL_VAD_SILENCE_MS = 600;
@@ -15,6 +18,29 @@ const ASSISTANT_DUCK_GAIN = 0.3;
 const ASSISTANT_NORMAL_GAIN = 1.0;
 const DUCK_RAMP_SECONDS = 0.08;
 const RESTORE_RAMP_SECONDS = 0.12;
+const MIN_PROGRESSIVE_TTS_CHARACTERS = 24;
+
+function shouldSpeakSentence(
+  sentence,
+) {
+  const trimmed = sentence.trim();
+
+  if (
+    trimmed.length >=
+    MIN_PROGRESSIVE_TTS_CHARACTERS
+  ) {
+    return true;
+  }
+
+  return [
+    'yes.',
+    'no.',
+    'certainly.',
+    'of course.',
+  ].includes(
+    trimmed.toLowerCase(),
+  );
+}
 
 function appendTranscriptSegment(
   existingTranscript,
@@ -97,6 +123,14 @@ export default function MainApplication() {
     useRef(new Map());
   const streamedResponsesRef =
     useRef(new Map());
+  const responseSentenceBuffersRef =
+    useRef(new Map());
+  const spokenResponseTextRef =
+    useRef(new Map());
+  const progressiveTtsQueuesRef =
+    useRef(new Map());
+  const activeProgressiveResponseRef =
+    useRef(null);
   const spokenTurnTranscriptRef = useRef('');
   const processTurnTranscriptRef = useRef(null);
   const turnRequestPendingRef = useRef(false);
@@ -326,6 +360,11 @@ export default function MainApplication() {
 
       pendingTurnRequestsRef.current.clear();
       streamedResponsesRef.current.clear();
+      responseSentenceBuffersRef.current.clear();
+      spokenResponseTextRef.current.clear();
+      progressiveTtsQueuesRef.current.clear();
+      activeProgressiveResponseRef.current =
+        null;
 
       if (currentAudio.current) {
         currentAudio.current.onended = null;
@@ -778,10 +817,30 @@ export default function MainApplication() {
       onResponseStarted: ({
         requestId,
       }) => {
+        stopAssistantAudio();
+
         streamedResponsesRef.current.set(
           requestId,
           '',
         );
+        responseSentenceBuffersRef.current.set(
+          requestId,
+          '',
+        );
+        spokenResponseTextRef.current.set(
+          requestId,
+          '',
+        );
+        progressiveTtsQueuesRef.current.set(
+          requestId,
+          Promise.resolve(),
+        );
+        activeProgressiveResponseRef.current = {
+          requestId,
+          llmComplete: false,
+          synthesisComplete: false,
+          playbackComplete: true,
+        };
         setStreamedAssistantResponse('');
       },
 
@@ -812,6 +871,47 @@ export default function MainApplication() {
         );
         setStreamedAssistantResponse(
           updatedText,
+        );
+
+        const existingBuffer =
+          responseSentenceBuffersRef
+            .current
+            .get(requestId) ?? '';
+        const updatedBuffer =
+          `${existingBuffer}${delta}`;
+        const {
+          sentences,
+          remainder,
+        } = extractSpeakableSentences(
+          updatedBuffer,
+        );
+        let retainedText = '';
+
+        for (const sentence of sentences) {
+          const candidateSentence =
+            `${retainedText} ${sentence}`
+              .trim();
+
+          if (
+            shouldSpeakSentence(
+              candidateSentence,
+            )
+          ) {
+            enqueueProgressiveTtsSentence(
+              requestId,
+              candidateSentence,
+            );
+            retainedText = '';
+          } else {
+            retainedText =
+              candidateSentence;
+          }
+        }
+
+        responseSentenceBuffersRef.current.set(
+          requestId,
+          `${retainedText} ${remainder}`
+            .trimStart(),
         );
       },
 
@@ -852,6 +952,32 @@ export default function MainApplication() {
         setStreamedAssistantResponse(
           completedText,
         );
+
+        const remainder =
+          responseSentenceBuffersRef.current
+            .get(requestId)
+            ?.trim() ?? '';
+
+        if (remainder) {
+          enqueueProgressiveTtsSentence(
+            requestId,
+            remainder,
+          );
+          responseSentenceBuffersRef.current.set(
+            requestId,
+            '',
+          );
+        }
+
+        const activeResponse =
+          activeProgressiveResponseRef.current;
+
+        if (
+          activeResponse?.requestId ===
+          requestId
+        ) {
+          activeResponse.llmComplete = true;
+        }
       },
 
       onQueryComplete: ({
@@ -872,6 +998,10 @@ export default function MainApplication() {
           streamedResponsesRef.current.get(
             requestId,
           ) ?? '';
+        const spokenText =
+          spokenResponseTextRef.current.get(
+            requestId,
+          ) ?? '';
 
         console.log({
           streamedText,
@@ -884,11 +1014,22 @@ export default function MainApplication() {
         pendingTurnRequestsRef.current.delete(
           requestId,
         );
-        streamedResponsesRef.current.delete(
-          requestId,
-        );
         setStreamedAssistantResponse(
           payload.response ?? streamedText,
+        );
+
+        if (
+          !spokenText.trim() &&
+          payload.response?.trim()
+        ) {
+          enqueueProgressiveTtsSentence(
+            requestId,
+            payload.response,
+          );
+        }
+
+        finishProgressiveTtsQueue(
+          requestId,
         );
 
         pendingRequest?.resolve({
@@ -1008,6 +1149,31 @@ export default function MainApplication() {
     );
   };
 
+  const completeProgressiveResponseIfReady =
+    () => {
+      const activeResponse =
+        activeProgressiveResponseRef.current;
+
+      if (
+        !activeResponse ||
+        !activeResponse.llmComplete ||
+        !activeResponse.synthesisComplete ||
+        !activeResponse.playbackComplete
+      ) {
+        return false;
+      }
+
+      activeProgressiveResponseRef.current =
+        null;
+      isPlaying.current = false;
+      activeTtsStreamIdRef.current = null;
+      restoreAssistantAudio();
+      setAssistantAudioStatus('idle');
+      notifyPlaybackComplete();
+
+      return true;
+    };
+
   const ensureTtsPlayer = async () => {
     let audioContext =
       speakAudioContextRef.current;
@@ -1072,12 +1238,40 @@ export default function MainApplication() {
         switch (event.data?.type) {
           case 'playback_started':
             isPlaying.current = true;
+
+            if (
+              activeProgressiveResponseRef.current
+            ) {
+              activeProgressiveResponseRef
+                .current
+                .playbackComplete = false;
+            }
+
             setAssistantAudioStatus(
               'playing',
             );
             break;
 
           case 'playback_complete':
+            if (
+              activeProgressiveResponseRef.current
+            ) {
+              isPlaying.current = false;
+              activeProgressiveResponseRef
+                .current
+                .playbackComplete = true;
+
+              if (
+                !completeProgressiveResponseIfReady()
+              ) {
+                setAssistantAudioStatus(
+                  'synthesising',
+                );
+              }
+
+              break;
+            }
+
             isPlaying.current = false;
             activeTtsStreamIdRef.current =
               null;
@@ -1091,6 +1285,16 @@ export default function MainApplication() {
           case 'playback_flushed':
             isPlaying.current = false;
             restoreAssistantAudio();
+
+            if (
+              activeProgressiveResponseRef.current
+            ) {
+              activeProgressiveResponseRef
+                .current
+                .playbackComplete = true;
+              completeProgressiveResponseIfReady();
+            }
+
             break;
 
           default:
@@ -1107,14 +1311,20 @@ export default function MainApplication() {
 
   const streamAssistantResponse = async (
     responseText,
+    {
+      replace = true,
+      requestId = null,
+    } = {},
   ) => {
     const cleanedText = responseText?.trim();
 
     if (!cleanedText) {
-      return;
+      return null;
     }
 
-    stopAssistantAudio();
+    if (replace) {
+      stopAssistantAudio();
+    }
 
     setAssistantAudioStatus(
       'synthesising',
@@ -1126,91 +1336,127 @@ export default function MainApplication() {
       const playerNode =
         await ensureTtsPlayer();
 
-      const ttsClient =
-        new TtsStreamClient({
-          onStarted: (metadata) => {
-            activeTtsStreamIdRef.current =
-              metadata.stream_id;
+      return await new Promise(
+        (resolve, reject) => {
+          let settled = false;
 
-            setLatestTtsMetadata({
-              voice:
-                metadata.voice_name,
-              language:
-                metadata.language_code,
-              sampleRate:
-                metadata.sample_rate,
-              characterCount:
-                metadata.character_count,
-              generationSeconds: 0,
-            });
-          },
-
-          onAudioChunk: ({
-            samples,
-          }) => {
-            playerNode.port.postMessage(
-              {
-                type: 'enqueue',
-                samples,
-              },
-              [samples.buffer],
-            );
-          },
-
-          onComplete: (metadata) => {
-            setLatestTtsMetadata(
-              (current) => ({
-                ...current,
-                generationSeconds:
-                  metadata
-                  .generation_seconds,
-                chunkCount:
-                  metadata.chunk_count,
-                audioBytes:
-                  metadata.audio_bytes,
-              }),
-            );
-
-            playerNode.port.postMessage({
-              type: 'complete',
-            });
-          },
-
-          onError: (error) => {
-            console.error(
-              'Streaming TTS failed:',
-              error,
-            );
-
-            playerNode.port.postMessage({
-              type: 'flush',
-            });
-
-            setAssistantAudioStatus(
-              'error',
-            );
-            setAssistantAudioError(
-              error.message,
-            );
-          },
-
-          onClose: () => {
-            if (
-              ttsStreamClientRef.current ===
-              ttsClient
-            ) {
-              ttsStreamClientRef.current =
-                null;
+          const resolveOnce = (value) => {
+            if (settled) {
+              return;
             }
-          },
-        });
 
-      ttsStreamClientRef.current =
-        ttsClient;
+            settled = true;
+            resolve(value);
+          };
 
-      await ttsClient.connect({
-        text: cleanedText,
-      });
+          const rejectOnce = (error) => {
+            if (settled) {
+              return;
+            }
+
+            settled = true;
+            reject(error);
+          };
+
+          const ttsClient =
+            new TtsStreamClient({
+              onStarted: (metadata) => {
+                activeTtsStreamIdRef.current =
+                  metadata.stream_id;
+
+                setLatestTtsMetadata({
+                  voice:
+                    metadata.voice_name,
+                  language:
+                    metadata.language_code,
+                  sampleRate:
+                    metadata.sample_rate,
+                  characterCount:
+                    metadata.character_count,
+                  generationSeconds: 0,
+                  requestId,
+                });
+              },
+
+              onAudioChunk: ({
+                samples,
+              }) => {
+                playerNode.port.postMessage(
+                  {
+                    type: 'enqueue',
+                    samples,
+                  },
+                  [samples.buffer],
+                );
+              },
+
+              onComplete: (metadata) => {
+                setLatestTtsMetadata(
+                  (current) => ({
+                    ...current,
+                    generationSeconds:
+                      metadata
+                      .generation_seconds,
+                    chunkCount:
+                      metadata.chunk_count,
+                    audioBytes:
+                      metadata.audio_bytes,
+                  }),
+                );
+
+                playerNode.port.postMessage({
+                  type: 'complete',
+                });
+
+                resolveOnce(metadata);
+              },
+
+              onError: (error) => {
+                console.error(
+                  'Streaming TTS failed:',
+                  error,
+                );
+
+                playerNode.port.postMessage({
+                  type: 'flush',
+                });
+
+                setAssistantAudioStatus(
+                  'error',
+                );
+                setAssistantAudioError(
+                  error.message,
+                );
+                rejectOnce(error);
+              },
+
+              onClose: () => {
+                if (
+                  ttsStreamClientRef.current ===
+                  ttsClient
+                ) {
+                  ttsStreamClientRef.current =
+                    null;
+                }
+
+                if (!settled) {
+                  rejectOnce(
+                    new Error(
+                      'TTS stream closed before completion.',
+                    ),
+                  );
+                }
+              },
+            });
+
+          ttsStreamClientRef.current =
+            ttsClient;
+
+          ttsClient.connect({
+            text: cleanedText,
+          }).catch(rejectOnce);
+        },
+      );
     } catch (error) {
       console.error(
         'Could not start TTS stream:',
@@ -1225,7 +1471,113 @@ export default function MainApplication() {
           ? error.message
           : 'Could not start TTS stream.',
       );
+
+      throw error;
     }
+  };
+
+  const enqueueProgressiveTtsSentence = (
+    requestId,
+    sentence,
+  ) => {
+    const cleanedSentence =
+      sentence.trim();
+
+    if (!cleanedSentence) {
+      return (
+        progressiveTtsQueuesRef.current.get(
+          requestId,
+        ) ?? Promise.resolve()
+      );
+    }
+
+    const existingQueue =
+      progressiveTtsQueuesRef.current.get(
+        requestId,
+      ) ?? Promise.resolve();
+
+    const updatedQueue =
+      existingQueue
+        .then(async () => {
+          const activeResponse =
+            activeProgressiveResponseRef.current;
+
+          if (
+            activeResponse?.requestId ===
+            requestId
+          ) {
+            activeResponse.playbackComplete =
+              false;
+          }
+
+          await streamAssistantResponse(
+            cleanedSentence,
+            {
+              replace: false,
+              requestId,
+            },
+          );
+        })
+        .catch((error) => {
+          console.error(
+            'Progressive TTS failed:',
+            error,
+          );
+        });
+
+    progressiveTtsQueuesRef.current.set(
+      requestId,
+      updatedQueue,
+    );
+
+    const spokenText =
+      spokenResponseTextRef.current.get(
+        requestId,
+      ) ?? '';
+
+    spokenResponseTextRef.current.set(
+      requestId,
+      `${spokenText} ${cleanedSentence}`
+        .trim(),
+    );
+
+    return updatedQueue;
+  };
+
+  const finishProgressiveTtsQueue = (
+    requestId,
+  ) => {
+    const queue =
+      progressiveTtsQueuesRef.current.get(
+        requestId,
+      ) ?? Promise.resolve();
+
+    void queue.finally(() => {
+      responseSentenceBuffersRef.current.delete(
+        requestId,
+      );
+      spokenResponseTextRef.current.delete(
+        requestId,
+      );
+      progressiveTtsQueuesRef.current.delete(
+        requestId,
+      );
+      streamedResponsesRef.current.delete(
+        requestId,
+      );
+
+      const activeResponse =
+        activeProgressiveResponseRef.current;
+
+      if (
+        activeResponse?.requestId ===
+        requestId
+      ) {
+        activeResponse.synthesisComplete =
+          true;
+        completeProgressiveResponseIfReady();
+      }
+    });
   };
 
   const playAssistantResponse = async (
@@ -1389,27 +1741,6 @@ export default function MainApplication() {
 
       setLatestTurnResult(result);
       setTurnDecision(result.turn.decision);
-
-      const floorIntent =
-        result.utterance_route?.floor_intent;
-
-      if (floorIntent === 'take_floor') {
-        stopAssistantAudio();
-      } else if (
-        floorIntent === 'backchannel' ||
-        floorIntent === 'none'
-      ) {
-        restoreAssistantAudio();
-      }
-
-      if (
-        result.turn.should_finalise_turn &&
-        result.query?.response
-      ) {
-        void streamAssistantResponse(
-          result.query.response,
-        );
-      }
 
       if (clearTypedInput && result.query) {
         setTestUtterance('');

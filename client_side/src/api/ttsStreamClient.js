@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
+  import.meta.env?.VITE_API_BASE_URL ??
   'http://127.0.0.1:8000';
 
 
@@ -189,17 +189,26 @@ export class TtsStreamClient {
       return;
     }
 
+    const onClose = this.onClose;
+    const socket = this.socket;
+
     this.socket.onmessage = null;
     this.socket.onerror = null;
     this.socket.onclose = null;
 
     try {
-      this.socket.close();
+      socket.close();
     } catch {
       // The socket may already be closed.
     }
 
     this.socket = null;
     this.pendingChunkMetadata = null;
+
+    onClose?.({
+      code: 1000,
+      reason: 'client_closed',
+      wasClean: true,
+    });
   }
 }
