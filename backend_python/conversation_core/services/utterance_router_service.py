@@ -16,6 +16,12 @@ VALID_ROUTE_TYPES = {
     "call_to_action",
     "interruption",
 }
+VALID_FLOOR_INTENTS = {
+    "none",
+    "backchannel",
+    "hold_floor",
+    "take_floor",
+}
 
 
 def add_routing_time(
@@ -108,6 +114,8 @@ Example requests:
 def build_utterance_route_prompt(
     text: str,
     domain_profile: ClassifierDomainProfile,
+    *,
+    assistant_was_speaking: bool = False,
 ) -> str:
     retrieval_policy = format_retrieval_policy(domain_profile)
     available_actions = format_available_actions(domain_profile)
@@ -169,6 +177,29 @@ AVAILABLE USER-FACING ACTIONS
 
 {available_actions}
 
+ASSISTANT FLOOR STATE
+
+The assistant was speaking when this user contribution began:
+{assistant_was_speaking}
+
+FLOOR INTENT
+
+none:
+No meaningful floor-management behaviour is present.
+
+backchannel:
+A brief acknowledgement that supports the assistant continuing,
+such as "mm-hm", "right", "okay" or "I see", when it does not
+introduce a new question, correction or request.
+
+hold_floor:
+The user appears to be continuing an incomplete contribution and
+has not yet produced a complete request.
+
+take_floor:
+The user asks a question, corrects, redirects, stops or otherwise
+produces a meaningful contribution that should receive the floor.
+
 CLASSIFICATION RULES
 
 - proposed_action must be one of the supplied action names or null.
@@ -190,6 +221,7 @@ Return only one JSON object using this exact shape:
 
 {{
   "route_type": "noise | response_request | call_to_action | interruption",
+  "floor_intent": "none | backchannel | hold_floor | take_floor",
   "requires_retrieval": false,
   "proposed_action": null,
   "candidate_subjects": [],
@@ -231,6 +263,7 @@ def build_fallback_route(
 ) -> UtteranceRoute:
     return UtteranceRoute(
         route_type="response_request",
+        floor_intent="none",
         requires_retrieval=False,
         proposed_action=None,
         candidate_subjects=[],
@@ -292,6 +325,14 @@ def normalise_route_payload(
     if route_type == "call_to_action" and proposed_action is None:
         route_type = "response_request"
 
+    floor_intent = payload.get(
+        "floor_intent",
+        "none",
+    )
+
+    if floor_intent not in VALID_FLOOR_INTENTS:
+        floor_intent = "none"
+
     requires_retrieval = normalise_boolean(
         payload.get("requires_retrieval")
     )
@@ -311,6 +352,7 @@ def normalise_route_payload(
     should_ignore = bool(payload.get("should_ignore", route_type == "noise"))
 
     if route_type == "noise":
+        floor_intent = "none"
         is_relevant = False
         should_ignore = True
         requires_retrieval = False
@@ -332,6 +374,7 @@ def normalise_route_payload(
 
     return UtteranceRoute(
         route_type=route_type,
+        floor_intent=floor_intent,
         requires_retrieval=requires_retrieval,
         proposed_action=proposed_action,
         candidate_subjects=candidate_subjects,
@@ -345,6 +388,8 @@ def normalise_route_payload(
 def route_utterance(
     text: str,
     domain_profile: ClassifierDomainProfile,
+    *,
+    assistant_was_speaking: bool = False,
 ) -> UtteranceRoute:
     started_at = perf_counter()
 
@@ -352,6 +397,7 @@ def route_utterance(
         return add_routing_time(
             UtteranceRoute(
                 route_type="noise",
+                floor_intent="none",
                 requires_retrieval=False,
                 proposed_action=None,
                 candidate_subjects=[],
@@ -375,6 +421,7 @@ def route_utterance(
     prompt = build_utterance_route_prompt(
         text=text,
         domain_profile=domain_profile,
+        assistant_was_speaking=assistant_was_speaking,
     )
     raw_response = generate_llm_response(
         prompt=prompt,

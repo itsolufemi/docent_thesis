@@ -23,6 +23,9 @@ from conversation_core.api.routes_tts_stream import (
 from conversation_core.api.routes_turn_buffer import (
     create_turn_buffer_router,
 )
+from conversation_core.api.routes_turn_buffer_stream import (
+    create_turn_buffer_stream_router,
+)
 from conversation_core.api.routes_turn_detection import (
     router as turn_detection_router,
 )
@@ -34,6 +37,9 @@ from docent.api.routes_artworks import router as artworks_router
 from docent.api.routes_docent_index import router as docent_index_router
 from docent.api.routes_docent_retrieval import router as docent_retrieval_router
 from docent.services.docent_query_service import docent_query_engine
+from docent.services.docent_utterance_classifier import (
+    classify_docent_utterance,
+)
 from docent.api.routes_docent_embeddings import router as docent_embeddings_router
 from docent.api.routes_docent_vector import router as docent_vector_router
 
@@ -70,6 +76,11 @@ query_router = create_query_router(
 )
 turn_buffer_router = create_turn_buffer_router(
     query_engine=docent_query_engine,
+    utterance_classifier=classify_docent_utterance,
+)
+turn_buffer_stream_router = create_turn_buffer_stream_router(
+    query_engine=docent_query_engine,
+    utterance_classifier=classify_docent_utterance,
 )
 transcription_router = create_transcription_router()
 audio_stream_router = create_audio_stream_router()
@@ -89,6 +100,7 @@ app.include_router(utterance_router)
 app.include_router(trp_router)
 app.include_router(turn_detection_router)
 app.include_router(turn_buffer_router)
+app.include_router(turn_buffer_stream_router)
 app.include_router(transcription_router)
 app.include_router(audio_stream_router)
 app.include_router(tts_router)

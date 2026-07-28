@@ -14,6 +14,9 @@ from conversation_core.schemas.turn_buffer_schemas import (
     TurnBufferResult,
     TurnBufferState,
 )
+from conversation_core.schemas.utterance_route_schemas import (
+    UtteranceRoute,
+)
 from conversation_core.services.turn_processing_service import (
     process_conversation_turn,
 )
@@ -39,6 +42,7 @@ class TurnProcessingServiceTest(unittest.TestCase):
             reason="Speech is active.",
         )
         query_engine = Mock()
+        utterance_classifier = Mock()
 
         result = process_conversation_turn(
             event=TurnBufferEvent(
@@ -48,9 +52,12 @@ class TurnProcessingServiceTest(unittest.TestCase):
                 silence_duration_ms=0,
             ),
             query_engine=query_engine,
+            utterance_classifier=utterance_classifier,
         )
 
         self.assertIsNone(result.query)
+        self.assertIsNone(result.utterance_route)
+        utterance_classifier.assert_not_called()
         query_engine.generate_response.assert_not_called()
 
     @patch(
@@ -72,6 +79,7 @@ class TurnProcessingServiceTest(unittest.TestCase):
             reason="The utterance appears incomplete.",
         )
         query_engine = Mock()
+        utterance_classifier = Mock()
 
         result = process_conversation_turn(
             event=TurnBufferEvent(
@@ -81,9 +89,12 @@ class TurnProcessingServiceTest(unittest.TestCase):
                 silence_duration_ms=500,
             ),
             query_engine=query_engine,
+            utterance_classifier=utterance_classifier,
         )
 
         self.assertIsNone(result.query)
+        self.assertIsNone(result.utterance_route)
+        utterance_classifier.assert_not_called()
         query_engine.generate_response.assert_not_called()
 
     @patch(
@@ -111,6 +122,18 @@ class TurnProcessingServiceTest(unittest.TestCase):
             response="The Arab Tent is...",
             conversation_id="conversation-1",
         )
+        utterance_route = UtteranceRoute(
+            route_type="response_request",
+            floor_intent="take_floor",
+            requires_retrieval=True,
+            is_relevant=True,
+            should_ignore=False,
+            confidence=0.95,
+            reason="The user asks a question.",
+        )
+        utterance_classifier = Mock(
+            return_value=utterance_route,
+        )
 
         result = process_conversation_turn(
             event=TurnBufferEvent(
@@ -118,18 +141,29 @@ class TurnProcessingServiceTest(unittest.TestCase):
                 partial_utterance="Tell me about The Arab Tent.",
                 is_speech_active=False,
                 silence_duration_ms=500,
+                assistant_was_speaking=True,
             ),
             query_engine=query_engine,
+            utterance_classifier=utterance_classifier,
             include_debug=True,
         )
 
+        utterance_classifier.assert_called_once_with(
+            "Tell me about The Arab Tent.",
+            True,
+        )
         query_engine.generate_response.assert_called_once_with(
             text="Tell me about The Arab Tent.",
             conversation_id="conversation-1",
             subject_reference=None,
+            utterance_route=utterance_route,
             include_debug=True,
         )
         self.assertIsNotNone(result.query)
+        self.assertIs(
+            result.utterance_route,
+            utterance_route,
+        )
         self.assertEqual(result.query.response, "The Arab Tent is...")
 
 

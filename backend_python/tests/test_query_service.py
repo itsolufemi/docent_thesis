@@ -2,7 +2,12 @@ from conversation_core.services.query_service import QueryEngine
 
 
 class FakeResolver:
-    def __call__(self, subject_reference, user_input):
+    def __call__(
+        self,
+        subject_reference,
+        user_input,
+        utterance_route=None,
+    ):
         return type(
             "ResolvedContext",
             (),

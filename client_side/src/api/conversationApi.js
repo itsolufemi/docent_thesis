@@ -6,6 +6,7 @@ export async function sendTurnBufferEvent({
   partialUtterance,
   isSpeechActive,
   silenceDurationMs,
+  assistantWasSpeaking = false,
   debug = false,
 }) {
   const response = await fetch(
@@ -20,6 +21,8 @@ export async function sendTurnBufferEvent({
         partial_utterance: partialUtterance,
         is_speech_active: isSpeechActive,
         silence_duration_ms: silenceDurationMs,
+        assistant_was_speaking:
+          assistantWasSpeaking,
         debug,
       }),
     },

@@ -10,9 +10,17 @@ UtteranceRouteType = Literal[
     "interruption",
 ]
 
+FloorIntent = Literal[
+    "none",
+    "backchannel",
+    "hold_floor",
+    "take_floor",
+]
+
 
 class UtteranceRoute(BaseModel):
     route_type: UtteranceRouteType
+    floor_intent: FloorIntent = "none"
     requires_retrieval: bool = False
     proposed_action: str | None = None
     candidate_subjects: list[str] = Field(default_factory=list)

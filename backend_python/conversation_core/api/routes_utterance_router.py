@@ -8,6 +8,7 @@ from docent.config.docent_classifier_profile import docent_classifier_profile
 
 class UtteranceRouteRequest(BaseModel):
     text: str
+    assistant_was_speaking: bool = False
 
 
 router = APIRouter()
@@ -23,4 +24,7 @@ def read_utterance_route(
     return route_utterance(
         text=request.text,
         domain_profile=docent_classifier_profile,
+        assistant_was_speaking=(
+            request.assistant_was_speaking
+        ),
     )

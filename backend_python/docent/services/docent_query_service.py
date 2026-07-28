@@ -4,6 +4,9 @@ from conversation_core.schemas.conversation_schemas import (
 )
 from conversation_core.schemas.query_schemas import ResolvedContext
 from conversation_core.schemas.source_schemas import QuerySource
+from conversation_core.schemas.utterance_route_schemas import (
+    UtteranceRoute,
+)
 from conversation_core.services.query_service import QueryEngine
 from conversation_core.services.utterance_router_service import route_utterance
 from conversation_core.services.prompt_service import (
@@ -47,6 +50,7 @@ def build_utterance_route_debug_payload(
 ) -> dict:
     return {
         "utterance_route_type": utterance_route.route_type,
+        "utterance_floor_intent": utterance_route.floor_intent,
         "utterance_route_confidence": utterance_route.confidence,
         "utterance_route_reason": utterance_route.reason,
         "utterance_is_relevant": utterance_route.is_relevant,
@@ -66,6 +70,7 @@ def build_utterance_route_prompt_payload(
 ) -> dict:
     return {
         "route_type": utterance_route.route_type,
+        "floor_intent": utterance_route.floor_intent,
         "requires_retrieval": utterance_route.requires_retrieval,
         "proposed_action": utterance_route.proposed_action,
         "candidate_subjects": utterance_route.candidate_subjects,
@@ -158,14 +163,20 @@ def build_route_handled_context(
 def docent_resolve_context(
     subject_reference: str | None,
     user_input: str,
+    utterance_route: UtteranceRoute | None = None,
 ) -> ResolvedContext:
     sources: list[QuerySource] = []
-    utterance_route = route_utterance(
-        text=user_input,
-        domain_profile=docent_classifier_profile,
+    active_utterance_route = (
+        utterance_route
+        or route_utterance(
+            text=user_input,
+            domain_profile=docent_classifier_profile,
+        )
     )
 
-    route_handled_context = build_route_handled_context(utterance_route)
+    route_handled_context = build_route_handled_context(
+        active_utterance_route
+    )
 
     if route_handled_context is not None:
         return route_handled_context
@@ -189,14 +200,16 @@ def docent_resolve_context(
                     subject_reference=subject_reference,
                     sources=sources,
                     prompt_payload={
-                        **build_utterance_route_prompt_payload(utterance_route),
+                        **build_utterance_route_prompt_payload(
+                            active_utterance_route
+                        ),
                         "artwork": artwork,
                         "retrieved_chunks": [],
                         "retrieved_documents": [],
                     },
                     debug_payload={
                         **build_utterance_route_debug_payload(
-                            utterance_route=utterance_route,
+                            utterance_route=active_utterance_route,
                             retrieval_skipped_by_utterance_route=False,
                         ),
                         "painting_index": painting_index,
@@ -209,14 +222,16 @@ def docent_resolve_context(
                 subject_reference=subject_reference,
                 sources=[],
                 prompt_payload={
-                    **build_utterance_route_prompt_payload(utterance_route),
+                    **build_utterance_route_prompt_payload(
+                        active_utterance_route
+                    ),
                     "artwork": None,
                     "retrieved_chunks": [],
                     "retrieved_documents": [],
                 },
                 debug_payload={
                     **build_utterance_route_debug_payload(
-                        utterance_route=utterance_route,
+                        utterance_route=active_utterance_route,
                         retrieval_skipped_by_utterance_route=False,
                     ),
                     "painting_index": painting_index,
@@ -240,14 +255,16 @@ def docent_resolve_context(
             subject_reference=None,
             sources=build_sources_from_retrieved_chunks(retrieved_chunks),
             prompt_payload={
-                **build_utterance_route_prompt_payload(utterance_route),
+                **build_utterance_route_prompt_payload(
+                    active_utterance_route
+                ),
                 "artwork": None,
                 "retrieved_chunks": retrieved_chunks,
                 "retrieved_documents": [],
             },
             debug_payload={
                 **build_utterance_route_debug_payload(
-                    utterance_route=utterance_route,
+                    utterance_route=active_utterance_route,
                     retrieval_skipped_by_utterance_route=False,
                 ),
                 "vector_retrieval_used": True,
@@ -276,14 +293,16 @@ def docent_resolve_context(
             subject_reference=None,
             sources=build_sources_from_retrieved_documents(retrieved_documents),
             prompt_payload={
-                **build_utterance_route_prompt_payload(utterance_route),
+                **build_utterance_route_prompt_payload(
+                    active_utterance_route
+                ),
                 "artwork": None,
                 "retrieved_chunks": [],
                 "retrieved_documents": retrieved_documents,
             },
             debug_payload={
                 **build_utterance_route_debug_payload(
-                    utterance_route=utterance_route,
+                    utterance_route=active_utterance_route,
                     retrieval_skipped_by_utterance_route=False,
                 ),
                 "document_retrieval_used": True,
@@ -299,14 +318,16 @@ def docent_resolve_context(
         subject_reference=None,
         sources=[],
         prompt_payload={
-            **build_utterance_route_prompt_payload(utterance_route),
+            **build_utterance_route_prompt_payload(
+                active_utterance_route
+            ),
             "artwork": None,
             "retrieved_chunks": [],
             "retrieved_documents": [],
         },
         debug_payload={
             **build_utterance_route_debug_payload(
-                utterance_route=utterance_route,
+                utterance_route=active_utterance_route,
                 retrieval_skipped_by_utterance_route=False,
             ),
             "vector_retrieval_timings": (
@@ -328,6 +349,7 @@ def docent_build_prompt_from_context(
 
     payload = resolved_context.prompt_payload
     route_type = payload.get("route_type", "response_request")
+    floor_intent = payload.get("floor_intent", "none")
     proposed_action = payload.get("proposed_action")
     candidate_subjects = payload.get("candidate_subjects", [])
 
@@ -336,6 +358,9 @@ def docent_build_prompt_from_context(
 
     Route type:
     {route_type}
+
+    Floor intent:
+    {floor_intent}
 
     Proposed structural action:
     {proposed_action or "None"}

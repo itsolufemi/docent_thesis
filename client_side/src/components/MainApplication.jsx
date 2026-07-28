@@ -2,10 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import StartScreen from './StartScreen';
 import MainApp from './MainApp';
 import { connectToServer, makeServerRequest } from './utils/server_functions';
-import { sendTurnBufferEvent } from '../api/conversationApi';
 import { AudioStreamClient } from '../api/audioStreamClient';
 import { synthesiseSpeech } from '../api/ttsApi';
 import { TtsStreamClient } from '../api/ttsStreamClient';
+import { TurnStreamClient } from '../api/turnStreamClient';
 import { calculateRemainingSilenceMs } from '../audio/vadMath';
 
 const FORCED_FINALISATION_SILENCE_MS = 1800;
@@ -86,6 +86,11 @@ export default function MainApplication() {
   const assistantIsDuckedRef = useRef(false);
   const assistantAudioStatusRef = useRef('idle');
   const audioStreamClientRef = useRef(null);
+  const turnStreamClientRef = useRef(null);
+  const turnStreamConnectionPromiseRef =
+    useRef(null);
+  const pendingTurnRequestsRef =
+    useRef(new Map());
   const spokenTurnTranscriptRef = useRef('');
   const processTurnTranscriptRef = useRef(null);
   const turnRequestPendingRef = useRef(false);
@@ -283,6 +288,7 @@ export default function MainApplication() {
         false;
       clearSilenceReevaluationTimer();
       clearDuckingTimer();
+      restoreAssistantAudio();
     }
   }, [recording]);
 
@@ -297,6 +303,22 @@ export default function MainApplication() {
       clearDuckingTimer();
 
       ttsAbortControllerRef.current?.abort();
+
+      turnStreamClientRef.current?.close();
+      turnStreamClientRef.current = null;
+      turnStreamConnectionPromiseRef.current =
+        null;
+
+      for (
+        const pendingRequest
+        of pendingTurnRequestsRef.current.values()
+      ) {
+        pendingRequest.reject(
+          new Error('Turn stream closed.'),
+        );
+      }
+
+      pendingTurnRequestsRef.current.clear();
 
       if (currentAudio.current) {
         currentAudio.current.onended = null;
@@ -629,6 +651,259 @@ export default function MainApplication() {
     setAssistantAudioStatus('idle');
   };
 
+  const rejectPendingTurnRequests = (
+    error,
+  ) => {
+    for (
+      const pendingRequest
+      of pendingTurnRequestsRef.current.values()
+    ) {
+      pendingRequest.reject(error);
+    }
+
+    pendingTurnRequestsRef.current.clear();
+  };
+
+  const ensureTurnStream = async () => {
+    const existingClient =
+      turnStreamClientRef.current;
+
+    if (
+      existingClient?.socket?.readyState ===
+      WebSocket.OPEN
+    ) {
+      return existingClient;
+    }
+
+    if (
+      existingClient &&
+      turnStreamConnectionPromiseRef.current
+    ) {
+      await turnStreamConnectionPromiseRef.current;
+      return existingClient;
+    }
+
+    const client = new TurnStreamClient({
+      onReady: (payload) => {
+        console.log(
+          'Turn stream ready:',
+          payload,
+        );
+      },
+
+      onTurnEvaluated: ({
+        requestId,
+        payload,
+      }) => {
+        console.log(
+          'Turn evaluated:',
+          payload,
+        );
+
+        const pendingRequest =
+          pendingTurnRequestsRef.current.get(
+            requestId,
+          );
+
+        if (!pendingRequest) {
+          return;
+        }
+
+        pendingRequest.turn = payload;
+
+        if (!payload.should_finalise_turn) {
+          pendingTurnRequestsRef.current.delete(
+            requestId,
+          );
+
+          pendingRequest.resolve({
+            turn: payload,
+            utterance_route: null,
+            query: null,
+          });
+        }
+      },
+
+      onUtteranceClassified: ({
+        requestId,
+        payload,
+      }) => {
+        console.log(
+          'Utterance classified:',
+          payload,
+        );
+
+        const pendingRequest =
+          pendingTurnRequestsRef.current.get(
+            requestId,
+          );
+
+        if (pendingRequest) {
+          pendingRequest.route = payload;
+        }
+
+        const floorIntent =
+          payload.floor_intent;
+
+        if (floorIntent === 'take_floor') {
+          stopAssistantAudio();
+          return;
+        }
+
+        if (
+          floorIntent === 'backchannel' ||
+          floorIntent === 'none'
+        ) {
+          restoreAssistantAudio();
+        }
+      },
+
+      onQueryStarted: ({
+        payload,
+      }) => {
+        console.log(
+          'Turn query started:',
+          payload,
+        );
+        setTurnRequestPending(true);
+      },
+
+      onQueryComplete: ({
+        requestId,
+        payload,
+      }) => {
+        console.log(
+          'Turn query complete:',
+          payload,
+        );
+        setTurnRequestPending(false);
+
+        const pendingRequest =
+          pendingTurnRequestsRef.current.get(
+            requestId,
+          );
+
+        pendingTurnRequestsRef.current.delete(
+          requestId,
+        );
+
+        pendingRequest?.resolve({
+          turn: pendingRequest.turn,
+          utterance_route:
+            pendingRequest.route,
+          query: payload,
+        });
+      },
+
+      onError: (
+        error,
+        requestId,
+      ) => {
+        setTurnRequestPending(false);
+
+        const pendingRequest =
+          pendingTurnRequestsRef.current.get(
+            requestId,
+          );
+
+        if (pendingRequest) {
+          pendingTurnRequestsRef.current.delete(
+            requestId,
+          );
+          pendingRequest.reject(error);
+        } else {
+          rejectPendingTurnRequests(error);
+          setTurnRequestError(
+            error.message,
+          );
+        }
+      },
+
+      onClose: () => {
+        if (
+          turnStreamClientRef.current ===
+          client
+        ) {
+          turnStreamClientRef.current =
+            null;
+        }
+
+        setTurnRequestPending(false);
+        rejectPendingTurnRequests(
+          new Error('Turn stream closed.'),
+        );
+      },
+    });
+
+    turnStreamClientRef.current = client;
+
+    const connectionPromise =
+      client.connect();
+
+    turnStreamConnectionPromiseRef.current =
+      connectionPromise;
+
+    try {
+      await connectionPromise;
+      return client;
+    } catch (error) {
+      if (
+        turnStreamClientRef.current ===
+        client
+      ) {
+        turnStreamClientRef.current =
+          null;
+      }
+
+      throw error;
+    } finally {
+      if (
+        turnStreamConnectionPromiseRef.current ===
+        connectionPromise
+      ) {
+        turnStreamConnectionPromiseRef.current =
+          null;
+      }
+    }
+  };
+
+  const sendStreamedTurnEvent = async ({
+    partialUtterance,
+    isSpeechActive,
+    silenceDurationMs,
+    debug = false,
+  }) => {
+    const client =
+      await ensureTurnStream();
+
+    return new Promise(
+      (resolve, reject) => {
+        const requestId =
+          client.sendTurnEvent({
+            partialUtterance,
+            isSpeechActive,
+            silenceDurationMs,
+            assistantWasSpeaking:
+              assistantAudioStatusRef.current ===
+                'synthesising' ||
+              assistantAudioStatusRef.current ===
+                'playing',
+            debug,
+          });
+
+        pendingTurnRequestsRef.current.set(
+          requestId,
+          {
+            resolve,
+            reject,
+            turn: null,
+            route: null,
+          },
+        );
+      },
+    );
+  };
+
   const ensureTtsPlayer = async () => {
     let audioContext =
       speakAudioContextRef.current;
@@ -736,7 +1011,6 @@ export default function MainApplication() {
     }
 
     stopAssistantAudio();
-    restoreAssistantAudio();
 
     setAssistantAudioStatus(
       'synthesising',
@@ -1002,7 +1276,7 @@ export default function MainApplication() {
     }
 
     try {
-      const result = await sendTurnBufferEvent({
+      const result = await sendStreamedTurnEvent({
         partialUtterance: cleanedUtterance,
         isSpeechActive: false,
         silenceDurationMs,
@@ -1011,6 +1285,18 @@ export default function MainApplication() {
 
       setLatestTurnResult(result);
       setTurnDecision(result.turn.decision);
+
+      const floorIntent =
+        result.utterance_route?.floor_intent;
+
+      if (floorIntent === 'take_floor') {
+        stopAssistantAudio();
+      } else if (
+        floorIntent === 'backchannel' ||
+        floorIntent === 'none'
+      ) {
+        restoreAssistantAudio();
+      }
 
       if (
         result.turn.should_finalise_turn &&

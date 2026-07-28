@@ -22,6 +22,9 @@ from conversation_core.schemas.query_schemas import (
     QueryResult,
     ResolvedContext,
 )
+from conversation_core.schemas.utterance_route_schemas import (
+    UtteranceRoute,
+)
 from conversation_core.services.llm_service import (
     generate_llm_response,
     generate_tool_aware_llm_response,
@@ -44,7 +47,7 @@ NON_RETRIEVAL_CONTEXT_SOURCES = {
 
 
 SubjectResolver = Callable[
-    [str | None, str],
+    [str | None, str, UtteranceRoute | None],
     ResolvedContext,
 ]
 
@@ -94,6 +97,7 @@ class QueryEngine:
         text: str,
         conversation_id: str | None = None,
         subject_reference: str | None = None,
+        utterance_route: UtteranceRoute | None = None,
         include_debug: bool = False,
     ) -> QueryResult:
         """
@@ -155,6 +159,7 @@ class QueryEngine:
         resolved_context = self.subject_resolver(
             subject_reference,
             text,
+            utterance_route,
         )
 
         context_resolution_seconds = (
@@ -262,6 +267,7 @@ DEFAULT_CONVERSATION_PROFILE = PromptProfile(
 def default_resolve_context(
     subject_reference: str | None,
     user_input: str,
+    utterance_route: UtteranceRoute | None = None,
 ) -> ResolvedContext:
     return ResolvedContext(
         context_source="no_external_context",

@@ -91,6 +91,27 @@ class DocentRetrievalRoutingTest(unittest.TestCase):
 
         return context, vector_retrieval, keyword_retrieval
 
+    def test_preclassified_route_is_reused(self) -> None:
+        route = utterance_route(
+            route_type="response_request",
+            requires_retrieval=False,
+        )
+
+        with patch(
+            "docent.services.docent_query_service.route_utterance",
+        ) as classify:
+            context = docent_resolve_context(
+                subject_reference=None,
+                user_input="Hello.",
+                utterance_route=route,
+            )
+
+        classify.assert_not_called()
+        self.assertEqual(
+            context.prompt_payload["route_type"],
+            "response_request",
+        )
+
     def test_greeting_skips_retrieval(self) -> None:
         route = utterance_route(
             route_type="response_request",
