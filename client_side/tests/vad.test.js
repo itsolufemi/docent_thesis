@@ -209,7 +209,7 @@ test(
     );
     assert.equal(
       firstSpeechEnd.silenceDurationMs,
-      600,
+      504,
     );
 
     const messageCountAfterFirstSegment =

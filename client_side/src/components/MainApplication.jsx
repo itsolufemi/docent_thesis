@@ -12,7 +12,7 @@ import {
 } from '../audio/sentenceBuffer';
 
 const FORCED_FINALISATION_SILENCE_MS = 1800;
-const INITIAL_VAD_SILENCE_MS = 600;
+const INITIAL_VAD_SILENCE_MS = 500;
 const BARGE_IN_CONFIRMATION_MS = 200;
 const ASSISTANT_DUCK_GAIN = 0.3;
 const ASSISTANT_NORMAL_GAIN = 1.0;
@@ -651,7 +651,8 @@ export default function MainApplication() {
   };
 
   const finaliseAudioSegment = (
-    silenceDurationMs = 600,
+    silenceDurationMs =
+      INITIAL_VAD_SILENCE_MS,
   ) => {
     try {
       audioStreamClientRef.current?.finaliseSegment({

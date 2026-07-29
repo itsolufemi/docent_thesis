@@ -1,0 +1,1122 @@
+{
+  "method": {
+    "sample_rate": 16000,
+    "worklet_frame_samples": 128,
+    "speech_threshold": 0.02,
+    "speech_start_duration_ms": 40,
+    "pre_roll_duration_ms": 250,
+    "thresholds_ms": [
+      200,
+      300,
+      400,
+      600
+    ],
+    "semantic_check_minimum_ms": 300,
+    "fixture_voice": "en-GB-Chirp3-HD-Aoede",
+    "trp_warmup_error": {
+      "error_type": "ReadTimeout",
+      "error": "timed out"
+    }
+  },
+  "fixtures": [
+    {
+      "fixture_id": "complete_request",
+      "parts": [
+        "Tell me about The Arab Tent."
+      ],
+      "pauses_ms": [],
+      "expected_transcript": "Tell me about The Arab Tent.",
+      "first_part_expected_complete": null
+    },
+    {
+      "fixture_id": "incomplete_pause_250",
+      "parts": [
+        "Could you tell me about",
+        "The Arab Tent?"
+      ],
+      "pauses_ms": [
+        250
+      ],
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "first_part_expected_complete": false
+    },
+    {
+      "fixture_id": "incomplete_pause_350",
+      "parts": [
+        "Could you tell me about",
+        "The Arab Tent?"
+      ],
+      "pauses_ms": [
+        350
+      ],
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "first_part_expected_complete": false
+    },
+    {
+      "fixture_id": "incomplete_pause_450",
+      "parts": [
+        "Could you tell me about",
+        "The Arab Tent?"
+      ],
+      "pauses_ms": [
+        450
+      ],
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "first_part_expected_complete": false
+    },
+    {
+      "fixture_id": "unfinished_clause_pause_350",
+      "parts": [
+        "I think that",
+        "the painting is beautiful."
+      ],
+      "pauses_ms": [
+        350
+      ],
+      "expected_transcript": "I think that the painting is beautiful.",
+      "first_part_expected_complete": false
+    },
+    {
+      "fixture_id": "complete_clause_pause_350",
+      "parts": [
+        "The Arab Tent is remarkable.",
+        "Its interior is richly decorated."
+      ],
+      "pauses_ms": [
+        350
+      ],
+      "expected_transcript": "The Arab Tent is remarkable. Its interior is richly decorated.",
+      "first_part_expected_complete": true
+    }
+  ],
+  "threshold_summaries": [
+    {
+      "threshold_ms": 200,
+      "fixture_count": 6,
+      "successful_conditions": 6,
+      "failed_conditions": 0,
+      "acoustic_splits": 5,
+      "premature_finalisations": 0,
+      "final_segments_finalised": 0,
+      "incomplete_split_cases": 4,
+      "incomplete_splits_awaited": 0,
+      "mean_word_error_rate": 0.0,
+      "guaranteed_final_pause_saving_ms": 400
+    },
+    {
+      "threshold_ms": 300,
+      "fixture_count": 6,
+      "successful_conditions": 6,
+      "failed_conditions": 0,
+      "acoustic_splits": 5,
+      "premature_finalisations": 1,
+      "final_segments_finalised": 6,
+      "incomplete_split_cases": 4,
+      "incomplete_splits_awaited": 4,
+      "mean_word_error_rate": 0.0,
+      "guaranteed_final_pause_saving_ms": 300
+    },
+    {
+      "threshold_ms": 400,
+      "fixture_count": 6,
+      "successful_conditions": 6,
+      "failed_conditions": 0,
+      "acoustic_splits": 4,
+      "premature_finalisations": 1,
+      "final_segments_finalised": 6,
+      "incomplete_split_cases": 3,
+      "incomplete_splits_awaited": 3,
+      "mean_word_error_rate": 0.0,
+      "guaranteed_final_pause_saving_ms": 200
+    },
+    {
+      "threshold_ms": 600,
+      "fixture_count": 6,
+      "successful_conditions": 6,
+      "failed_conditions": 0,
+      "acoustic_splits": 0,
+      "premature_finalisations": 0,
+      "final_segments_finalised": 6,
+      "incomplete_split_cases": 0,
+      "incomplete_splits_awaited": 0,
+      "mean_word_error_rate": 0.0,
+      "guaranteed_final_pause_saving_ms": 0
+    }
+  ],
+  "results": [
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "complete_request",
+      "threshold_ms": 200,
+      "expected_transcript": "Tell me about The Arab Tent.",
+      "combined_transcript": "Tell me about the Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 1,
+      "acoustic_split": false,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 0,
+      "final_segment_finalised": false,
+      "first_segment_decision": "continue_listening",
+      "first_part_expected_complete": null,
+      "guaranteed_final_pause_saving_ms": 400,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.824,
+          "duration_seconds": 1.776,
+          "transcript": "Tell me about the Arab tent.",
+          "transcription_seconds": 0.6192,
+          "accumulated_transcript": "Tell me about the Arab tent.",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0002,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_250",
+      "threshold_ms": 200,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about... The Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": true,
+      "premature_finalisations": 0,
+      "finalised_turns": 0,
+      "final_segment_finalised": false,
+      "first_segment_decision": "continue_listening",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 400,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.64,
+          "duration_seconds": 1.56,
+          "transcript": "Could you tell me about...",
+          "transcription_seconds": 0.5655,
+          "accumulated_transcript": "Could you tell me about...",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0001,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 2.784,
+          "duration_seconds": 1.144,
+          "transcript": "The Arab tent.",
+          "transcription_seconds": 0.539,
+          "accumulated_transcript": "Could you tell me about... The Arab tent.",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0001,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_350",
+      "threshold_ms": 200,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about... The Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": true,
+      "premature_finalisations": 0,
+      "finalised_turns": 0,
+      "final_segment_finalised": false,
+      "first_segment_decision": "continue_listening",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 400,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.64,
+          "duration_seconds": 1.56,
+          "transcript": "Could you tell me about...",
+          "transcription_seconds": 0.5765,
+          "accumulated_transcript": "Could you tell me about...",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0001,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 2.88,
+          "duration_seconds": 1.232,
+          "transcript": "The Arab tent.",
+          "transcription_seconds": 0.5473,
+          "accumulated_transcript": "Could you tell me about... The Arab tent.",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0001,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_450",
+      "threshold_ms": 200,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about... The Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": true,
+      "premature_finalisations": 0,
+      "finalised_turns": 0,
+      "final_segment_finalised": false,
+      "first_segment_decision": "continue_listening",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 400,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.64,
+          "duration_seconds": 1.56,
+          "transcript": "Could you tell me about...",
+          "transcription_seconds": 0.5442,
+          "accumulated_transcript": "Could you tell me about...",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0001,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 2.984,
+          "duration_seconds": 1.232,
+          "transcript": "The Arab tent.",
+          "transcription_seconds": 0.5348,
+          "accumulated_transcript": "Could you tell me about... The Arab tent.",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0001,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "unfinished_clause_pause_350",
+      "threshold_ms": 200,
+      "expected_transcript": "I think that the painting is beautiful.",
+      "combined_transcript": "I think that... The painting is beautiful.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": true,
+      "premature_finalisations": 0,
+      "finalised_turns": 0,
+      "final_segment_finalised": false,
+      "first_segment_decision": "continue_listening",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 400,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.136,
+          "duration_seconds": 1.016,
+          "transcript": "I think that...",
+          "transcription_seconds": 0.5369,
+          "accumulated_transcript": "I think that...",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0001,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 2.872,
+          "duration_seconds": 1.648,
+          "transcript": "The painting is beautiful.",
+          "transcription_seconds": 0.5331,
+          "accumulated_transcript": "I think that... The painting is beautiful.",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0001,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "complete_clause_pause_350",
+      "threshold_ms": 200,
+      "expected_transcript": "The Arab Tent is remarkable. Its interior is richly decorated.",
+      "combined_transcript": "The Arab tent is remarkable. Its interior is richly decorated.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": true,
+      "premature_finalisations": 0,
+      "finalised_turns": 0,
+      "final_segment_finalised": false,
+      "first_segment_decision": "continue_listening",
+      "first_part_expected_complete": true,
+      "guaranteed_final_pause_saving_ms": 400,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 2.048,
+          "duration_seconds": 1.92,
+          "transcript": "The Arab tent is remarkable.",
+          "transcription_seconds": 0.7115,
+          "accumulated_transcript": "The Arab tent is remarkable.",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0001,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 4.544,
+          "duration_seconds": 2.432,
+          "transcript": "Its interior is richly decorated.",
+          "transcription_seconds": 0.571,
+          "accumulated_transcript": "The Arab tent is remarkable. Its interior is richly decorated.",
+          "decision": "continue_listening",
+          "should_finalise_turn": false,
+          "trp_probability": null,
+          "turn_processing_seconds": 0.0001,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "complete_request",
+      "threshold_ms": 300,
+      "expected_transcript": "Tell me about The Arab Tent.",
+      "combined_transcript": "Tell me about the Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 1,
+      "acoustic_split": false,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": null,
+      "guaranteed_final_pause_saving_ms": 300,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.928,
+          "duration_seconds": 1.88,
+          "transcript": "Tell me about the Arab tent.",
+          "transcription_seconds": 0.5666,
+          "accumulated_transcript": "Tell me about the Arab tent.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 1.0,
+          "turn_processing_seconds": 0.8613,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_250",
+      "threshold_ms": 300,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about? The Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "await_more_speech",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 300,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.744,
+          "duration_seconds": 1.664,
+          "transcript": "Could you tell me about?",
+          "transcription_seconds": 0.5735,
+          "accumulated_transcript": "Could you tell me about?",
+          "decision": "await_more_speech",
+          "should_finalise_turn": false,
+          "trp_probability": 0.1,
+          "turn_processing_seconds": 0.855,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 2.888,
+          "duration_seconds": 1.144,
+          "transcript": "The Arab tent.",
+          "transcription_seconds": 0.5781,
+          "accumulated_transcript": "Could you tell me about? The Arab tent.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.95,
+          "turn_processing_seconds": 2.3282,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_350",
+      "threshold_ms": 300,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about... The Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": true,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "await_more_speech",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 300,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.744,
+          "duration_seconds": 1.664,
+          "transcript": "Could you tell me about...",
+          "transcription_seconds": 0.609,
+          "accumulated_transcript": "Could you tell me about...",
+          "decision": "await_more_speech",
+          "should_finalise_turn": false,
+          "trp_probability": 0.1,
+          "turn_processing_seconds": 1.2341,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 2.984,
+          "duration_seconds": 1.24,
+          "transcript": "The Arab tent.",
+          "transcription_seconds": 0.5722,
+          "accumulated_transcript": "Could you tell me about... The Arab tent.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.85,
+          "turn_processing_seconds": 1.544,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_450",
+      "threshold_ms": 300,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about... The Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": true,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "await_more_speech",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 300,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.744,
+          "duration_seconds": 1.664,
+          "transcript": "Could you tell me about...",
+          "transcription_seconds": 0.5914,
+          "accumulated_transcript": "Could you tell me about...",
+          "decision": "await_more_speech",
+          "should_finalise_turn": false,
+          "trp_probability": 0.1,
+          "turn_processing_seconds": 1.0038,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 3.088,
+          "duration_seconds": 1.336,
+          "transcript": "The Arab tent.",
+          "transcription_seconds": 0.5676,
+          "accumulated_transcript": "Could you tell me about... The Arab tent.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.95,
+          "turn_processing_seconds": 0.9374,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "unfinished_clause_pause_350",
+      "threshold_ms": 300,
+      "expected_transcript": "I think that the painting is beautiful.",
+      "combined_transcript": "I think that... The painting is beautiful.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": true,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "await_more_speech",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 300,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.24,
+          "duration_seconds": 1.12,
+          "transcript": "I think that...",
+          "transcription_seconds": 0.5953,
+          "accumulated_transcript": "I think that...",
+          "decision": "await_more_speech",
+          "should_finalise_turn": false,
+          "trp_probability": 0.1,
+          "turn_processing_seconds": 2.2519,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 2.976,
+          "duration_seconds": 1.736,
+          "transcript": "The painting is beautiful.",
+          "transcription_seconds": 0.5696,
+          "accumulated_transcript": "I think that... The painting is beautiful.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.95,
+          "turn_processing_seconds": 0.9957,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "complete_clause_pause_350",
+      "threshold_ms": 300,
+      "expected_transcript": "The Arab Tent is remarkable. Its interior is richly decorated.",
+      "combined_transcript": "The Arab tent is remarkable. Its interior is richly decorated.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": true,
+      "premature_finalisations": 1,
+      "finalised_turns": 2,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": true,
+      "guaranteed_final_pause_saving_ms": 300,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 2.152,
+          "duration_seconds": 2.024,
+          "transcript": "The Arab tent is remarkable.",
+          "transcription_seconds": 0.5494,
+          "accumulated_transcript": "The Arab tent is remarkable.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.95,
+          "turn_processing_seconds": 1.0381,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 4.648,
+          "duration_seconds": 2.496,
+          "transcript": "Its interior is richly decorated.",
+          "transcription_seconds": 0.6008,
+          "accumulated_transcript": "Its interior is richly decorated.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 1.0,
+          "turn_processing_seconds": 1.0135,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "complete_request",
+      "threshold_ms": 400,
+      "expected_transcript": "Tell me about The Arab Tent.",
+      "combined_transcript": "Tell me about the Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 1,
+      "acoustic_split": false,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": null,
+      "guaranteed_final_pause_saving_ms": 200,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 2.024,
+          "duration_seconds": 1.976,
+          "transcript": "Tell me about the Arab tent.",
+          "transcription_seconds": 0.6459,
+          "accumulated_transcript": "Tell me about the Arab tent.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 1.0,
+          "turn_processing_seconds": 15.4418,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_250",
+      "threshold_ms": 400,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about the Arab tent?",
+      "word_error_rate": 0.0,
+      "segment_count": 1,
+      "acoustic_split": false,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 200,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 2.984,
+          "duration_seconds": 2.904,
+          "transcript": "Could you tell me about the Arab tent?",
+          "transcription_seconds": 0.6259,
+          "accumulated_transcript": "Could you tell me about the Arab tent?",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 1.0,
+          "turn_processing_seconds": 1.0591,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_350",
+      "threshold_ms": 400,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about? The Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "await_more_speech",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 200,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.84,
+          "duration_seconds": 1.76,
+          "transcript": "Could you tell me about?",
+          "transcription_seconds": 0.567,
+          "accumulated_transcript": "Could you tell me about?",
+          "decision": "await_more_speech",
+          "should_finalise_turn": false,
+          "trp_probability": 0.1,
+          "turn_processing_seconds": 1.9834,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 3.08,
+          "duration_seconds": 1.24,
+          "transcript": "The Arab tent.",
+          "transcription_seconds": 0.6114,
+          "accumulated_transcript": "Could you tell me about? The Arab tent.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.9,
+          "turn_processing_seconds": 1.6986,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_450",
+      "threshold_ms": 400,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about... The Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": true,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "await_more_speech",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 200,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.84,
+          "duration_seconds": 1.76,
+          "transcript": "Could you tell me about...",
+          "transcription_seconds": 0.611,
+          "accumulated_transcript": "Could you tell me about...",
+          "decision": "await_more_speech",
+          "should_finalise_turn": false,
+          "trp_probability": 0.1,
+          "turn_processing_seconds": 1.8003,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 3.184,
+          "duration_seconds": 1.344,
+          "transcript": "The Arab tent.",
+          "transcription_seconds": 0.5452,
+          "accumulated_transcript": "Could you tell me about... The Arab tent.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.85,
+          "turn_processing_seconds": 1.3941,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "unfinished_clause_pause_350",
+      "threshold_ms": 400,
+      "expected_transcript": "I think that the painting is beautiful.",
+      "combined_transcript": "I think that... The painting is beautiful.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "await_more_speech",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 200,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 1.336,
+          "duration_seconds": 1.216,
+          "transcript": "I think that...",
+          "transcription_seconds": 0.5509,
+          "accumulated_transcript": "I think that...",
+          "decision": "await_more_speech",
+          "should_finalise_turn": false,
+          "trp_probability": 0.1,
+          "turn_processing_seconds": 8.3303,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 3.072,
+          "duration_seconds": 1.736,
+          "transcript": "The painting is beautiful.",
+          "transcription_seconds": 0.6033,
+          "accumulated_transcript": "I think that... The painting is beautiful.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.95,
+          "turn_processing_seconds": 2.5752,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "complete_clause_pause_350",
+      "threshold_ms": 400,
+      "expected_transcript": "The Arab Tent is remarkable. Its interior is richly decorated.",
+      "combined_transcript": "The Arab tent is remarkable. Its interior is richly decorated.",
+      "word_error_rate": 0.0,
+      "segment_count": 2,
+      "acoustic_split": true,
+      "expected_internal_split": false,
+      "premature_finalisations": 1,
+      "finalised_turns": 2,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": true,
+      "guaranteed_final_pause_saving_ms": 200,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 2.248,
+          "duration_seconds": 2.12,
+          "transcript": "The Arab tent is remarkable.",
+          "transcription_seconds": 0.6014,
+          "accumulated_transcript": "The Arab tent is remarkable.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.95,
+          "turn_processing_seconds": 1.5358,
+          "is_last_segment": false
+        },
+        {
+          "segment_index": 1,
+          "end_seconds": 4.744,
+          "duration_seconds": 2.496,
+          "transcript": "Its interior is richly decorated.",
+          "transcription_seconds": 0.5839,
+          "accumulated_transcript": "Its interior is richly decorated.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.95,
+          "turn_processing_seconds": 1.9901,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "complete_request",
+      "threshold_ms": 600,
+      "expected_transcript": "Tell me about The Arab Tent.",
+      "combined_transcript": "Tell me about the Arab tent.",
+      "word_error_rate": 0.0,
+      "segment_count": 1,
+      "acoustic_split": false,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": null,
+      "guaranteed_final_pause_saving_ms": 0,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 2.224,
+          "duration_seconds": 2.176,
+          "transcript": "Tell me about the Arab tent.",
+          "transcription_seconds": 0.6088,
+          "accumulated_transcript": "Tell me about the Arab tent.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 1.0,
+          "turn_processing_seconds": 0.8366,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_250",
+      "threshold_ms": 600,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about the Arab tent?",
+      "word_error_rate": 0.0,
+      "segment_count": 1,
+      "acoustic_split": false,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 0,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 3.184,
+          "duration_seconds": 3.104,
+          "transcript": "Could you tell me about the Arab tent?",
+          "transcription_seconds": 0.6124,
+          "accumulated_transcript": "Could you tell me about the Arab tent?",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 1.0,
+          "turn_processing_seconds": 0.8547,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_350",
+      "threshold_ms": 600,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about the Arab tent?",
+      "word_error_rate": 0.0,
+      "segment_count": 1,
+      "acoustic_split": false,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 0,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 3.28,
+          "duration_seconds": 3.2,
+          "transcript": "Could you tell me about the Arab tent?",
+          "transcription_seconds": 0.5577,
+          "accumulated_transcript": "Could you tell me about the Arab tent?",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 1.0,
+          "turn_processing_seconds": 0.7657,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "incomplete_pause_450",
+      "threshold_ms": 600,
+      "expected_transcript": "Could you tell me about The Arab Tent?",
+      "combined_transcript": "Could you tell me about the Arab tent?",
+      "word_error_rate": 0.0,
+      "segment_count": 1,
+      "acoustic_split": false,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 0,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 3.384,
+          "duration_seconds": 3.304,
+          "transcript": "Could you tell me about the Arab tent?",
+          "transcription_seconds": 0.6303,
+          "accumulated_transcript": "Could you tell me about the Arab tent?",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 1.0,
+          "turn_processing_seconds": 2.3147,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "unfinished_clause_pause_350",
+      "threshold_ms": 600,
+      "expected_transcript": "I think that the painting is beautiful.",
+      "combined_transcript": "I think that the painting is beautiful.",
+      "word_error_rate": 0.0,
+      "segment_count": 1,
+      "acoustic_split": false,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": false,
+      "guaranteed_final_pause_saving_ms": 0,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 3.272,
+          "duration_seconds": 3.152,
+          "transcript": "I think that the painting is beautiful.",
+          "transcription_seconds": 0.6375,
+          "accumulated_transcript": "I think that the painting is beautiful.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 1.0,
+          "turn_processing_seconds": 0.8796,
+          "is_last_segment": true
+        }
+      ]
+    },
+    {
+      "success": true,
+      "error": null,
+      "fixture_id": "complete_clause_pause_350",
+      "threshold_ms": 600,
+      "expected_transcript": "The Arab Tent is remarkable. Its interior is richly decorated.",
+      "combined_transcript": "The Arab tent is remarkable. Its interior is richly decorated.",
+      "word_error_rate": 0.0,
+      "segment_count": 1,
+      "acoustic_split": false,
+      "expected_internal_split": false,
+      "premature_finalisations": 0,
+      "finalised_turns": 1,
+      "final_segment_finalised": true,
+      "first_segment_decision": "finalise_turn",
+      "first_part_expected_complete": true,
+      "guaranteed_final_pause_saving_ms": 0,
+      "segments": [
+        {
+          "segment_index": 0,
+          "end_seconds": 4.944,
+          "duration_seconds": 4.816,
+          "transcript": "The Arab tent is remarkable. Its interior is richly decorated.",
+          "transcription_seconds": 0.5895,
+          "accumulated_transcript": "The Arab tent is remarkable. Its interior is richly decorated.",
+          "decision": "finalise_turn",
+          "should_finalise_turn": true,
+          "trp_probability": 0.9,
+          "turn_processing_seconds": 1.6681,
+          "is_last_segment": true
+        }
+      ]
+    }
+  ]
+}

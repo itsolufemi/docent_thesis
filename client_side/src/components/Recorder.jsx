@@ -1,6 +1,8 @@
 import React, { useRef } from 'react';
 import { micOff_chime, micOn_chime } from './AudioPlayer';
 
+const DEFAULT_VAD_SILENCE_MS = 500;
+
 function floatTo16BitPCM(float32Array) {
   const buffer = new ArrayBuffer(float32Array.length * 2);
   const view = new DataView(buffer);
@@ -86,7 +88,8 @@ export default function Recorder({
 
       case 'speech_end': {
         onVadSpeechEnd?.(
-          message.silenceDurationMs ?? 600,
+          message.silenceDurationMs ??
+            DEFAULT_VAD_SILENCE_MS,
         );
 
         if (!segmentActiveRef.current) {
@@ -96,7 +99,8 @@ export default function Recorder({
         segmentActiveRef.current = false;
 
         onAudioSegmentFinalise?.(
-          message.silenceDurationMs ?? 600,
+          message.silenceDurationMs ??
+            DEFAULT_VAD_SILENCE_MS,
         );
 
         return;
