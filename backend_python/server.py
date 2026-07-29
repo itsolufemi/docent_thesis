@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from config import settings
 
 from conversation_core.api.routes_audio_stream import (
     create_audio_stream_router,
@@ -31,6 +32,9 @@ from conversation_core.api.routes_turn_detection import (
 )
 from conversation_core.api.routes_utterance_router import (
     router as utterance_router,
+)
+from conversation_core.services.smart_turn_service import (
+    SmartTurnService,
 )
 
 from docent.api.routes_artworks import router as artworks_router
@@ -83,7 +87,20 @@ turn_buffer_stream_router = create_turn_buffer_stream_router(
     utterance_classifier=classify_docent_utterance,
 )
 transcription_router = create_transcription_router()
-audio_stream_router = create_audio_stream_router()
+smart_turn_service = (
+    SmartTurnService(
+        model_path=settings.smart_turn_model_path,
+        threshold=settings.smart_turn_threshold,
+        max_audio_seconds=(
+            settings.smart_turn_max_audio_seconds
+        ),
+    )
+    if settings.smart_turn_enabled
+    else None
+)
+audio_stream_router = create_audio_stream_router(
+    smart_turn_service=smart_turn_service,
+)
 tts_router = create_tts_router()
 tts_stream_router = create_tts_stream_router()
 

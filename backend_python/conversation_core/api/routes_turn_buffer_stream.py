@@ -152,6 +152,12 @@ async def process_streamed_turn_event(
                     False,
                 )
             ),
+            turn_completion_confirmed=bool(
+                payload.get(
+                    "turn_completion_confirmed",
+                    False,
+                )
+            ),
         )
 
         turn_result = await asyncio.to_thread(

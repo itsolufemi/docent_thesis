@@ -22,6 +22,9 @@ node_modules/
 *.env
 .tmp.driveupload/
 
+# Local Smart Turn benchmark and human-recording archives
+ml_lab/**/*.zip
+
 # Expo
 .expo/
 dist/

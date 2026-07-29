@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
+  import.meta.env?.VITE_API_BASE_URL ??
   'http://127.0.0.1:8000';
 
 
@@ -68,10 +68,7 @@ export class AudioStreamClient {
           const message = JSON.parse(event.data);
 
           if (
-            (
-              message.type === 'audio_error' ||
-              message.type === 'audio_segment_cancelled'
-            ) &&
+            message.type === 'audio_segment_cancelled' &&
             message.payload?.segment_id ===
               this.currentSegmentId
           ) {
@@ -188,6 +185,8 @@ export class AudioStreamClient {
 
   finaliseSegment({
     silenceDurationMs = 500,
+    candidateId = null,
+    forcedFinalisation = false,
   } = {}) {
     if (!this.currentSegmentId) {
       throw new Error(
@@ -202,11 +201,53 @@ export class AudioStreamClient {
       {
         segment_id: segmentId,
         silence_duration_ms: silenceDurationMs,
+        candidate_id: candidateId,
+        forced_finalisation: forcedFinalisation,
       },
     );
 
     this.currentSegmentId = null;
     return segmentId;
+  }
+
+  evaluateCandidate({
+    candidateId,
+    silenceDurationMs = 500,
+  }) {
+    if (!this.currentSegmentId) {
+      throw new Error(
+        'No active audio segment exists.',
+      );
+    }
+
+    this.sendControl(
+      'candidate_segment',
+      {
+        segment_id: this.currentSegmentId,
+        candidate_id: candidateId,
+        silence_duration_ms: silenceDurationMs,
+      },
+    );
+
+    return this.currentSegmentId;
+  }
+
+  notifySpeechResumed({
+    candidateId = null,
+  } = {}) {
+    if (!this.currentSegmentId) {
+      return null;
+    }
+
+    this.sendControl(
+      'speech_resumed',
+      {
+        segment_id: this.currentSegmentId,
+        candidate_id: candidateId,
+      },
+    );
+
+    return this.currentSegmentId;
   }
 
   cancelSegment() {

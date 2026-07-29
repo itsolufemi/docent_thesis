@@ -1,0 +1,41 @@
+case_id,audio_path,expected_label,transcript,category,source,voice
+direct_request__aoede,audio/suite/direct_request__aoede.wav,complete,Tell me about The Arab Tent.,complete_request,google_chirp,en-GB-Chirp3-HD-Aoede
+wh_question__aoede,audio/suite/wh_question__aoede.wav,complete,Who painted it?,complete_question,google_chirp,en-GB-Chirp3-HD-Aoede
+tour_command__aoede,audio/suite/tour_command__aoede.wav,complete,Give me a highlights tour.,complete_command,google_chirp,en-GB-Chirp3-HD-Aoede
+short_affirmation__aoede,audio/suite/short_affirmation__aoede.wav,complete,Yes.,short_answer,google_chirp,en-GB-Chirp3-HD-Aoede
+contextual_answer__aoede,audio/suite/contextual_answer__aoede.wav,complete,Its history.,contextual_answer,google_chirp,en-GB-Chirp3-HD-Aoede
+declarative__aoede,audio/suite/declarative__aoede.wav,complete,The Arab Tent is remarkable.,complete_declarative,google_chirp,en-GB-Chirp3-HD-Aoede
+polite_completion__aoede,audio/suite/polite_completion__aoede.wav,complete,Please continue.,complete_command,google_chirp,en-GB-Chirp3-HD-Aoede
+short_rejection__aoede,audio/suite/short_rejection__aoede.wav,complete,"No, thank you.",short_answer,google_chirp,en-GB-Chirp3-HD-Aoede
+trailing_object__aoede,audio/suite/trailing_object__aoede.wav,incomplete,Could you tell me about...,trailing_object,google_chirp,en-GB-Chirp3-HD-Aoede
+trailing_because__aoede,audio/suite/trailing_because__aoede.wav,incomplete,I wanted to ask because...,trailing_conjunction,google_chirp,en-GB-Chirp3-HD-Aoede
+trailing_determiner__aoede,audio/suite/trailing_determiner__aoede.wav,incomplete,Tell me about the...,trailing_determiner,google_chirp,en-GB-Chirp3-HD-Aoede
+trailing_copula__aoede,audio/suite/trailing_copula__aoede.wav,incomplete,I think the painting is...,trailing_copula,google_chirp,en-GB-Chirp3-HD-Aoede
+trailing_and__aoede,audio/suite/trailing_and__aoede.wav,incomplete,And what about...,trailing_conjunction,google_chirp,en-GB-Chirp3-HD-Aoede
+conditional_clause__aoede,audio/suite/conditional_clause__aoede.wav,incomplete,If we move to the next room...,subordinate_clause,google_chirp,en-GB-Chirp3-HD-Aoede
+relative_clause__aoede,audio/suite/relative_clause__aoede.wav,incomplete,The artist who painted it...,relative_clause,google_chirp,en-GB-Chirp3-HD-Aoede
+question_stem__aoede,audio/suite/question_stem__aoede.wav,incomplete,Could you explain how...,question_stem,google_chirp,en-GB-Chirp3-HD-Aoede
+direct_request__achernar,audio/suite/direct_request__achernar.wav,complete,Tell me about The Arab Tent.,complete_request,google_chirp,en-GB-Chirp3-HD-Achernar
+wh_question__achernar,audio/suite/wh_question__achernar.wav,complete,Who painted it?,complete_question,google_chirp,en-GB-Chirp3-HD-Achernar
+tour_command__achernar,audio/suite/tour_command__achernar.wav,complete,Give me a highlights tour.,complete_command,google_chirp,en-GB-Chirp3-HD-Achernar
+short_affirmation__achernar,audio/suite/short_affirmation__achernar.wav,complete,Yes.,short_answer,google_chirp,en-GB-Chirp3-HD-Achernar
+contextual_answer__achernar,audio/suite/contextual_answer__achernar.wav,complete,Its history.,contextual_answer,google_chirp,en-GB-Chirp3-HD-Achernar
+declarative__achernar,audio/suite/declarative__achernar.wav,complete,The Arab Tent is remarkable.,complete_declarative,google_chirp,en-GB-Chirp3-HD-Achernar
+polite_completion__achernar,audio/suite/polite_completion__achernar.wav,complete,Please continue.,complete_command,google_chirp,en-GB-Chirp3-HD-Achernar
+short_rejection__achernar,audio/suite/short_rejection__achernar.wav,complete,"No, thank you.",short_answer,google_chirp,en-GB-Chirp3-HD-Achernar
+trailing_object__achernar,audio/suite/trailing_object__achernar.wav,incomplete,Could you tell me about...,trailing_object,google_chirp,en-GB-Chirp3-HD-Achernar
+trailing_because__achernar,audio/suite/trailing_because__achernar.wav,incomplete,I wanted to ask because...,trailing_conjunction,google_chirp,en-GB-Chirp3-HD-Achernar
+trailing_determiner__achernar,audio/suite/trailing_determiner__achernar.wav,incomplete,Tell me about the...,trailing_determiner,google_chirp,en-GB-Chirp3-HD-Achernar
+trailing_copula__achernar,audio/suite/trailing_copula__achernar.wav,incomplete,I think the painting is...,trailing_copula,google_chirp,en-GB-Chirp3-HD-Achernar
+trailing_and__achernar,audio/suite/trailing_and__achernar.wav,incomplete,And what about...,trailing_conjunction,google_chirp,en-GB-Chirp3-HD-Achernar
+conditional_clause__achernar,audio/suite/conditional_clause__achernar.wav,incomplete,If we move to the next room...,subordinate_clause,google_chirp,en-GB-Chirp3-HD-Achernar
+relative_clause__achernar,audio/suite/relative_clause__achernar.wav,incomplete,The artist who painted it...,relative_clause,google_chirp,en-GB-Chirp3-HD-Achernar
+question_stem__achernar,audio/suite/question_stem__achernar.wav,incomplete,Could you explain how...,question_stem,google_chirp,en-GB-Chirp3-HD-Achernar
+human_voice_request,audio/suite/human_voice_request.wav,complete,Tell me about The Swing.,human_complete_request,human,
+pause_complete_request,audio/suite/pause_complete_request.wav,complete,Tell me about The Arab Tent.,synthetic_complete_request,existing_fixture,
+pause_250_continuation,audio/suite/pause_250_continuation.wav,complete,Could you tell me about The Arab Tent?,internal_pause,existing_fixture,
+pause_350_continuation,audio/suite/pause_350_continuation.wav,complete,Could you tell me about The Arab Tent?,internal_pause,existing_fixture,
+pause_450_continuation,audio/suite/pause_450_continuation.wav,complete,Could you tell me about The Arab Tent?,internal_pause,existing_fixture,
+unfinished_clause_then_completion,audio/suite/unfinished_clause_then_completion.wav,complete,I think that the painting is beautiful.,internal_pause,existing_fixture,
+existing_trailing_object,audio/suite/existing_trailing_object.wav,incomplete,Could you tell me about,trailing_object,existing_fixture,
+existing_subordinate_stem,audio/suite/existing_subordinate_stem.wav,incomplete,I think that,subordinate_clause,existing_fixture,

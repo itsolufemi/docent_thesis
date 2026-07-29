@@ -5,6 +5,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _read_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+
+    if value is None:
+        return default
+
+    return value.strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 class Settings():
     backend_root: Path = Path(__file__).resolve().parent
 
@@ -23,6 +38,27 @@ class Settings():
     whisper_compute_type: str = os.getenv(
         "WHISPER_COMPUTE_TYPE",
         "int8",
+    )
+
+    smart_turn_enabled: bool = _read_bool(
+        "SMART_TURN_ENABLED",
+        False,
+    )
+    smart_turn_model_path: Path = (
+        backend_root
+        / os.getenv(
+            "SMART_TURN_MODEL_PATH",
+            "models/smart-turn-v3.2-cpu.onnx",
+        )
+    ).resolve()
+    smart_turn_threshold: float = float(
+        os.getenv("SMART_TURN_THRESHOLD", "0.50")
+    )
+    smart_turn_max_audio_seconds: float = float(
+        os.getenv(
+            "SMART_TURN_MAX_AUDIO_SECONDS",
+            "8.0",
+        )
     )
 
     docent_vector_store_directory: Path = (

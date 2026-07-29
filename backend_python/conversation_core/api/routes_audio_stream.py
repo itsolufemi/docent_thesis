@@ -1,6 +1,8 @@
 import asyncio
 import json
+import logging
 from collections.abc import Coroutine
+from time import perf_counter
 from typing import Any
 
 from fastapi import (
@@ -10,8 +12,14 @@ from fastapi import (
 )
 from starlette.concurrency import run_in_threadpool
 
+from conversation_core.schemas.smart_turn_schemas import (
+    SmartTurnResult,
+)
 from conversation_core.services.audio_stream_service import (
     AudioStreamBuffer,
+)
+from conversation_core.services.smart_turn_service import (
+    SmartTurnService,
 )
 from conversation_core.services.transcription_service import (
     TranscriptionService,
@@ -22,12 +30,14 @@ from conversation_core.services.transcription_service import (
 DEFAULT_SAMPLE_RATE = 16_000
 DEFAULT_CHANNELS = 1
 PCM16_SAMPLE_WIDTH_BYTES = 2
-
 MAX_SEGMENT_BYTES = 30 * 1024 * 1024
+
+logger = logging.getLogger(__name__)
 
 
 def create_audio_stream_router(
     transcription_service: TranscriptionService | None = None,
+    smart_turn_service: SmartTurnService | None = None,
 ) -> APIRouter:
     router = APIRouter()
     active_transcription_service = (
@@ -43,10 +53,12 @@ def create_audio_stream_router(
 
         active_segment_id: str | None = None
         active_buffer: AudioStreamBuffer | None = None
+        active_candidate_id: int | None = None
         known_segment_ids: set[str] = set()
-        transcription_tasks: set[asyncio.Task[None]] = set()
+        background_tasks: set[asyncio.Task[None]] = set()
         send_lock = asyncio.Lock()
         connection_open = True
+        last_complete_candidate: dict[str, Any] | None = None
 
         async def send_message(
             message_type: str,
@@ -68,6 +80,7 @@ def create_audio_stream_router(
             detail: str,
             *,
             segment_id: str | None = None,
+            candidate_id: int | None = None,
         ) -> None:
             payload: dict[str, Any] = {
                 "detail": detail,
@@ -75,6 +88,9 @@ def create_audio_stream_router(
 
             if segment_id is not None:
                 payload["segment_id"] = segment_id
+
+            if candidate_id is not None:
+                payload["candidate_id"] = candidate_id
 
             await send_message(
                 "audio_error",
@@ -86,6 +102,8 @@ def create_audio_stream_router(
             segment_id: str,
             audio_buffer: AudioStreamBuffer,
             silence_duration_ms: int,
+            forced_finalisation: bool,
+            turn_completion_confirmed: bool,
         ) -> None:
             summary = audio_buffer.summary()
             pcm_bytes = audio_buffer.to_bytes()
@@ -125,6 +143,12 @@ def create_audio_stream_router(
                     "silence_duration_ms": (
                         silence_duration_ms
                     ),
+                    "forced_finalisation": (
+                        forced_finalisation
+                    ),
+                    "turn_completion_confirmed": (
+                        turn_completion_confirmed
+                    ),
                     "stream": summary.model_dump(),
                     "transcription": (
                         transcription.model_dump()
@@ -132,13 +156,206 @@ def create_audio_stream_router(
                 },
             )
 
+        async def evaluate_smart_turn_candidate(
+            *,
+            segment_id: str,
+            candidate_id: int,
+            pcm_audio: bytes,
+            sample_rate: int,
+            channels: int,
+            silence_duration_ms: int,
+            audio_duration_ms: int,
+        ) -> None:
+            nonlocal last_complete_candidate
+
+            if smart_turn_service is None:
+                await send_audio_error(
+                    "Smart Turn is not enabled.",
+                    segment_id=segment_id,
+                    candidate_id=candidate_id,
+                )
+                return
+
+            try:
+                prediction = await run_in_threadpool(
+                    smart_turn_service.predict,
+                    pcm_audio,
+                    sample_rate,
+                    channels=channels,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:
+                await send_audio_error(
+                    f"Smart Turn prediction failed: {error}",
+                    segment_id=segment_id,
+                    candidate_id=candidate_id,
+                )
+                return
+
+            prediction_is_current = (
+                active_segment_id == segment_id
+                and active_candidate_id == candidate_id
+            )
+            result = SmartTurnResult(
+                completion_probability=(
+                    prediction.completion_probability
+                ),
+                turn_complete=prediction.turn_complete,
+                feature_extraction_seconds=(
+                    prediction.feature_extraction_seconds
+                ),
+                inference_seconds=(
+                    prediction.inference_seconds
+                ),
+                total_seconds=prediction.total_seconds,
+            )
+            log_payload = {
+                "candidate_id": candidate_id,
+                "segment_id": segment_id,
+                "silence_ms": silence_duration_ms,
+                "audio_duration_ms": audio_duration_ms,
+                "completion_probability": (
+                    prediction.completion_probability
+                ),
+                "turn_complete": prediction.turn_complete,
+                "smart_turn_seconds": (
+                    prediction.total_seconds
+                ),
+                "speech_resumed_during_prediction": (
+                    not prediction_is_current
+                ),
+                "forced_finalisation": False,
+            }
+            logger.info(
+                "smart_turn_candidate %s",
+                json.dumps(log_payload),
+            )
+
+            await send_message(
+                "smart_turn_result",
+                {
+                    "segment_id": segment_id,
+                    "candidate_id": candidate_id,
+                    "silence_duration_ms": (
+                        silence_duration_ms
+                    ),
+                    "audio_duration_ms": audio_duration_ms,
+                    "stale": not prediction_is_current,
+                    **result.model_dump(),
+                },
+            )
+
+            if not prediction_is_current:
+                return
+
+            if prediction.turn_complete:
+                last_complete_candidate = {
+                    "segment_id": segment_id,
+                    "candidate_id": candidate_id,
+                    "returned_at": perf_counter(),
+                }
+                return
+
+            await send_message(
+                "awaiting_speech_continuation",
+                {
+                    "segment_id": segment_id,
+                    "candidate_id": candidate_id,
+                    "completion_probability": (
+                        prediction.completion_probability
+                    ),
+                    "turn_complete": False,
+                },
+            )
+
         def start_background_task(
             coroutine: Coroutine[Any, Any, None],
         ) -> None:
             task = asyncio.create_task(coroutine)
-            transcription_tasks.add(task)
+            background_tasks.add(task)
             task.add_done_callback(
-                transcription_tasks.discard
+                background_tasks.discard
+            )
+
+        async def finalise_active_segment(
+            *,
+            silence_duration_ms: int,
+            forced_finalisation: bool,
+        ) -> None:
+            nonlocal active_segment_id
+            nonlocal active_buffer
+            nonlocal active_candidate_id
+
+            if (
+                active_buffer is None
+                or active_segment_id is None
+            ):
+                await send_audio_error(
+                    "No active audio segment exists.",
+                )
+                return
+
+            detached_segment_id = active_segment_id
+            detached_buffer = active_buffer
+            active_segment_id = None
+            active_buffer = None
+            active_candidate_id = None
+
+            if not detached_buffer.total_bytes:
+                await send_audio_error(
+                    "No audio data was received.",
+                    segment_id=detached_segment_id,
+                )
+                return
+
+            summary = detached_buffer.summary()
+            logger.info(
+                "audio_segment_finalised %s",
+                json.dumps(
+                    {
+                        "segment_id": detached_segment_id,
+                        "silence_ms": silence_duration_ms,
+                        "audio_duration_ms": round(
+                            summary.duration_seconds * 1_000
+                        ),
+                        "forced_finalisation": (
+                            forced_finalisation
+                        ),
+                    }
+                ),
+            )
+
+            await send_message(
+                "transcription_started",
+                {
+                    "segment_id": detached_segment_id,
+                    "silence_duration_ms": (
+                        silence_duration_ms
+                    ),
+                    "duration_seconds": (
+                        summary.duration_seconds
+                    ),
+                    "forced_finalisation": (
+                        forced_finalisation
+                    ),
+                },
+            )
+
+            start_background_task(
+                transcribe_segment(
+                    segment_id=detached_segment_id,
+                    audio_buffer=detached_buffer,
+                    silence_duration_ms=(
+                        silence_duration_ms
+                    ),
+                    forced_finalisation=(
+                        forced_finalisation
+                    ),
+                    turn_completion_confirmed=(
+                        smart_turn_service is not None
+                    ),
+                )
             )
 
         try:
@@ -273,7 +490,47 @@ def create_audio_stream_router(
                         )
                         continue
 
+                    if last_complete_candidate is not None:
+                        elapsed_ms = (
+                            perf_counter()
+                            - last_complete_candidate["returned_at"]
+                        ) * 1_000
+
+                        logger.info(
+                            "speech_after_smart_turn_complete %s",
+                            json.dumps(
+                                {
+                                    "prior_segment_id": (
+                                        last_complete_candidate[
+                                            "segment_id"
+                                        ]
+                                    ),
+                                    "prior_candidate_id": (
+                                        last_complete_candidate[
+                                            "candidate_id"
+                                        ]
+                                    ),
+                                    "resumed_after_ms": round(
+                                        elapsed_ms,
+                                        3,
+                                    ),
+                                    "within_250_ms": (
+                                        elapsed_ms <= 250
+                                    ),
+                                    "within_500_ms": (
+                                        elapsed_ms <= 500
+                                    ),
+                                    "within_1000_ms": (
+                                        elapsed_ms <= 1_000
+                                    ),
+                                }
+                            ),
+                        )
+
+                        last_complete_candidate = None
+
                     active_segment_id = segment_id
+                    active_candidate_id = None
                     active_buffer = AudioStreamBuffer(
                         sample_rate=sample_rate,
                         channels=channels,
@@ -290,7 +547,167 @@ def create_audio_stream_router(
                             "sample_rate": sample_rate,
                             "channels": channels,
                             "sample_format": sample_format,
+                            "smart_turn_enabled": (
+                                smart_turn_service is not None
+                            ),
                         },
+                    )
+
+                elif event_type == "speech_resumed":
+                    requested_segment_id = payload.get(
+                        "segment_id"
+                    )
+
+                    if (
+                        active_buffer is None
+                        or active_segment_id is None
+                    ):
+                        continue
+
+                    if requested_segment_id != active_segment_id:
+                        await send_audio_error(
+                            (
+                                "The segment_id does not match "
+                                "the active audio segment."
+                            ),
+                            segment_id=(
+                                requested_segment_id
+                                if isinstance(
+                                    requested_segment_id,
+                                    str,
+                                )
+                                else None
+                            ),
+                        )
+                        continue
+
+                    active_candidate_id = None
+
+                elif event_type == "candidate_segment":
+                    requested_segment_id = payload.get(
+                        "segment_id"
+                    )
+
+                    if smart_turn_service is None:
+                        await send_audio_error(
+                            "Smart Turn is not enabled.",
+                            segment_id=(
+                                requested_segment_id
+                                if isinstance(
+                                    requested_segment_id,
+                                    str,
+                                )
+                                else None
+                            ),
+                        )
+                        continue
+
+                    if (
+                        active_buffer is None
+                        or active_segment_id is None
+                    ):
+                        await send_audio_error(
+                            "No active audio segment exists.",
+                        )
+                        continue
+
+                    if requested_segment_id != active_segment_id:
+                        await send_audio_error(
+                            (
+                                "The segment_id does not match "
+                                "the active audio segment."
+                            ),
+                            segment_id=(
+                                requested_segment_id
+                                if isinstance(
+                                    requested_segment_id,
+                                    str,
+                                )
+                                else None
+                            ),
+                        )
+                        continue
+
+                    try:
+                        candidate_id = int(
+                            payload.get("candidate_id")
+                        )
+                        silence_duration_ms = int(
+                            payload.get(
+                                "silence_duration_ms",
+                                0,
+                            )
+                        )
+                    except (TypeError, ValueError):
+                        await send_audio_error(
+                            (
+                                "candidate_id and "
+                                "silence_duration_ms must be "
+                                "non-negative integers."
+                            ),
+                            segment_id=active_segment_id,
+                        )
+                        continue
+
+                    if (
+                        candidate_id < 0
+                        or silence_duration_ms < 0
+                    ):
+                        await send_audio_error(
+                            (
+                                "candidate_id and "
+                                "silence_duration_ms must be "
+                                "non-negative."
+                            ),
+                            segment_id=active_segment_id,
+                            candidate_id=candidate_id,
+                        )
+                        continue
+
+                    if not active_buffer.total_bytes:
+                        await send_audio_error(
+                            "No audio data was received.",
+                            segment_id=active_segment_id,
+                            candidate_id=candidate_id,
+                        )
+                        continue
+
+                    active_candidate_id = candidate_id
+                    candidate_pcm = active_buffer.to_bytes()
+                    audio_duration_ms = round(
+                        active_buffer.duration_seconds * 1_000
+                    )
+
+                    await send_message(
+                        "smart_turn_started",
+                        {
+                            "segment_id": active_segment_id,
+                            "candidate_id": candidate_id,
+                            "silence_duration_ms": (
+                                silence_duration_ms
+                            ),
+                            "audio_duration_ms": (
+                                audio_duration_ms
+                            ),
+                        },
+                    )
+
+                    start_background_task(
+                        evaluate_smart_turn_candidate(
+                            segment_id=active_segment_id,
+                            candidate_id=candidate_id,
+                            pcm_audio=candidate_pcm,
+                            sample_rate=(
+                                active_buffer.sample_rate
+                            ),
+                            channels=active_buffer.channels,
+                            silence_duration_ms=(
+                                silence_duration_ms
+                            ),
+                            audio_duration_ms=(
+                                audio_duration_ms
+                            ),
+                        )
                     )
 
                 elif event_type == "finalise_segment":
@@ -359,41 +776,38 @@ def create_audio_stream_router(
                         )
                         continue
 
-                    detached_segment_id = active_segment_id
-                    detached_buffer = active_buffer
-                    active_segment_id = None
-                    active_buffer = None
+                    forced_finalisation = bool(
+                        payload.get(
+                            "forced_finalisation",
+                            False,
+                        )
+                    )
+                    requested_candidate_id = payload.get(
+                        "candidate_id"
+                    )
 
-                    if not detached_buffer.total_bytes:
+                    if (
+                        not forced_finalisation
+                        and smart_turn_service is not None
+                        and requested_candidate_id
+                        != active_candidate_id
+                    ):
                         await send_audio_error(
-                            "No audio data was received.",
-                            segment_id=detached_segment_id,
+                            (
+                                "The Smart Turn candidate is no "
+                                "longer current."
+                            ),
+                            segment_id=active_segment_id,
                         )
                         continue
 
-                    summary = detached_buffer.summary()
-
-                    await send_message(
-                        "transcription_started",
-                        {
-                            "segment_id": detached_segment_id,
-                            "silence_duration_ms": (
-                                silence_duration_ms
-                            ),
-                            "duration_seconds": (
-                                summary.duration_seconds
-                            ),
-                        },
-                    )
-
-                    start_background_task(
-                        transcribe_segment(
-                            segment_id=detached_segment_id,
-                            audio_buffer=detached_buffer,
-                            silence_duration_ms=(
-                                silence_duration_ms
-                            ),
-                        )
+                    await finalise_active_segment(
+                        silence_duration_ms=(
+                            silence_duration_ms
+                        ),
+                        forced_finalisation=(
+                            forced_finalisation
+                        ),
                     )
 
                 elif event_type == "cancel_segment":
@@ -430,6 +844,7 @@ def create_audio_stream_router(
                     cancelled_segment_id = active_segment_id
                     active_segment_id = None
                     active_buffer = None
+                    active_candidate_id = None
 
                     await send_message(
                         "audio_segment_cancelled",
@@ -450,12 +865,12 @@ def create_audio_stream_router(
         finally:
             connection_open = False
 
-            for task in transcription_tasks:
+            for task in background_tasks:
                 task.cancel()
 
-            if transcription_tasks:
+            if background_tasks:
                 await asyncio.gather(
-                    *transcription_tasks,
+                    *background_tasks,
                     return_exceptions=True,
                 )
 

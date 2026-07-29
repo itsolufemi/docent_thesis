@@ -93,3 +93,35 @@ test(
     );
   },
 );
+
+
+test(
+  'confirmed acoustic turns are included in turn events',
+  () => {
+    const sentMessages = [];
+    const client = new TurnStreamClient();
+
+    client.socket = {
+      readyState: WebSocket.OPEN,
+      send(message) {
+        sentMessages.push(
+          JSON.parse(message),
+        );
+      },
+    };
+
+    client.sendTurnEvent({
+      partialUtterance: 'Tell me about it.',
+      isSpeechActive: false,
+      silenceDurationMs: 500,
+      assistantWasSpeaking: false,
+      turnCompletionConfirmed: true,
+    });
+
+    assert.equal(
+      sentMessages[0].payload
+        .turn_completion_confirmed,
+      true,
+    );
+  },
+);

@@ -1,0 +1,6 @@
+numpy
+onnxruntime-gpu
+transformers
+librosa
+soundfile
+huggingface_hub

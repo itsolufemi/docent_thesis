@@ -23,6 +23,7 @@ class TurnBufferEvent(BaseModel):
     is_speech_active: bool
     silence_duration_ms: int = Field(ge=0)
     assistant_was_speaking: bool = False
+    turn_completion_confirmed: bool = False
 
 
 class TurnBufferEventRequest(BaseModel):
@@ -30,6 +31,7 @@ class TurnBufferEventRequest(BaseModel):
     is_speech_active: bool
     silence_duration_ms: int = Field(ge=0)
     assistant_was_speaking: bool = False
+    turn_completion_confirmed: bool = False
     debug: bool = False
 
 

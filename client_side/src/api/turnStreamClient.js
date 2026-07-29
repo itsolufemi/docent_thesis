@@ -237,6 +237,7 @@ export class TurnStreamClient {
     isSpeechActive,
     silenceDurationMs,
     assistantWasSpeaking,
+    turnCompletionConfirmed = false,
     debug = false,
   }) {
     if (
@@ -264,6 +265,8 @@ export class TurnStreamClient {
             silenceDurationMs,
           assistant_was_speaking:
             assistantWasSpeaking,
+          turn_completion_confirmed:
+            turnCompletionConfirmed,
           debug,
         },
       }),

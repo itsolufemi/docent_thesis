@@ -80,6 +80,10 @@ export default function MainApplication() {
   const [audioStreamError, setAudioStreamError] = useState('');
   const [audioTranscript, setAudioTranscript] = useState('');
   const [
+    latestSmartTurnResult,
+    setLatestSmartTurnResult,
+  ] = useState(null);
+  const [
     accumulatedSpokenTranscript,
     setAccumulatedSpokenTranscript,
   ] = useState('');
@@ -146,6 +150,9 @@ export default function MainApplication() {
   const vadSpeechEndedAtRef = useRef(null);
   const awaitingSpeechContinuationRef = useRef(false);
   const silenceReevaluationTimerRef = useRef(null);
+  const smartTurnEnabledRef = useRef(false);
+  const smartTurnCandidateIdRef = useRef(0);
+  const smartTurnForcedTimerRef = useRef(null);
 
   const setAssistantGain = (
     targetGain,
@@ -223,11 +230,24 @@ export default function MainApplication() {
     }
   };
 
+  const clearSmartTurnForcedTimer = () => {
+    if (!smartTurnForcedTimerRef.current) {
+      return;
+    }
+
+    window.clearTimeout(
+      smartTurnForcedTimerRef.current,
+    );
+    smartTurnForcedTimerRef.current = null;
+  };
+
   const handleVadSpeechStart = () => {
+    smartTurnCandidateIdRef.current += 1;
     vadSpeechActiveRef.current = true;
     vadSpeechEndedAtRef.current = null;
     awaitingSpeechContinuationRef.current = false;
     clearSilenceReevaluationTimer();
+    clearSmartTurnForcedTimer();
     clearDuckingTimer();
 
     const assistantIsActive =
@@ -268,6 +288,44 @@ export default function MainApplication() {
       performance.now() -
       Math.max(0, silenceDurationMs);
     clearDuckingTimer();
+  };
+
+  const scheduleSmartTurnForcedFinalisation = ({
+    candidateId,
+  }) => {
+    clearSmartTurnForcedTimer();
+
+    const remainingSilenceMs =
+      calculateRemainingSilenceMs({
+        speechEndedAtMs:
+          vadSpeechEndedAtRef.current,
+        nowMs: performance.now(),
+        initialSilenceMs:
+          INITIAL_VAD_SILENCE_MS,
+        forcedFinalisationSilenceMs:
+          FORCED_FINALISATION_SILENCE_MS,
+      });
+
+    smartTurnForcedTimerRef.current =
+      window.setTimeout(() => {
+        smartTurnForcedTimerRef.current = null;
+
+        if (
+          vadSpeechActiveRef.current ||
+          candidateId !==
+            smartTurnCandidateIdRef.current
+        ) {
+          return;
+        }
+
+        finaliseAudioSegment(
+          FORCED_FINALISATION_SILENCE_MS,
+          {
+            candidateId,
+            forcedFinalisation: true,
+          },
+        );
+      }, remainingSilenceMs);
   };
 
   const scheduleSilenceReevaluation = (
@@ -331,6 +389,7 @@ export default function MainApplication() {
       awaitingSpeechContinuationRef.current =
         false;
       clearSilenceReevaluationTimer();
+      clearSmartTurnForcedTimer();
       clearDuckingTimer();
       restoreAssistantAudio();
     }
@@ -344,6 +403,7 @@ export default function MainApplication() {
   useEffect(() => {
     return () => {
       clearSilenceReevaluationTimer();
+      clearSmartTurnForcedTimer();
       clearDuckingTimer();
 
       ttsAbortControllerRef.current?.abort();
@@ -489,9 +549,13 @@ export default function MainApplication() {
 
         switch (message.type) {
           case 'audio_segment_started':
+            smartTurnEnabledRef.current = Boolean(
+              message.payload?.smart_turn_enabled,
+            );
             setAudioStreamStatus('streaming');
             setAudioStreamSummary(null);
             setAudioTranscript('');
+            setLatestSmartTurnResult(null);
             setAudioStreamError('');
             setTurnRequestError('');
             break;
@@ -499,7 +563,57 @@ export default function MainApplication() {
             setAudioStreamStatus('connected');
             setAudioStreamSummary(message.payload);
             break;
+          case 'smart_turn_started':
+            setAudioStreamStatus('evaluating turn');
+            break;
+          case 'smart_turn_result': {
+            const candidateId =
+              message.payload?.candidate_id;
+
+            setLatestSmartTurnResult(
+              message.payload,
+            );
+
+            if (
+              message.payload?.stale ||
+              candidateId !==
+                smartTurnCandidateIdRef.current
+            ) {
+              break;
+            }
+
+            if (
+              message.payload?.turn_complete &&
+              !vadSpeechActiveRef.current
+            ) {
+              clearSmartTurnForcedTimer();
+              finaliseAudioSegment(
+                message.payload
+                  .silence_duration_ms ??
+                  INITIAL_VAD_SILENCE_MS,
+                {
+                  candidateId,
+                  forcedFinalisation: false,
+                },
+              );
+            } else if (
+              !message.payload?.turn_complete
+            ) {
+              setAudioStreamStatus('listening');
+            }
+
+            break;
+          }
+          case 'awaiting_speech_continuation':
+            if (
+              message.payload?.candidate_id ===
+              smartTurnCandidateIdRef.current
+            ) {
+              setAudioStreamStatus('listening');
+            }
+            break;
           case 'transcription_started':
+            clearSmartTurnForcedTimer();
             setAudioStreamStatus('transcribing');
             break;
           case 'audio_transcription': {
@@ -534,6 +648,7 @@ export default function MainApplication() {
               segmentId,
             );
             clearSilenceReevaluationTimer();
+            clearSmartTurnForcedTimer();
             awaitingSpeechContinuationRef.current =
               false;
             setAudioStreamStatus('connected');
@@ -544,7 +659,10 @@ export default function MainApplication() {
             const segmentId =
               message.payload?.segment_id;
 
-            if (segmentId) {
+            if (
+              segmentId &&
+              message.payload?.candidate_id == null
+            ) {
               pendingAudioSegmentIdsRef.current =
                 pendingAudioSegmentIdsRef.current.filter(
                   (pendingId) => pendingId !== segmentId,
@@ -553,6 +671,7 @@ export default function MainApplication() {
                 segmentId,
               );
               clearSilenceReevaluationTimer();
+              clearSmartTurnForcedTimer();
               awaitingSpeechContinuationRef.current =
                 false;
               processCompletedAudioSegmentsRef.current?.();
@@ -638,6 +757,16 @@ export default function MainApplication() {
     }
 
     setAudioStreamError('');
+
+    if (audioClient.currentSegmentId) {
+      audioClient.notifySpeechResumed({
+        candidateId:
+          smartTurnCandidateIdRef.current,
+      });
+      setAudioStreamStatus('streaming');
+      return audioClient.currentSegmentId;
+    }
+
     const segmentId = audioClient.startSegment({
       sampleRate: 16000,
       channels: 1,
@@ -653,10 +782,18 @@ export default function MainApplication() {
   const finaliseAudioSegment = (
     silenceDurationMs =
       INITIAL_VAD_SILENCE_MS,
+    {
+      candidateId = null,
+      forcedFinalisation = false,
+    } = {},
   ) => {
+    clearSmartTurnForcedTimer();
+
     try {
       audioStreamClientRef.current?.finaliseSegment({
         silenceDurationMs,
+        candidateId,
+        forcedFinalisation,
       });
     } catch (error) {
       console.error(
@@ -666,8 +803,41 @@ export default function MainApplication() {
     }
   };
 
+  const evaluateAudioSegmentCandidate = (
+    silenceDurationMs =
+      INITIAL_VAD_SILENCE_MS,
+  ) => {
+    if (!smartTurnEnabledRef.current) {
+      finaliseAudioSegment(silenceDurationMs);
+      return;
+    }
+
+    smartTurnCandidateIdRef.current += 1;
+    const candidateId =
+      smartTurnCandidateIdRef.current;
+
+    try {
+      audioStreamClientRef.current
+        ?.evaluateCandidate({
+          candidateId,
+          silenceDurationMs,
+        });
+      setAudioStreamStatus('evaluating turn');
+      scheduleSmartTurnForcedFinalisation({
+        candidateId,
+      });
+    } catch (error) {
+      console.error(
+        'Could not evaluate Smart Turn candidate:',
+        error,
+      );
+    }
+  };
+
   const cancelAudioSegment = () => {
+    smartTurnCandidateIdRef.current += 1;
     clearSilenceReevaluationTimer();
+    clearSmartTurnForcedTimer();
     awaitingSpeechContinuationRef.current = false;
 
     try {
@@ -1380,6 +1550,7 @@ export default function MainApplication() {
     partialUtterance,
     isSpeechActive,
     silenceDurationMs,
+    turnCompletionConfirmed = false,
     debug = false,
   }) => {
     const client =
@@ -1397,6 +1568,7 @@ export default function MainApplication() {
                 'synthesising' ||
               assistantAudioStatusRef.current ===
                 'playing',
+            turnCompletionConfirmed,
             debug,
           });
 
@@ -2081,6 +2253,7 @@ export default function MainApplication() {
     {
       clearTypedInput = false,
       silenceDurationMs = INITIAL_VAD_SILENCE_MS,
+      turnCompletionConfirmed = false,
     } = {},
   ) => {
     const cleanedUtterance = utterance.trim();
@@ -2107,6 +2280,7 @@ export default function MainApplication() {
         partialUtterance: cleanedUtterance,
         isSpeechActive: false,
         silenceDurationMs,
+        turnCompletionConfirmed,
         debug: true,
       });
 
@@ -2177,6 +2351,10 @@ export default function MainApplication() {
         const silenceDurationMs =
           segmentPayload.silence_duration_ms ??
           INITIAL_VAD_SILENCE_MS;
+        const turnCompletionConfirmed = Boolean(
+          segmentPayload
+            .turn_completion_confirmed,
+        );
 
         setAudioTranscript(segmentTranscript);
 
@@ -2201,6 +2379,7 @@ export default function MainApplication() {
             accumulatedTranscript,
             {
               silenceDurationMs,
+              turnCompletionConfirmed,
             },
           );
 
@@ -2296,6 +2475,9 @@ export default function MainApplication() {
             streamedAssistantResponse
           }
           onAudioSegmentStart={startAudioSegment}
+          onAudioSegmentCandidate={
+            evaluateAudioSegmentCandidate
+          }
           onAudioSegmentFinalise={
             finaliseAudioSegment
           }
@@ -2308,6 +2490,9 @@ export default function MainApplication() {
           audioTranscript={audioTranscript}
           accumulatedSpokenTranscript={
             accumulatedSpokenTranscript
+          }
+          latestSmartTurnResult={
+            latestSmartTurnResult
           }
         />
       )}
