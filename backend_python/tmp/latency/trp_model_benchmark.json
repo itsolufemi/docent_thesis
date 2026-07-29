@@ -1,0 +1,274 @@
+{
+  "fixture": "tmp\\latency\\voice_request.wav",
+  "transcript": "Tell me about the swing.",
+  "spoken_audio_seconds": 1.32,
+  "vad_finalisation_seconds": 0.6,
+  "transcription_timings_seconds": [
+    0.5469,
+    0.799,
+    0.5772
+  ],
+  "median_transcription_seconds": 0.5772,
+  "median_pre_trp_seconds": 2.4972,
+  "warmups": {
+    "gemini-3-flash-preview:latest": {
+      "success": false,
+      "elapsed_seconds": 0.3638,
+      "error_type": "ValidationError",
+      "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...213-8411-1ae7935cdd2b)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...213-8411-1ae7935cdd2b)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...213-8411-1ae7935cdd2b)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+    },
+    "gpt-oss:20b-cloud": {
+      "success": false,
+      "elapsed_seconds": 1.976,
+      "error_type": "JSONDecodeError",
+      "error": "Expecting value: line 1 column 1 (char 0)"
+    },
+    "gemma4:cloud": {
+      "success": true,
+      "elapsed_seconds": 10.4663,
+      "service_prediction_seconds": 10.4662,
+      "trp_probability": 1.0,
+      "turn_complete": true,
+      "reason": "The utterance is a complete imperative sentence forming a clear request."
+    },
+    "gemma4:31b-cloud": {
+      "success": true,
+      "elapsed_seconds": 5.1961,
+      "service_prediction_seconds": 5.1961,
+      "trp_probability": 1.0,
+      "turn_complete": true,
+      "reason": "The utterance is a complete imperative sentence forming a clear request."
+    },
+    "qwen3.5:cloud": {
+      "success": false,
+      "elapsed_seconds": 0.4261,
+      "error_type": "ValidationError",
+      "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'error': 'this model req...9eb-8dc3-ebd0f61bbd40)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'error': 'this model req...9eb-8dc3-ebd0f61bbd40)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'error': 'this model req...9eb-8dc3-ebd0f61bbd40)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+    }
+  },
+  "models": [
+    {
+      "model": "gemini-3-flash-preview:latest",
+      "runs": 5,
+      "successful_runs": 0,
+      "expected_decision_runs": 0,
+      "samples": [
+        {
+          "success": false,
+          "elapsed_seconds": 0.4088,
+          "error_type": "ValidationError",
+          "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...cfd-b2b9-a3bbee4fc098)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...cfd-b2b9-a3bbee4fc098)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...cfd-b2b9-a3bbee4fc098)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.5396,
+          "error_type": "ValidationError",
+          "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...67b-9c2a-b3aed708a466)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...67b-9c2a-b3aed708a466)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...67b-9c2a-b3aed708a466)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.4027,
+          "error_type": "ValidationError",
+          "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...97b-852b-f891bdd83f89)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...97b-852b-f891bdd83f89)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...97b-852b-f891bdd83f89)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.418,
+          "error_type": "ValidationError",
+          "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...68a-8591-5a854c88bd88)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...68a-8591-5a854c88bd88)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...68a-8591-5a854c88bd88)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.3969,
+          "error_type": "ValidationError",
+          "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...421-a1b4-218c60150e19)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...421-a1b4-218c60150e19)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'StatusCode': 410, 'Stat...421-a1b4-218c60150e19)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        }
+      ]
+    },
+    {
+      "model": "gpt-oss:20b-cloud",
+      "runs": 5,
+      "successful_runs": 0,
+      "expected_decision_runs": 0,
+      "samples": [
+        {
+          "success": false,
+          "elapsed_seconds": 1.5817,
+          "error_type": "JSONDecodeError",
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 1.4936,
+          "error_type": "JSONDecodeError",
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 1.4815,
+          "error_type": "JSONDecodeError",
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 1.8062,
+          "error_type": "JSONDecodeError",
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 1.5555,
+          "error_type": "JSONDecodeError",
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        }
+      ]
+    },
+    {
+      "model": "gemma4:cloud",
+      "runs": 5,
+      "successful_runs": 4,
+      "expected_decision_runs": 4,
+      "samples": [
+        {
+          "success": true,
+          "elapsed_seconds": 6.3514,
+          "service_prediction_seconds": 6.3514,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request."
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 7.8048,
+          "service_prediction_seconds": 7.8048,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request."
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 20.2643,
+          "error_type": "JSONDecodeError",
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 10.5072,
+          "service_prediction_seconds": 10.5072,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request."
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 6.5643,
+          "service_prediction_seconds": 6.5642,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request."
+        }
+      ],
+      "median_trp_seconds": 7.1845,
+      "mean_trp_seconds": 7.8069,
+      "minimum_trp_seconds": 6.3514,
+      "maximum_trp_seconds": 10.5072,
+      "population_stddev_seconds": 1.6549,
+      "median_voice_to_classifier_seconds": 9.6817
+    },
+    {
+      "model": "gemma4:31b-cloud",
+      "runs": 5,
+      "successful_runs": 3,
+      "expected_decision_runs": 3,
+      "samples": [
+        {
+          "success": true,
+          "elapsed_seconds": 4.7974,
+          "service_prediction_seconds": 4.7974,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request."
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 11.3011,
+          "service_prediction_seconds": 11.3011,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request."
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 20.2908,
+          "error_type": "JSONDecodeError",
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 15.4048,
+          "service_prediction_seconds": 15.4047,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request."
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 20.3647,
+          "error_type": "JSONDecodeError",
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        }
+      ],
+      "median_trp_seconds": 11.3011,
+      "mean_trp_seconds": 10.5011,
+      "minimum_trp_seconds": 4.7974,
+      "maximum_trp_seconds": 15.4048,
+      "population_stddev_seconds": 4.3672,
+      "median_voice_to_classifier_seconds": 13.7983
+    },
+    {
+      "model": "qwen3.5:cloud",
+      "runs": 5,
+      "successful_runs": 0,
+      "expected_decision_runs": 0,
+      "samples": [
+        {
+          "success": false,
+          "elapsed_seconds": 0.4294,
+          "error_type": "ValidationError",
+          "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'error': 'this model req...089-82ab-b66041cccf51)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'error': 'this model req...089-82ab-b66041cccf51)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'error': 'this model req...089-82ab-b66041cccf51)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.3546,
+          "error_type": "ValidationError",
+          "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'error': 'this model req...f3e-b69a-38109b73467c)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'error': 'this model req...f3e-b69a-38109b73467c)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'error': 'this model req...f3e-b69a-38109b73467c)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.3791,
+          "error_type": "ValidationError",
+          "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'error': 'this model req...fe5-9d09-aed80a9732e5)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'error': 'this model req...fe5-9d09-aed80a9732e5)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'error': 'this model req...fe5-9d09-aed80a9732e5)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.4726,
+          "error_type": "ValidationError",
+          "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'error': 'this model req...0af-84da-f21bdec28376)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'error': 'this model req...0af-84da-f21bdec28376)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'error': 'this model req...0af-84da-f21bdec28376)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.6714,
+          "error_type": "ValidationError",
+          "error": "3 validation errors for TRPPrediction\ntrp_probability\n  Field required [type=missing, input_value={'error': 'this model req...04e-8375-e8dc4b5896d6)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nturn_complete\n  Field required [type=missing, input_value={'error': 'this model req...04e-8375-e8dc4b5896d6)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nreason\n  Field required [type=missing, input_value={'error': 'this model req...04e-8375-e8dc4b5896d6)'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+        }
+      ]
+    }
+  ],
+  "ranking": [
+    "gemma4:cloud",
+    "gemma4:31b-cloud",
+    "gemini-3-flash-preview:latest",
+    "gpt-oss:20b-cloud",
+    "qwen3.5:cloud"
+  ]
+}

@@ -1,0 +1,458 @@
+{
+  "fixture": "tmp\\latency\\voice_request.wav",
+  "conversation_id": "89bb6710-8999-4dc0-b2b0-ffea755f01d6",
+  "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+  "transcript": "Tell me about the swing.",
+  "events": [
+    {
+      "name": "voice_onset",
+      "elapsed_seconds": 0.0,
+      "interval_seconds": 0.0
+    },
+    {
+      "name": "vad_speech_confirmed",
+      "elapsed_seconds": 0.0502,
+      "interval_seconds": 0.0502,
+      "configured_duration_ms": 40
+    },
+    {
+      "name": "audio_segment_started",
+      "elapsed_seconds": 0.0512,
+      "interval_seconds": 0.001,
+      "segment_id": "latency-ad7584c2-202c-4af0-841e-7cb75a6ce6ad"
+    },
+    {
+      "name": "first_pcm_received_by_websocket",
+      "elapsed_seconds": 0.0515,
+      "interval_seconds": 0.0003,
+      "pre_roll_ms": 250
+    },
+    {
+      "name": "spoken_audio_complete",
+      "elapsed_seconds": 1.3401,
+      "interval_seconds": 1.2886,
+      "spoken_audio_seconds": 1.32
+    },
+    {
+      "name": "vad_silence_threshold_reached",
+      "elapsed_seconds": 1.9417,
+      "interval_seconds": 0.6016,
+      "configured_duration_ms": 600
+    },
+    {
+      "name": "audio_segment_finalise_sent",
+      "elapsed_seconds": 1.9419,
+      "interval_seconds": 0.0002,
+      "segment_id": "latency-ad7584c2-202c-4af0-841e-7cb75a6ce6ad"
+    },
+    {
+      "name": "transcription_started",
+      "elapsed_seconds": 1.9425,
+      "interval_seconds": 0.0006,
+      "payload": {
+        "segment_id": "latency-ad7584c2-202c-4af0-841e-7cb75a6ce6ad",
+        "silence_duration_ms": 600,
+        "duration_seconds": 2.13
+      }
+    },
+    {
+      "name": "audio_transcription",
+      "elapsed_seconds": 4.5588,
+      "interval_seconds": 2.6163,
+      "payload": {
+        "segment_id": "latency-ad7584c2-202c-4af0-841e-7cb75a6ce6ad",
+        "silence_duration_ms": 600,
+        "stream": {
+          "event": "stream_complete",
+          "sample_rate": 16000,
+          "channels": 1,
+          "sample_width_bytes": 2,
+          "chunk_count": 95,
+          "total_bytes": 68160,
+          "total_samples": 34080,
+          "duration_seconds": 2.13
+        },
+        "transcription": {
+          "text": "Tell me about the swing.",
+          "language": "en",
+          "language_probability": 1.0,
+          "duration_seconds": 2.13,
+          "segments": [
+            {
+              "start_seconds": 0.0,
+              "end_seconds": 2.0,
+              "text": "Tell me about the swing."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "turn_event_sent",
+      "elapsed_seconds": 4.5596,
+      "interval_seconds": 0.0008,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "transcript": "Tell me about the swing."
+    },
+    {
+      "name": "turn_evaluated",
+      "elapsed_seconds": 5.7109,
+      "interval_seconds": 1.1513,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {
+        "state": {
+          "conversation_id": "89bb6710-8999-4dc0-b2b0-ffea755f01d6",
+          "transcript": "Tell me about the swing.",
+          "is_speech_active": false,
+          "silence_duration_ms": 600,
+          "last_evaluated_transcript": "Tell me about the swing.",
+          "last_trp_probability": 1.0,
+          "is_finalised": true
+        },
+        "decision": "finalise_turn",
+        "should_finalise_turn": true,
+        "finalised_utterance": "Tell me about the swing.",
+        "reason": "A pause occurred and the utterance was judged semantically complete."
+      }
+    },
+    {
+      "name": "utterance_classified",
+      "elapsed_seconds": 7.1072,
+      "interval_seconds": 1.3963,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": null,
+        "candidate_subjects": [
+          "the swing"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.98,
+        "reason": "The user is requesting factual/interpretive information about a specific artwork, which requires retrieval from the Docent domain.",
+        "routing_seconds": 1.3952
+      }
+    },
+    {
+      "name": "query_started",
+      "elapsed_seconds": 7.1075,
+      "interval_seconds": 0.0003,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {
+        "utterance": "Tell me about the swing."
+      }
+    },
+    {
+      "name": "response_started",
+      "elapsed_seconds": 10.8723,
+      "interval_seconds": 3.7648,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {}
+    },
+    {
+      "name": "tool_call_started",
+      "elapsed_seconds": 17.0811,
+      "interval_seconds": 6.2088,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {
+        "tool_calls": [
+          {
+            "name": "create_conversation_branch",
+            "arguments": {
+              "branch_type": "bounded",
+              "current_subjects": [],
+              "name": "The Swing",
+              "remaining_subjects": [
+                "the swing"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "tool_call_complete",
+      "elapsed_seconds": 17.0815,
+      "interval_seconds": 0.0004,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {
+        "tool_name": "create_conversation_branch",
+        "result": {
+          "tool_name": "create_conversation_branch",
+          "success": false,
+          "message": "The tool arguments were invalid.",
+          "data": {
+            "validation_errors": [
+              {
+                "type": "model_type",
+                "loc": [
+                  "remaining_subjects",
+                  0
+                ],
+                "msg": "Input should be a valid dictionary or instance of ToolSubjectInput",
+                "input": "the swing",
+                "ctx": {
+                  "class_name": "ToolSubjectInput"
+                },
+                "url": "https://errors.pydantic.dev/2.13/v/model_type"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_call_started",
+      "elapsed_seconds": 21.3284,
+      "interval_seconds": 4.2469,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {
+        "tool_calls": [
+          {
+            "name": "create_conversation_branch",
+            "arguments": {
+              "branch_type": "bounded",
+              "current_subjects": [],
+              "name": "The Swing",
+              "remaining_subjects": [
+                {
+                  "subject": "the swing"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "tool_call_complete",
+      "elapsed_seconds": 21.3287,
+      "interval_seconds": 0.0003,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {
+        "tool_name": "create_conversation_branch",
+        "result": {
+          "tool_name": "create_conversation_branch",
+          "success": false,
+          "message": "The tool arguments were invalid.",
+          "data": {
+            "validation_errors": [
+              {
+                "type": "missing",
+                "loc": [
+                  "remaining_subjects",
+                  0,
+                  "label"
+                ],
+                "msg": "Field required",
+                "input": {
+                  "subject": "the swing"
+                },
+                "url": "https://errors.pydantic.dev/2.13/v/missing"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "response_first_delta",
+      "elapsed_seconds": 23.2829,
+      "interval_seconds": 1.9542,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {
+        "seconds": 16.1752
+      }
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.283,
+      "interval_seconds": 0.0001,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": "I"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.2846,
+      "interval_seconds": 0.0016,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": "\u2019m"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.3032,
+      "interval_seconds": 0.0186,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": " sorry"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.3099,
+      "interval_seconds": 0.0067,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": "\u2014I"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.3216,
+      "interval_seconds": 0.0117,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": " don"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.3269,
+      "interval_seconds": 0.0053,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": "\u2019t"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.3375,
+      "interval_seconds": 0.0106,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": " have"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.3462,
+      "interval_seconds": 0.0087,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": " any"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.357,
+      "interval_seconds": 0.0108,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": " information"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.3675,
+      "interval_seconds": 0.0105,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": " about"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.3828,
+      "interval_seconds": 0.0153,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": " the"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.3943,
+      "interval_seconds": 0.0115,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": " swing"
+    },
+    {
+      "name": "response_delta",
+      "elapsed_seconds": 23.3992,
+      "interval_seconds": 0.0049,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "text": "."
+    },
+    {
+      "name": "response_complete",
+      "elapsed_seconds": 23.5002,
+      "interval_seconds": 0.101,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {
+        "response": "I\u2019m sorry\u2014I don\u2019t have any information about the swing."
+      }
+    },
+    {
+      "name": "query_complete",
+      "elapsed_seconds": 23.5022,
+      "interval_seconds": 0.002,
+      "request_id": "180611f1-a817-4a6a-88e2-ae3936d228b3",
+      "payload": {
+        "request": "Tell me about the swing.",
+        "response": "I\u2019m sorry\u2014I don\u2019t have any information about the swing.",
+        "conversation_id": "89bb6710-8999-4dc0-b2b0-ffea755f01d6",
+        "subject_reference": null,
+        "sources": [],
+        "debug": {
+          "conversation_found": true,
+          "subject_reference": null,
+          "context_source": "no_external_context",
+          "context_used": true,
+          "dialogue_turns_used": 0,
+          "prompt": "You are Docent, a conversational AI museum guide.\n\nBehavioural rules:\n- Speak naturally, as if speaking aloud to a visitor.\n- Keep your answer brief unless the visitor asks for detail.\n- Use the supplied context to ground your answer.\n- Do not invent details that are not supported by the supplied context.\n- If the supplied context is insufficient, say so briefly.\n\nContext:\nNo additional context.\n\nRecent dialogue:\nNo previous dialogue.\n\nVisitor says:\nUTTERANCE CLASSIFICATION\n\n    Route type:\n    response_request\n\n    Floor intent:\n    take_floor\n\n    Proposed structural action:\n    None\n\n    Candidate subjects:\n    ['the swing']\n\n    ACTIVE CONVERSATION BRANCH\n\n    Branch name: branch-1\nBranch type: open\nBranch status: active\nPrevious subjects: []\nCurrent subjects: []\nRemaining subjects: []\n\n    CONVERSATION-TREE GUIDANCE\n\n    The active branch represents the current overarching conversational activity.\n\n    Do not close a bounded branch merely because the user asks a digressive or unrelated question.\n\n    Keep a bounded branch active until:\n    - its defined activity is complete; or\n    - the user clearly asks to stop it.\n\n    Use operational tools only when the conversation-tree state genuinely needs to change.\n\n    The proposed action is advisory classifier output.\n\n    Use a conversation-tree tool only when the user's request and the\n    current conversation state justify it.\n\n    For create_bounded_branch:\n    - use retrieved artwork evidence to form an ordered remaining-subject list;\n    - create the bounded branch with current_subjects empty;\n    - do not mark the first subject current until the conversation actually\n      begins discussing it.\n\n    For close_bounded_branch:\n    - close the active bounded branch only when the user clearly requests\n      its termination or it has completed.\n\n    USER UTTERANCE\n\n    Tell me about the swing.\n\nRespond as Docent:",
+          "retrieval_used": false,
+          "sources_count": 0,
+          "sources": [],
+          "debug_payload": {
+            "utterance_route_type": "response_request",
+            "utterance_floor_intent": "take_floor",
+            "utterance_route_confidence": 0.98,
+            "utterance_route_reason": "The user is requesting factual/interpretive information about a specific artwork, which requires retrieval from the Docent domain.",
+            "utterance_is_relevant": true,
+            "utterance_should_ignore": false,
+            "utterance_requires_retrieval": true,
+            "utterance_proposed_action": null,
+            "utterance_candidate_subjects": [
+              "the swing"
+            ],
+            "utterance_routing_seconds": 1.3952,
+            "retrieval_skipped_by_utterance_route": false,
+            "vector_retrieval_timings": {
+              "total_seconds": 3.7476,
+              "query_embedding_seconds": 3.6998,
+              "vector_index_seconds": 0.0342,
+              "vector_similarity_seconds": 0.0117,
+              "parent_expansion_seconds": 0.0001,
+              "hybrid_reranking_seconds": 0.0009,
+              "confidence_filter_seconds": 0.0,
+              "vector_index_rebuilt": false,
+              "vector_index_source": "disk"
+            },
+            "conversation_created": false,
+            "timings": {
+              "total_request_seconds": 16.3916,
+              "context_resolution_seconds": 3.7635,
+              "response_generation_seconds": 12.628
+            }
+          }
+        }
+      }
+    }
+  ],
+  "query_debug": {
+    "utterance_route_type": "response_request",
+    "utterance_floor_intent": "take_floor",
+    "utterance_route_confidence": 0.98,
+    "utterance_route_reason": "The user is requesting factual/interpretive information about a specific artwork, which requires retrieval from the Docent domain.",
+    "utterance_is_relevant": true,
+    "utterance_should_ignore": false,
+    "utterance_requires_retrieval": true,
+    "utterance_proposed_action": null,
+    "utterance_candidate_subjects": [
+      "the swing"
+    ],
+    "utterance_routing_seconds": 1.3952,
+    "retrieval_skipped_by_utterance_route": false,
+    "vector_retrieval_timings": {
+      "total_seconds": 3.7476,
+      "query_embedding_seconds": 3.6998,
+      "vector_index_seconds": 0.0342,
+      "vector_similarity_seconds": 0.0117,
+      "parent_expansion_seconds": 0.0001,
+      "hybrid_reranking_seconds": 0.0009,
+      "confidence_filter_seconds": 0.0,
+      "vector_index_rebuilt": false,
+      "vector_index_source": "disk"
+    },
+    "conversation_created": false,
+    "timings": {
+      "total_request_seconds": 16.3916,
+      "context_resolution_seconds": 3.7635,
+      "response_generation_seconds": 12.628
+    }
+  }
+}

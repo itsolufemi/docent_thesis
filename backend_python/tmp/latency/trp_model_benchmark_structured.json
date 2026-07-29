@@ -1,0 +1,365 @@
+{
+  "fixture": "tmp\\latency\\voice_request.wav",
+  "request_profile": "structured",
+  "transcript": "Tell me about the swing.",
+  "spoken_audio_seconds": 1.32,
+  "vad_finalisation_seconds": 0.6,
+  "transcription_timings_seconds": [
+    0.558,
+    0.7043,
+    0.6594
+  ],
+  "median_transcription_seconds": 0.6594,
+  "median_pre_trp_seconds": 2.5794,
+  "warmups": {
+    "gemini-3-flash-preview:latest": {
+      "success": false,
+      "elapsed_seconds": 0.4664,
+      "error_type": "HTTPStatusError",
+      "error": "Client error '410 Gone' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/410",
+      "think": false
+    },
+    "gpt-oss:20b-cloud": {
+      "success": true,
+      "elapsed_seconds": 2.2218,
+      "trp_probability": 0.1,
+      "turn_complete": false,
+      "reason": "The utterance is a complete request that can stand alone.",
+      "think": "low",
+      "ollama_total_seconds": 1.6208,
+      "prompt_eval_count": 247,
+      "eval_count": 83
+    },
+    "gemma4:cloud": {
+      "success": true,
+      "elapsed_seconds": 4.3519,
+      "trp_probability": 1.0,
+      "turn_complete": true,
+      "reason": "The utterance is a complete imperative sentence forming a clear request.",
+      "think": false,
+      "ollama_total_seconds": 3.7598,
+      "prompt_eval_count": 215,
+      "eval_count": 48
+    },
+    "gemma4:31b-cloud": {
+      "success": true,
+      "elapsed_seconds": 11.4668,
+      "trp_probability": 1.0,
+      "turn_complete": true,
+      "reason": "The utterance is a complete imperative sentence forming a clear request.",
+      "think": false,
+      "ollama_total_seconds": 10.9288,
+      "prompt_eval_count": 215,
+      "eval_count": 48
+    },
+    "qwen3.5:cloud": {
+      "success": false,
+      "elapsed_seconds": 0.5199,
+      "error_type": "HTTPStatusError",
+      "error": "Client error '403 Forbidden' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+      "think": false
+    }
+  },
+  "models": [
+    {
+      "model": "gemini-3-flash-preview:latest",
+      "runs": 5,
+      "successful_runs": 0,
+      "expected_decision_runs": 0,
+      "samples": [
+        {
+          "success": false,
+          "elapsed_seconds": 0.4912,
+          "error_type": "HTTPStatusError",
+          "error": "Client error '410 Gone' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/410",
+          "think": false
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.5029,
+          "error_type": "HTTPStatusError",
+          "error": "Client error '410 Gone' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/410",
+          "think": false
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.6151,
+          "error_type": "HTTPStatusError",
+          "error": "Client error '410 Gone' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/410",
+          "think": false
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.4377,
+          "error_type": "HTTPStatusError",
+          "error": "Client error '410 Gone' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/410",
+          "think": false
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.4994,
+          "error_type": "HTTPStatusError",
+          "error": "Client error '410 Gone' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/410",
+          "think": false
+        }
+      ]
+    },
+    {
+      "model": "gpt-oss:20b-cloud",
+      "runs": 5,
+      "successful_runs": 5,
+      "expected_decision_runs": 4,
+      "samples": [
+        {
+          "success": true,
+          "elapsed_seconds": 2.3612,
+          "trp_probability": 0.95,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative request.",
+          "think": "low",
+          "ollama_total_seconds": 1.9059,
+          "prompt_eval_count": 247,
+          "eval_count": 123
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 1.6046,
+          "trp_probability": 0.9,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative request.",
+          "think": "low",
+          "ollama_total_seconds": 1.1708,
+          "prompt_eval_count": 247,
+          "eval_count": 78
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 1.517,
+          "trp_probability": 0.1,
+          "turn_complete": false,
+          "reason": "The utterance is a complete request.",
+          "think": "low",
+          "ollama_total_seconds": 0.9749,
+          "prompt_eval_count": 247,
+          "eval_count": 79
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 1.4114,
+          "trp_probability": 0.9,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative request.",
+          "think": "low",
+          "ollama_total_seconds": 0.9309,
+          "prompt_eval_count": 247,
+          "eval_count": 86
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 2.1276,
+          "trp_probability": 0.9,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative request.",
+          "think": "low",
+          "ollama_total_seconds": 1.4996,
+          "prompt_eval_count": 247,
+          "eval_count": 78
+        }
+      ],
+      "median_trp_seconds": 1.6046,
+      "mean_trp_seconds": 1.8044,
+      "minimum_trp_seconds": 1.4114,
+      "maximum_trp_seconds": 2.3612,
+      "population_stddev_seconds": 0.3719,
+      "median_voice_to_classifier_seconds": 4.184
+    },
+    {
+      "model": "gemma4:cloud",
+      "runs": 5,
+      "successful_runs": 5,
+      "expected_decision_runs": 5,
+      "samples": [
+        {
+          "success": true,
+          "elapsed_seconds": 7.3768,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request.",
+          "think": false,
+          "ollama_total_seconds": 6.7769,
+          "prompt_eval_count": 215,
+          "eval_count": 48
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 16.4933,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request.",
+          "think": false,
+          "ollama_total_seconds": 16.0127,
+          "prompt_eval_count": 215,
+          "eval_count": 48
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 21.9001,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request.",
+          "think": false,
+          "ollama_total_seconds": 21.4066,
+          "prompt_eval_count": 215,
+          "eval_count": 48
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 9.567,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request.",
+          "think": false,
+          "ollama_total_seconds": 9.2113,
+          "prompt_eval_count": 215,
+          "eval_count": 48
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 7.2915,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request.",
+          "think": false,
+          "ollama_total_seconds": 6.7769,
+          "prompt_eval_count": 215,
+          "eval_count": 48
+        }
+      ],
+      "median_trp_seconds": 9.567,
+      "mean_trp_seconds": 12.5257,
+      "minimum_trp_seconds": 7.2915,
+      "maximum_trp_seconds": 21.9001,
+      "population_stddev_seconds": 5.7669,
+      "median_voice_to_classifier_seconds": 12.1464
+    },
+    {
+      "model": "gemma4:31b-cloud",
+      "runs": 5,
+      "successful_runs": 5,
+      "expected_decision_runs": 5,
+      "samples": [
+        {
+          "success": true,
+          "elapsed_seconds": 5.6125,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request.",
+          "think": false,
+          "ollama_total_seconds": 5.1889,
+          "prompt_eval_count": 215,
+          "eval_count": 48
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 10.1459,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request.",
+          "think": false,
+          "ollama_total_seconds": 9.6308,
+          "prompt_eval_count": 215,
+          "eval_count": 48
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 6.9262,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request.",
+          "think": false,
+          "ollama_total_seconds": 6.4922,
+          "prompt_eval_count": 215,
+          "eval_count": 48
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 16.2587,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request.",
+          "think": false,
+          "ollama_total_seconds": 15.5855,
+          "prompt_eval_count": 215,
+          "eval_count": 48
+        },
+        {
+          "success": true,
+          "elapsed_seconds": 15.119,
+          "trp_probability": 1.0,
+          "turn_complete": true,
+          "reason": "The utterance is a complete imperative sentence forming a clear request.",
+          "think": false,
+          "ollama_total_seconds": 14.4884,
+          "prompt_eval_count": 215,
+          "eval_count": 48
+        }
+      ],
+      "median_trp_seconds": 10.1459,
+      "mean_trp_seconds": 10.8125,
+      "minimum_trp_seconds": 5.6125,
+      "maximum_trp_seconds": 16.2587,
+      "population_stddev_seconds": 4.2613,
+      "median_voice_to_classifier_seconds": 12.7253
+    },
+    {
+      "model": "qwen3.5:cloud",
+      "runs": 5,
+      "successful_runs": 0,
+      "expected_decision_runs": 0,
+      "samples": [
+        {
+          "success": false,
+          "elapsed_seconds": 0.4706,
+          "error_type": "HTTPStatusError",
+          "error": "Client error '403 Forbidden' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "think": false
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.554,
+          "error_type": "HTTPStatusError",
+          "error": "Client error '403 Forbidden' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "think": false
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.493,
+          "error_type": "HTTPStatusError",
+          "error": "Client error '403 Forbidden' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "think": false
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.5503,
+          "error_type": "HTTPStatusError",
+          "error": "Client error '403 Forbidden' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "think": false
+        },
+        {
+          "success": false,
+          "elapsed_seconds": 0.514,
+          "error_type": "HTTPStatusError",
+          "error": "Client error '403 Forbidden' for url 'http://localhost:11434/api/generate'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "think": false
+        }
+      ]
+    }
+  ],
+  "ranking": [
+    "gpt-oss:20b-cloud",
+    "gemma4:cloud",
+    "gemma4:31b-cloud",
+    "gemini-3-flash-preview:latest",
+    "qwen3.5:cloud"
+  ]
+}
