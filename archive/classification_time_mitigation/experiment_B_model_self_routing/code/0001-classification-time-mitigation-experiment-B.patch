@@ -1,0 +1,5318 @@
+From e7496306cb4659e47bafc85541d3fabe4394a96b Mon Sep 17 00:00:00 2001
+From: "Olufemi.Davies-Davies" <itsolufemi@gmail.com>
+Date: Thu, 30 Jul 2026 08:06:38 +0100
+Subject: [PATCH] classification time mitigation experiment B
+
+---
+ backend_python/README.md                      |   26 +
+ backend_python/config.py                      |   35 +
+ .../api/routes_turn_buffer_stream.py          |    9 +
+ .../schemas/llm_stream_schemas.py             |    2 +
+ .../schemas/model_route_schemas.py            |   22 +
+ .../conversation_core/services/llm_service.py |   37 +-
+ .../services/model_route_parser.py            |  130 ++
+ .../services/query_service.py                 |  228 ++-
+ .../docent/services/docent_query_service.py   |  205 ++-
+ .../scripts/benchmark_model_self_routing.py   |  638 ++++++++
+ backend_python/server.py                      |   21 +-
+ .../tests/test_model_self_routing.py          |  411 ++++++
+ .../latency/model_self_routing_comparison.md  |  121 ++
+ ...model_self_routing_gemma4_think_false.json |  781 ++++++++++
+ .../model_self_routing_gemma4_think_false.md  |   34 +
+ .../model_self_routing_gemma4_think_true.json |  761 ++++++++++
+ .../model_self_routing_gemma4_think_true.md   |   34 +
+ ...odel_self_routing_gpt_oss_think_false.json | 1279 +++++++++++++++++
+ .../model_self_routing_gpt_oss_think_false.md |   34 +
+ client_side/src/api/turnStreamClient.js       |   11 +
+ .../src/components/MainApplication.jsx        |   21 +
+ 21 files changed, 4785 insertions(+), 55 deletions(-)
+ create mode 100644 backend_python/conversation_core/schemas/model_route_schemas.py
+ create mode 100644 backend_python/conversation_core/services/model_route_parser.py
+ create mode 100644 backend_python/scripts/benchmark_model_self_routing.py
+ create mode 100644 backend_python/tests/test_model_self_routing.py
+ create mode 100644 backend_python/tmp/latency/model_self_routing_comparison.md
+ create mode 100644 backend_python/tmp/latency/model_self_routing_gemma4_think_false.json
+ create mode 100644 backend_python/tmp/latency/model_self_routing_gemma4_think_false.md
+ create mode 100644 backend_python/tmp/latency/model_self_routing_gemma4_think_true.json
+ create mode 100644 backend_python/tmp/latency/model_self_routing_gemma4_think_true.md
+ create mode 100644 backend_python/tmp/latency/model_self_routing_gpt_oss_think_false.json
+ create mode 100644 backend_python/tmp/latency/model_self_routing_gpt_oss_think_false.md
+
+diff --git a/backend_python/README.md b/backend_python/README.md
+index 494fb593..36565ff2 100644
+--- a/backend_python/README.md
++++ b/backend_python/README.md
+@@ -120,3 +120,29 @@ uvicorn server:app --reload --port 8000
+ ```
+ 
+ 3. The client expects CORS origins at `http://localhost:5173` (see `server.py`).
++
++## Model self-routing experiment
++
++On `experiment/model-self-routing`, the active
++query and turn-buffer routes do not call the
++utterance classifier. They prefetch available
++retrieval context and make one main-model request.
++
++The model begins its first output with a hidden
++`<route>...</route>` JSON block. The backend
++validates it as `ModelRouteAssessment`, emits a
++`route_assessment` stream event, and sends only the
++following response text to the visitor and TTS.
++
++Malformed or missing route metadata does not trigger
++a retry and does not discard a valid spoken answer.
++Operational conversation-tree state is still changed
++only by registered tools.
++
++The main model and reasoning profile are configured
++with:
++
++```text
++OLLAMA_MODEL=gemma4:cloud
++OLLAMA_MAIN_THINK=false
++```
+diff --git a/backend_python/config.py b/backend_python/config.py
+index 6009e7c2..2807b029 100644
+--- a/backend_python/config.py
++++ b/backend_python/config.py
+@@ -5,6 +5,36 @@ from dotenv import load_dotenv
+ 
+ load_dotenv()
+ 
++
++def _optional_boolean(
++    name: str,
++) -> bool | None:
++    value = os.getenv(name)
++
++    if value is None:
++        return None
++
++    normalised = value.strip().lower()
++
++    if normalised in {
++        "1",
++        "true",
++        "yes",
++        "on",
++    }:
++        return True
++
++    if normalised in {
++        "0",
++        "false",
++        "no",
++        "off",
++    }:
++        return False
++
++    return None
++
++
+ class Settings():
+     backend_root: Path = Path(__file__).resolve().parent
+ 
+@@ -17,6 +47,11 @@ class Settings():
+     ollama_embedding_model: str = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
+     ollama_trp_model: str = os.getenv("OLLAMA_TRP_MODEL", "")
+     ollama_classifier_model: str = os.getenv("OLLAMA_CLASSIFIER_MODEL", "")
++    ollama_main_think: bool | None = (
++        _optional_boolean(
++            "OLLAMA_MAIN_THINK"
++        )
++    )
+ 
+     whisper_model: str = os.getenv("WHISPER_MODEL", "base.en")
+     whisper_device: str = os.getenv("WHISPER_DEVICE", "cpu")
+diff --git a/backend_python/conversation_core/api/routes_turn_buffer_stream.py b/backend_python/conversation_core/api/routes_turn_buffer_stream.py
+index 3aa1d6e5..89a0b708 100644
+--- a/backend_python/conversation_core/api/routes_turn_buffer_stream.py
++++ b/backend_python/conversation_core/api/routes_turn_buffer_stream.py
+@@ -73,6 +73,15 @@ def build_stream_websocket_message(
+             },
+         }
+ 
++    if event.event_type == "route_assessment":
++        return {
++            "type": "route_assessment",
++            "request_id": request_id,
++            "payload": (
++                event.route_assessment or {}
++            ),
++        }
++
+     if event.event_type == "tool_call":
+         return {
+             "type": "tool_call_started",
+diff --git a/backend_python/conversation_core/schemas/llm_stream_schemas.py b/backend_python/conversation_core/schemas/llm_stream_schemas.py
+index 0dad0b84..284a9af1 100644
+--- a/backend_python/conversation_core/schemas/llm_stream_schemas.py
++++ b/backend_python/conversation_core/schemas/llm_stream_schemas.py
+@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
+ 
+ LLMStreamEventType = Literal[
+     "response_started",
++    "route_assessment",
+     "content_delta",
+     "tool_call",
+     "tool_result",
+@@ -21,4 +22,5 @@ class LLMStreamEvent(BaseModel):
+     )
+     tool_name: str | None = None
+     tool_result: dict[str, Any] | None = None
++    route_assessment: dict[str, Any] | None = None
+     done: bool = False
+diff --git a/backend_python/conversation_core/schemas/model_route_schemas.py b/backend_python/conversation_core/schemas/model_route_schemas.py
+new file mode 100644
+index 00000000..3e58c1c0
+--- /dev/null
++++ b/backend_python/conversation_core/schemas/model_route_schemas.py
+@@ -0,0 +1,22 @@
++from typing import Literal
++
++from pydantic import BaseModel, Field
++
++
++class ModelRouteAssessment(BaseModel):
++    route_type: Literal[
++        "response_request",
++        "call_to_action",
++        "interruption",
++        "noise",
++    ]
++    is_relevant: bool
++    should_ignore: bool
++    retrieval_required: bool
++    retrieved_context_used: bool
++    proposed_action: str | None = None
++    confidence: float = Field(
++        ge=0.0,
++        le=1.0,
++    )
++    reason: str
+diff --git a/backend_python/conversation_core/services/llm_service.py b/backend_python/conversation_core/services/llm_service.py
+index afacc037..837624e1 100644
+--- a/backend_python/conversation_core/services/llm_service.py
++++ b/backend_python/conversation_core/services/llm_service.py
+@@ -153,11 +153,14 @@ def parse_ollama_tool_calls(
+ def send_ollama_chat_request(
+     messages: list[dict[str, Any]],
+     tools: list[dict[str, Any]] | None = None,
++    *,
++    model: str | None = None,
++    think: bool | None = None,
+ ) -> dict[str, Any]:
+     url = f"{settings.ollama_base_url}/api/chat"
+ 
+     payload: dict[str, Any] = {
+-        "model": settings.ollama_model,
++        "model": model or settings.ollama_model,
+         "messages": messages,
+         "stream": False,
+     }
+@@ -165,6 +168,15 @@ def send_ollama_chat_request(
+     if tools:
+         payload["tools"] = tools
+ 
++    selected_think = (
++        settings.ollama_main_think
++        if think is None
++        else think
++    )
++
++    if selected_think is not None:
++        payload["think"] = selected_think
++
+     response = httpx.post(
+         url,
+         json=payload,
+@@ -180,6 +192,9 @@ def stream_ollama_chat_request(
+     messages: list[dict[str, Any]],
+     tools: list[dict[str, Any]] | None = None,
+     cancellation_token: CancellationToken | None = None,
++    *,
++    model: str | None = None,
++    think: bool | None = None,
+ ) -> Iterator[dict[str, Any]]:
+     url = (
+         f"{settings.ollama_base_url}"
+@@ -187,7 +202,7 @@ def stream_ollama_chat_request(
+     )
+ 
+     payload: dict[str, Any] = {
+-        "model": settings.ollama_model,
++        "model": model or settings.ollama_model,
+         "messages": messages,
+         "stream": True,
+     }
+@@ -195,6 +210,15 @@ def stream_ollama_chat_request(
+     if tools:
+         payload["tools"] = tools
+ 
++    selected_think = (
++        settings.ollama_main_think
++        if think is None
++        else think
++    )
++
++    if selected_think is not None:
++        payload["think"] = selected_think
++
+     if (
+         cancellation_token is not None
+         and cancellation_token.is_cancelled
+@@ -235,6 +259,8 @@ def stream_tool_aware_llm_response(
+     buffer_for_tool_decision: bool,
+     cancellation_token: CancellationToken | None = None,
+     max_tool_rounds: int = 5,
++    model: str | None = None,
++    think: bool | None = None,
+ ) -> Iterator[LLMStreamEvent]:
+     messages: list[dict[str, Any]] = [
+         {
+@@ -287,6 +313,8 @@ def stream_tool_aware_llm_response(
+                 cancellation_token=(
+                     cancellation_token
+                 ),
++                model=model,
++                think=think,
+             ):
+                 response_message = (
+                     chunk.get("message") or {}
+@@ -509,6 +537,9 @@ def generate_tool_aware_llm_response(
+     prompt: str,
+     conversation_id: str,
+     max_tool_rounds: int = 5,
++    *,
++    model: str | None = None,
++    think: bool | None = None,
+ ) -> str:
+     """
+     Ask Ollama for a response while allowing it to call registered tools.
+@@ -535,6 +566,8 @@ def generate_tool_aware_llm_response(
+             response_data = send_ollama_chat_request(
+                 messages=messages,
+                 tools=tools,
++                model=model,
++                think=think,
+             )
+ 
+             response_message = response_data.get("message") or {}
+diff --git a/backend_python/conversation_core/services/model_route_parser.py b/backend_python/conversation_core/services/model_route_parser.py
+new file mode 100644
+index 00000000..669d1982
+--- /dev/null
++++ b/backend_python/conversation_core/services/model_route_parser.py
+@@ -0,0 +1,130 @@
++from __future__ import annotations
++
++import json
++
++from pydantic import ValidationError
++
++from conversation_core.schemas.model_route_schemas import (
++    ModelRouteAssessment,
++)
++
++
++ROUTE_OPEN_TAG = "<route>"
++ROUTE_CLOSE_TAG = "</route>"
++
++
++class ModelRouteStreamParser:
++    def __init__(self) -> None:
++        self.buffer = ""
++        self.route_complete = False
++        self.route_boundary_reached = False
++        self.route: ModelRouteAssessment | None = None
++        self.validation_error: str | None = None
++
++    def consume(
++        self,
++        text: str,
++    ) -> tuple[
++        ModelRouteAssessment | None,
++        str,
++    ]:
++        if not text:
++            return None, ""
++
++        if self.route_complete:
++            return None, text
++
++        self.buffer += text
++        candidate = self.buffer.lstrip()
++
++        if not (
++            candidate.startswith(ROUTE_OPEN_TAG)
++            or ROUTE_OPEN_TAG.startswith(candidate)
++        ):
++            spoken_text = self.buffer
++            self.buffer = ""
++            self.route_complete = True
++            self.validation_error = (
++                "The response did not begin with "
++                "a route block."
++            )
++            return None, spoken_text
++
++        close_index = candidate.find(
++            ROUTE_CLOSE_TAG
++        )
++
++        if close_index < 0:
++            return None, ""
++
++        route_json = candidate[
++            len(ROUTE_OPEN_TAG):close_index
++        ].strip()
++        spoken_text = candidate[
++            close_index + len(ROUTE_CLOSE_TAG):
++        ]
++
++        self.buffer = ""
++        self.route_complete = True
++        self.route_boundary_reached = True
++
++        try:
++            self.route = (
++                ModelRouteAssessment
++                .model_validate_json(route_json)
++            )
++        except (
++            ValidationError,
++            ValueError,
++            json.JSONDecodeError,
++        ) as error:
++            self.validation_error = str(error)
++            self.route = None
++
++        return self.route, spoken_text
++
++    def finish(self) -> str:
++        if self.route_complete:
++            return ""
++
++        pending = self.buffer
++        self.buffer = ""
++        self.route_complete = True
++
++        candidate = pending.lstrip()
++
++        if not candidate.startswith(
++            ROUTE_OPEN_TAG
++        ):
++            self.validation_error = (
++                "The response ended without a "
++                "route block."
++            )
++            return pending
++
++        self.validation_error = (
++            "The route block was not closed."
++        )
++        route_payload = candidate[
++            len(ROUTE_OPEN_TAG):
++        ].lstrip()
++
++        try:
++            _, end_index = (
++                json.JSONDecoder().raw_decode(
++                    route_payload
++                )
++            )
++        except json.JSONDecodeError:
++            first_line_break = (
++                route_payload.find("\n")
++            )
++
++            if first_line_break < 0:
++                return ""
++
++            return route_payload[
++                first_line_break + 1:
++            ]
++
++        return route_payload[end_index:].lstrip()
+diff --git a/backend_python/conversation_core/services/query_service.py b/backend_python/conversation_core/services/query_service.py
+index b905c390..3ce958b5 100644
+--- a/backend_python/conversation_core/services/query_service.py
++++ b/backend_python/conversation_core/services/query_service.py
+@@ -16,6 +16,9 @@ from conversation_core.schemas.conversation_schemas import (
+ from conversation_core.schemas.llm_stream_schemas import (
+     LLMStreamEvent,
+ )
++from conversation_core.schemas.model_route_schemas import (
++    ModelRouteAssessment,
++)
+ from conversation_core.schemas.prompt_schemas import (
+     PromptProfile,
+     PromptSection,
+@@ -40,6 +43,9 @@ from conversation_core.services.prompt_service import (
+     build_prompt,
+     format_conversation_branch_for_prompt,
+ )
++from conversation_core.services.model_route_parser import (
++    ModelRouteStreamParser,
++)
+ 
+ NON_RETRIEVAL_CONTEXT_SOURCES = {
+     "no_context",
+@@ -91,18 +97,42 @@ def default_response_generator(
+     )
+ 
+ 
++def model_route_response_generator(
++    prompt: str,
++    conversation_id: str | None,
++) -> str:
++    if conversation_id is None:
++        return generate_llm_response(prompt)
++
++    response_parts: list[str] = []
++
++    for event in stream_tool_aware_llm_response(
++        prompt=prompt,
++        conversation_id=conversation_id,
++        buffer_for_tool_decision=False,
++    ):
++        if event.event_type == "content_delta":
++            response_parts.append(event.text)
++
++    return "".join(response_parts).strip()
++
++
+ class QueryEngine:
+     def __init__(
+         self,
+         subject_resolver: SubjectResolver,
+         prompt_builder: PromptBuilder,
+         response_generator: ResponseGenerator | None = None,
++        model_route_output_enabled: bool = False,
+     ):
+         self.subject_resolver = subject_resolver
+         self.prompt_builder = prompt_builder
+         self.response_generator = (
+             response_generator or default_response_generator
+         )
++        self.model_route_output_enabled = (
++            model_route_output_enabled
++        )
+ 
+     def generate_response(
+         self,
+@@ -195,6 +225,25 @@ class QueryEngine:
+         response_generation_seconds = (
+             perf_counter() - response_generation_started_at
+         )
++        route_assessment: (
++            ModelRouteAssessment | None
++        ) = None
++        route_validation_error: str | None = None
++
++        if self.model_route_output_enabled:
++            route_parser = (
++                ModelRouteStreamParser()
++            )
++            route_assessment, spoken_response = (
++                route_parser.consume(response)
++            )
++            spoken_response += (
++                route_parser.finish()
++            )
++            response = spoken_response.strip()
++            route_validation_error = (
++                route_parser.validation_error
++            )
+ 
+         # Store dialogue for newly created and existing conversations.
+         if conversation_state is not None:
+@@ -217,6 +266,19 @@ class QueryEngine:
+         timing_debug_payload = {
+             **resolved_context.debug_payload,
+             "conversation_created": conversation_created,
++            "model_route_assessment": (
++                route_assessment.model_dump(
++                    mode="json"
++                )
++                if route_assessment is not None
++                else None
++            ),
++            "model_route_valid": (
++                route_assessment is not None
++            ),
++            "model_route_validation_error": (
++                route_validation_error
++            ),
+             "timings": {
+                 "total_request_seconds": round(
+                     total_request_seconds,
+@@ -342,6 +404,18 @@ class QueryEngine:
+             )
+ 
+         response_generation_started_at = perf_counter()
++        route_parser = (
++            ModelRouteStreamParser()
++            if self.model_route_output_enabled
++            else None
++        )
++        route_assessment: (
++            ModelRouteAssessment | None
++        ) = None
++        route_block_seconds: float | None = None
++        first_spoken_token_seconds: (
++            float | None
++        ) = None
+ 
+         response_cancelled = (
+             cancellation_token is not None
+@@ -425,10 +499,129 @@ class QueryEngine:
+                     stream_event.event_type
+                     == "content_delta"
+                 ):
+-                    response_parts.append(
++                    released_text = (
+                         stream_event.text
+                     )
+ 
++                    if route_parser is not None:
++                        (
++                            parsed_route,
++                            released_text,
++                        ) = route_parser.consume(
++                            stream_event.text
++                        )
++
++                        if (
++                            route_parser
++                            .route_boundary_reached
++                            and route_block_seconds
++                            is None
++                        ):
++                            route_block_seconds = (
++                                perf_counter()
++                                - response_generation_started_at
++                            )
++
++                        if (
++                            parsed_route is not None
++                            and route_assessment
++                            is None
++                        ):
++                            route_assessment = (
++                                parsed_route
++                            )
++
++                            if (
++                                on_stream_event
++                                is not None
++                            ):
++                                on_stream_event(
++                                    LLMStreamEvent(
++                                        event_type=(
++                                            "route_assessment"
++                                        ),
++                                        route_assessment=(
++                                            parsed_route
++                                            .model_dump(
++                                                mode="json"
++                                            )
++                                        ),
++                                    )
++                                )
++
++                    if released_text:
++                        response_parts.append(
++                            released_text
++                        )
++
++                        if (
++                            first_spoken_token_seconds
++                            is None
++                        ):
++                            first_spoken_token_seconds = (
++                                perf_counter()
++                                - response_generation_started_at
++                            )
++
++                        if on_stream_event is not None:
++                            on_stream_event(
++                                LLMStreamEvent(
++                                    event_type=(
++                                        "content_delta"
++                                    ),
++                                    text=released_text,
++                                )
++                            )
++
++                    continue
++
++                if (
++                    stream_event.event_type
++                    == "response_complete"
++                    and route_parser is not None
++                ):
++                    final_text = (
++                        route_parser.finish()
++                    )
++
++                    if final_text:
++                        response_parts.append(
++                            final_text
++                        )
++
++                        if (
++                            first_spoken_token_seconds
++                            is None
++                        ):
++                            first_spoken_token_seconds = (
++                                perf_counter()
++                                - response_generation_started_at
++                            )
++
++                        if on_stream_event is not None:
++                            on_stream_event(
++                                LLMStreamEvent(
++                                    event_type=(
++                                        "content_delta"
++                                    ),
++                                    text=final_text,
++                                )
++                            )
++
++                    if on_stream_event is not None:
++                        on_stream_event(
++                            LLMStreamEvent(
++                                event_type=(
++                                    "response_complete"
++                                ),
++                                text="".join(
++                                    response_parts
++                                ).strip(),
++                                done=True,
++                            )
++                        )
++                    continue
++
+                 if (
+                     stream_event.event_type
+                     == "response_cancelled"
+@@ -475,6 +668,21 @@ class QueryEngine:
+         timing_debug_payload = {
+             **resolved_context.debug_payload,
+             "conversation_created": conversation_created,
++            "model_route_assessment": (
++                route_assessment.model_dump(
++                    mode="json"
++                )
++                if route_assessment is not None
++                else None
++            ),
++            "model_route_valid": (
++                route_assessment is not None
++            ),
++            "model_route_validation_error": (
++                route_parser.validation_error
++                if route_parser is not None
++                else None
++            ),
+             "timings": {
+                 "total_request_seconds": round(
+                     total_request_seconds,
+@@ -488,6 +696,24 @@ class QueryEngine:
+                     response_generation_seconds,
+                     4,
+                 ),
++                "model_route_block_seconds": (
++                    round(
++                        route_block_seconds,
++                        4,
++                    )
++                    if route_block_seconds
++                    is not None
++                    else None
++                ),
++                "first_spoken_token_seconds": (
++                    round(
++                        first_spoken_token_seconds,
++                        4,
++                    )
++                    if first_spoken_token_seconds
++                    is not None
++                    else None
++                ),
+             },
+         }
+ 
+diff --git a/backend_python/docent/services/docent_query_service.py b/backend_python/docent/services/docent_query_service.py
+index 9e716982..7d7f8b8d 100644
+--- a/backend_python/docent/services/docent_query_service.py
++++ b/backend_python/docent/services/docent_query_service.py
+@@ -7,7 +7,10 @@ from conversation_core.schemas.source_schemas import QuerySource
+ from conversation_core.schemas.utterance_route_schemas import (
+     UtteranceRoute,
+ )
+-from conversation_core.services.query_service import QueryEngine
++from conversation_core.services.query_service import (
++    QueryEngine,
++    model_route_response_generator,
++)
+ from conversation_core.services.utterance_router_service import route_utterance
+ from conversation_core.services.prompt_service import (
+     format_conversation_branch_for_prompt,
+@@ -164,23 +167,56 @@ def docent_resolve_context(
+     subject_reference: str | None,
+     user_input: str,
+     utterance_route: UtteranceRoute | None = None,
++    *,
++    force_retrieval_without_route: bool = False,
+ ) -> ResolvedContext:
+     sources: list[QuerySource] = []
+-    active_utterance_route = (
+-        utterance_route
+-        or route_utterance(
+-            text=user_input,
+-            domain_profile=docent_classifier_profile,
++    active_utterance_route = None
++
++    if not force_retrieval_without_route:
++        active_utterance_route = (
++            utterance_route
++            or route_utterance(
++                text=user_input,
++                domain_profile=(
++                    docent_classifier_profile
++                ),
++            )
+         )
+-    )
+ 
+-    route_handled_context = build_route_handled_context(
+-        active_utterance_route
++    route_handled_context = (
++        build_route_handled_context(
++            active_utterance_route
++        )
++        if active_utterance_route is not None
++        else None
+     )
+ 
+     if route_handled_context is not None:
+         return route_handled_context
+ 
++    route_prompt_payload = (
++        build_utterance_route_prompt_payload(
++            active_utterance_route
++        )
++        if active_utterance_route is not None
++        else {}
++    )
++    route_debug_payload = (
++        build_utterance_route_debug_payload(
++            utterance_route=(
++                active_utterance_route
++            ),
++            retrieval_skipped_by_utterance_route=False,
++        )
++        if active_utterance_route is not None
++        else {
++            "model_routing_retrieval_prefetched": (
++                True
++            ),
++        }
++    )
++
+     if subject_reference is not None:
+         painting_index = docent_parse_subject_reference(subject_reference)
+ 
+@@ -200,18 +236,13 @@ def docent_resolve_context(
+                     subject_reference=subject_reference,
+                     sources=sources,
+                     prompt_payload={
+-                        **build_utterance_route_prompt_payload(
+-                            active_utterance_route
+-                        ),
++                        **route_prompt_payload,
+                         "artwork": artwork,
+                         "retrieved_chunks": [],
+                         "retrieved_documents": [],
+                     },
+                     debug_payload={
+-                        **build_utterance_route_debug_payload(
+-                            utterance_route=active_utterance_route,
+-                            retrieval_skipped_by_utterance_route=False,
+-                        ),
++                        **route_debug_payload,
+                         "painting_index": painting_index,
+                         "artwork_found": True,
+                     },
+@@ -222,18 +253,13 @@ def docent_resolve_context(
+                 subject_reference=subject_reference,
+                 sources=[],
+                 prompt_payload={
+-                    **build_utterance_route_prompt_payload(
+-                        active_utterance_route
+-                    ),
++                    **route_prompt_payload,
+                     "artwork": None,
+                     "retrieved_chunks": [],
+                     "retrieved_documents": [],
+                 },
+                 debug_payload={
+-                    **build_utterance_route_debug_payload(
+-                        utterance_route=active_utterance_route,
+-                        retrieval_skipped_by_utterance_route=False,
+-                    ),
++                    **route_debug_payload,
+                     "painting_index": painting_index,
+                     "artwork_found": False,
+                 },
+@@ -255,18 +281,13 @@ def docent_resolve_context(
+             subject_reference=None,
+             sources=build_sources_from_retrieved_chunks(retrieved_chunks),
+             prompt_payload={
+-                **build_utterance_route_prompt_payload(
+-                    active_utterance_route
+-                ),
++                **route_prompt_payload,
+                 "artwork": None,
+                 "retrieved_chunks": retrieved_chunks,
+                 "retrieved_documents": [],
+             },
+             debug_payload={
+-                **build_utterance_route_debug_payload(
+-                    utterance_route=active_utterance_route,
+-                    retrieval_skipped_by_utterance_route=False,
+-                ),
++                **route_debug_payload,
+                 "vector_retrieval_used": True,
+                 "parent_document_expansion_used": True,
+                 "hybrid_scoring_used": True,
+@@ -293,18 +314,13 @@ def docent_resolve_context(
+             subject_reference=None,
+             sources=build_sources_from_retrieved_documents(retrieved_documents),
+             prompt_payload={
+-                **build_utterance_route_prompt_payload(
+-                    active_utterance_route
+-                ),
++                **route_prompt_payload,
+                 "artwork": None,
+                 "retrieved_chunks": [],
+                 "retrieved_documents": retrieved_documents,
+             },
+             debug_payload={
+-                **build_utterance_route_debug_payload(
+-                    utterance_route=active_utterance_route,
+-                    retrieval_skipped_by_utterance_route=False,
+-                ),
++                **route_debug_payload,
+                 "document_retrieval_used": True,
+                 "retrieved_document_count": len(retrieved_documents),
+                 "vector_retrieval_timings": (
+@@ -318,18 +334,13 @@ def docent_resolve_context(
+         subject_reference=None,
+         sources=[],
+         prompt_payload={
+-            **build_utterance_route_prompt_payload(
+-                active_utterance_route
+-            ),
++            **route_prompt_payload,
+             "artwork": None,
+             "retrieved_chunks": [],
+             "retrieved_documents": [],
+         },
+         debug_payload={
+-            **build_utterance_route_debug_payload(
+-                utterance_route=active_utterance_route,
+-                retrieval_skipped_by_utterance_route=False,
+-            ),
++            **route_debug_payload,
+             "vector_retrieval_timings": (
+                 vector_retrieval_result.timings.model_dump()
+             ),
+@@ -451,7 +462,113 @@ def docent_build_prompt_from_context(
+         retrieved_chunks=payload.get("retrieved_chunks", []),
+     )
+ 
++
++MODEL_ROUTE_OUTPUT_INSTRUCTIONS = """
++ROUTING OUTPUT
++
++Begin your first assistant output for this visitor
++turn with exactly one compact route block:
++
++<route>{"route_type":"response_request","is_relevant":true,"should_ignore":false,"retrieval_required":true,"retrieved_context_used":true,"proposed_action":null,"confidence":0.98,"reason":"Artwork information requested."}</route>
++
++The content inside the route block must be valid
++JSON with exactly these fields:
++- route_type: response_request, call_to_action,
++  interruption, or noise;
++- is_relevant: boolean;
++- should_ignore: boolean;
++- retrieval_required: boolean;
++- retrieved_context_used: boolean;
++- proposed_action: a short action name or null;
++- confidence: number from 0 to 1;
++- reason: one short sentence.
++
++The route block is internal metadata. Put it before
++any visitor-facing words. After </route>, answer the
++visitor naturally. If you call an operational tool,
++emit the route block before the tool call and do not
++repeat it after the tool result.
++
++Classify explicit requests to begin or end a guided
++tour as call_to_action and populate proposed_action.
++Reporting an action does not execute it: use the
++available conversation-tree tools when state must
++actually change.
++""".strip()
++
++
++def docent_resolve_context_for_model_routing(
++    subject_reference: str | None,
++    user_input: str,
++    utterance_route: UtteranceRoute | None = None,
++) -> ResolvedContext:
++    return docent_resolve_context(
++        subject_reference,
++        user_input,
++        force_retrieval_without_route=True,
++    )
++
++
++def docent_build_model_routing_prompt(
++    user_input: str,
++    dialogue_history: list[DialogueTurn],
++    resolved_context: ResolvedContext,
++    active_branch: ConversationBranch | None,
++) -> str:
++    payload = resolved_context.prompt_payload
++    branch_context = (
++        format_conversation_branch_for_prompt(
++            active_branch
++        )
++    )
++    routed_user_input = f"""
++{MODEL_ROUTE_OUTPUT_INSTRUCTIONS}
++
++ACTIVE CONVERSATION BRANCH
++
++{branch_context}
++
++CONVERSATION-TREE GUIDANCE
++
++The active branch is the current overarching
++conversational activity. A digression does not close
++a bounded branch. Use operational tools only when
++conversation-tree state genuinely needs to change.
++
++USER UTTERANCE
++
++{user_input}
++""".strip()
++
++    return docent_build_prompt(
++        user_input=routed_user_input,
++        dialogue_history=dialogue_history,
++        artwork=payload.get("artwork"),
++        retrieved_documents=payload.get(
++            "retrieved_documents",
++            [],
++        ),
++        retrieved_chunks=payload.get(
++            "retrieved_chunks",
++            [],
++        ),
++    )
++
++
+ docent_query_engine = QueryEngine(
+     subject_resolver=docent_resolve_context,
+     prompt_builder=docent_build_prompt_from_context,
+ )
++
++docent_model_routing_query_engine = QueryEngine(
++    subject_resolver=(
++        docent_resolve_context_for_model_routing
++    ),
++    prompt_builder=(
++        docent_build_model_routing_prompt
++    ),
++    response_generator=(
++        model_route_response_generator
++    ),
++    model_route_output_enabled=True,
++)
+diff --git a/backend_python/scripts/benchmark_model_self_routing.py b/backend_python/scripts/benchmark_model_self_routing.py
+new file mode 100644
+index 00000000..4c011a18
+--- /dev/null
++++ b/backend_python/scripts/benchmark_model_self_routing.py
+@@ -0,0 +1,638 @@
++from __future__ import annotations
++
++import argparse
++import json
++import statistics
++import sys
++from pathlib import Path
++from time import perf_counter
++
++
++BACKEND_ROOT = (
++    Path(__file__).resolve().parents[1]
++)
++
++if str(BACKEND_ROOT) not in sys.path:
++    sys.path.insert(0, str(BACKEND_ROOT))
++
++
++from config import settings  # noqa: E402
++from conversation_core.schemas.llm_stream_schemas import (  # noqa: E402
++    LLMStreamEvent,
++)
++from docent.services.docent_query_service import (  # noqa: E402
++    docent_model_routing_query_engine,
++)
++
++
++CASES = [
++    {
++        "case_id": "artwork_information",
++        "text": (
++            "Tell me about The Arab Tent."
++        ),
++        "route_type": "response_request",
++        "retrieval_required": True,
++        "retrieved_context_used": True,
++        "action_required": False,
++        "expected_tool": None,
++    },
++    {
++        "case_id": "greeting",
++        "text": "Hi, how are you?",
++        "route_type": "response_request",
++        "retrieval_required": False,
++        "retrieved_context_used": False,
++        "action_required": False,
++        "expected_tool": None,
++    },
++    {
++        "case_id": "highlights_tour",
++        "text": (
++            "Start a highlights tour."
++        ),
++        "route_type": "call_to_action",
++        "retrieval_required": True,
++        "retrieved_context_used": True,
++        "action_required": True,
++        "expected_tool": (
++            "create_conversation_branch"
++        ),
++    },
++    {
++        "case_id": "noise",
++        "text": (
++            "[unintelligible background noise]"
++        ),
++        "route_type": "noise",
++        "retrieval_required": False,
++        "retrieved_context_used": False,
++        "action_required": False,
++        "expected_tool": None,
++    },
++]
++
++
++def rounded_median(
++    values: list[float],
++) -> float | None:
++    if not values:
++        return None
++
++    return round(
++        statistics.median(values),
++        4,
++    )
++
++
++def route_agrees(
++    *,
++    route: dict | None,
++    case: dict,
++) -> bool:
++    if route is None:
++        return False
++
++    route_type_agrees = (
++        route["route_type"]
++        == case["route_type"]
++    )
++
++    if case["case_id"] == "noise":
++        route_type_agrees = (
++            route["route_type"] == "noise"
++            or route["should_ignore"] is True
++        )
++
++    action_agrees = (
++        bool(route.get("proposed_action"))
++        == case["action_required"]
++    )
++
++    return (
++        route_type_agrees
++        and route["retrieval_required"]
++        == case["retrieval_required"]
++        and route["retrieved_context_used"]
++        == case["retrieved_context_used"]
++        and action_agrees
++    )
++
++
++def tool_call_is_correct(
++    *,
++    tool_calls: list[str],
++    tool_results: list[dict],
++    case: dict,
++) -> bool:
++    expected_tool = case["expected_tool"]
++
++    if expected_tool is None:
++        return not tool_calls
++
++    matching_results = [
++        result
++        for result in tool_results
++        if (
++            result.get("tool_name")
++            == expected_tool
++        )
++    ]
++
++    return (
++        expected_tool in tool_calls
++        and bool(matching_results)
++        and all(
++            result.get("success") is True
++            for result in matching_results
++        )
++    )
++
++
++def run_sample(
++    *,
++    case: dict,
++    repetition: int,
++) -> dict:
++    started_at = perf_counter()
++    route_event_seconds = None
++    first_spoken_seconds = None
++    route = None
++    tool_calls: list[str] = []
++    tool_results: list[dict] = []
++    event_types: list[str] = []
++
++    def on_stream_event(
++        event: LLMStreamEvent,
++    ) -> None:
++        nonlocal route_event_seconds
++        nonlocal first_spoken_seconds
++        nonlocal route
++
++        event_types.append(event.event_type)
++        elapsed = perf_counter() - started_at
++
++        if (
++            event.event_type
++            == "route_assessment"
++        ):
++            route_event_seconds = elapsed
++            route = event.route_assessment
++
++        if (
++            event.event_type
++            == "content_delta"
++            and event.text
++            and first_spoken_seconds is None
++        ):
++            first_spoken_seconds = elapsed
++
++        if event.event_type == "tool_call":
++            tool_calls.extend(
++                str(call.get("name", ""))
++                for call in event.tool_calls
++            )
++
++        if event.event_type == "tool_result":
++            tool_results.append(
++                event.tool_result or {}
++            )
++
++    try:
++        result = (
++            docent_model_routing_query_engine
++            .generate_streaming_response(
++                text=case["text"],
++                include_debug=True,
++                on_stream_event=on_stream_event,
++            )
++        )
++        total_seconds = (
++            perf_counter() - started_at
++        )
++        debug_payload = (
++            result.debug.debug_payload
++            if result.debug is not None
++            else {}
++        )
++        route = (
++            route
++            or debug_payload.get(
++                "model_route_assessment"
++            )
++        )
++        model_route_valid = bool(
++            debug_payload.get(
++                "model_route_valid"
++            )
++        )
++        timings = debug_payload.get(
++            "timings",
++            {},
++        )
++
++        return {
++            "success": True,
++            "case_id": case["case_id"],
++            "text": case["text"],
++            "repetition": repetition,
++            "route": route,
++            "model_route_valid": (
++                model_route_valid
++            ),
++            "route_agreement": route_agrees(
++                route=route,
++                case=case,
++            ),
++            "tool_call_correct": (
++                tool_call_is_correct(
++                    tool_calls=tool_calls,
++                    tool_results=tool_results,
++                    case=case,
++                )
++            ),
++            "tool_calls": tool_calls,
++            "tool_results": tool_results,
++            "time_to_route_event_seconds": (
++                round(
++                    route_event_seconds,
++                    4,
++                )
++                if route_event_seconds
++                is not None
++                else None
++            ),
++            "time_to_first_spoken_token_seconds": (
++                round(
++                    first_spoken_seconds,
++                    4,
++                )
++                if first_spoken_seconds
++                is not None
++                else None
++            ),
++            "context_resolution_seconds": (
++                timings.get(
++                    "context_resolution_seconds"
++                )
++            ),
++            "model_route_block_seconds": (
++                timings.get(
++                    "model_route_block_seconds"
++                )
++            ),
++            "response_generation_seconds": (
++                timings.get(
++                    "response_generation_seconds"
++                )
++            ),
++            "total_response_seconds": round(
++                total_seconds,
++                4,
++            ),
++            "response": result.response,
++            "route_header_leaked": (
++                "<route>" in result.response
++                or "</route>" in result.response
++            ),
++            "event_types": event_types,
++            "sources_count": len(
++                result.sources
++            ),
++        }
++    except Exception as error:
++        return {
++            "success": False,
++            "case_id": case["case_id"],
++            "text": case["text"],
++            "repetition": repetition,
++            "elapsed_seconds": round(
++                perf_counter() - started_at,
++                4,
++            ),
++            "error_type": (
++                type(error).__name__
++            ),
++            "error": str(error),
++        }
++
++
++def build_summary(
++    results: list[dict],
++) -> dict:
++    valid = [
++        result
++        for result in results
++        if result["success"]
++    ]
++    route_valid = [
++        result
++        for result in valid
++        if result["model_route_valid"]
++    ]
++    route_times = [
++        result[
++            "time_to_route_event_seconds"
++        ]
++        for result in valid
++        if result[
++            "time_to_route_event_seconds"
++        ] is not None
++    ]
++    first_spoken_times = [
++        result[
++            "time_to_first_spoken_token_seconds"
++        ]
++        for result in valid
++        if result[
++            "time_to_first_spoken_token_seconds"
++        ] is not None
++    ]
++
++    return {
++        "successful_samples": len(valid),
++        "route_valid_samples": len(route_valid),
++        "route_validity_rate": round(
++            len(route_valid) / len(valid),
++            4,
++        )
++        if valid
++        else 0.0,
++        "route_agreement_samples": sum(
++            result["route_agreement"]
++            for result in valid
++        ),
++        "route_agreement_rate": round(
++            sum(
++                result["route_agreement"]
++                for result in valid
++            )
++            / len(valid),
++            4,
++        )
++        if valid
++        else 0.0,
++        "tool_correct_samples": sum(
++            result["tool_call_correct"]
++            for result in valid
++        ),
++        "tool_correct_rate": round(
++            sum(
++                result["tool_call_correct"]
++                for result in valid
++            )
++            / len(valid),
++            4,
++        )
++        if valid
++        else 0.0,
++        "route_header_leaks": sum(
++            result["route_header_leaked"]
++            for result in valid
++        ),
++        "median_time_to_route_event_seconds": (
++            rounded_median(route_times)
++        ),
++        "median_time_to_first_spoken_token_seconds": (
++            rounded_median(
++                first_spoken_times
++            )
++        ),
++        "median_total_response_seconds": (
++            rounded_median(
++                [
++                    result[
++                        "total_response_seconds"
++                    ]
++                    for result in valid
++                ]
++            )
++        ),
++        "median_context_resolution_seconds": (
++            rounded_median(
++                [
++                    result[
++                        "context_resolution_seconds"
++                    ]
++                    for result in valid
++                    if result[
++                        "context_resolution_seconds"
++                    ] is not None
++                ]
++            )
++        ),
++    }
++
++
++def write_markdown(
++    path: Path,
++    report: dict,
++) -> None:
++    summary = report["summary"]
++    lines = [
++        "# Model self-routing benchmark",
++        "",
++        f"Model: `{report['model']}`",
++        "",
++        (
++            "Thinking: "
++            f"`{report['think']}`"
++        ),
++        "",
++        (
++            "Architecture: retrieval prefetch followed "
++            "by one main-model conversation that emits "
++            "a hidden route header and the spoken answer."
++        ),
++        "",
++        "| Metric | Result |",
++        "|---|---:|",
++        (
++            "| Valid route blocks | "
++            f"{summary['route_valid_samples']}/"
++            f"{summary['successful_samples']} |"
++        ),
++        (
++            "| Label agreement | "
++            f"{summary['route_agreement_samples']}/"
++            f"{summary['successful_samples']} |"
++        ),
++        (
++            "| Tool correctness | "
++            f"{summary['tool_correct_samples']}/"
++            f"{summary['successful_samples']} |"
++        ),
++        (
++            "| Median time to route block | "
++            f"{summary['median_time_to_route_event_seconds']}s |"
++        ),
++        (
++            "| Median time to first spoken token | "
++            f"{summary['median_time_to_first_spoken_token_seconds']}s |"
++        ),
++        (
++            "| Median full response time | "
++            f"{summary['median_total_response_seconds']}s |"
++        ),
++        (
++            "| Route-header leaks | "
++            f"{summary['route_header_leaks']} |"
++        ),
++        "",
++        "## Samples",
++        "",
++        "| Case | Run | Valid | Agrees | Tool correct | Route | First spoken | Total |",
++        "|---|---:|---:|---:|---:|---:|---:|---:|",
++    ]
++
++    for result in report["results"]:
++        route = result.get("route") or {}
++        lines.append(
++            f"| {result['case_id']} | "
++            f"{result['repetition']} | "
++            f"{result.get('model_route_valid')} | "
++            f"{result.get('route_agreement')} | "
++            f"{result.get('tool_call_correct')} | "
++            f"{route.get('route_type', 'n/a')} | "
++            f"{result.get('time_to_first_spoken_token_seconds')}s | "
++            f"{result.get('total_response_seconds')}s |"
++        )
++
++    path.write_text(
++        "\n".join(lines) + "\n",
++        encoding="utf-8",
++    )
++
++
++def main() -> None:
++    parser = argparse.ArgumentParser()
++    parser.add_argument(
++        "--model",
++        required=True,
++    )
++    parser.add_argument(
++        "--think",
++        choices=["false", "true"],
++        required=True,
++    )
++    parser.add_argument(
++        "--repetitions",
++        type=int,
++        default=3,
++    )
++    parser.add_argument(
++        "--output",
++        type=Path,
++        required=True,
++    )
++    arguments = parser.parse_args()
++    think = arguments.think == "true"
++    settings.ollama_model = arguments.model
++    settings.ollama_main_think = think
++    results = []
++    total = (
++        len(CASES)
++        * arguments.repetitions
++    )
++    sample_index = 0
++
++    for repetition in range(
++        1,
++        arguments.repetitions + 1,
++    ):
++        for case in CASES:
++            sample_index += 1
++            print(
++                f"{sample_index:02d}/{total} "
++                f"{case['case_id']} "
++                f"run={repetition}",
++                flush=True,
++            )
++            result = run_sample(
++                case=case,
++                repetition=repetition,
++            )
++            results.append(result)
++            print(
++                json.dumps(
++                    {
++                        "success": result[
++                            "success"
++                        ],
++                        "route_valid": (
++                            result.get(
++                                "model_route_valid"
++                            )
++                        ),
++                        "route_agreement": (
++                            result.get(
++                                "route_agreement"
++                            )
++                        ),
++                        "tool_correct": (
++                            result.get(
++                                "tool_call_correct"
++                            )
++                        ),
++                        "first_spoken": (
++                            result.get(
++                                "time_to_first_spoken_token_seconds"
++                            )
++                        ),
++                        "total": result.get(
++                            "total_response_seconds"
++                        ),
++                        "error": result.get(
++                            "error"
++                        ),
++                    },
++                    indent=2,
++                ),
++                flush=True,
++            )
++
++    report = {
++        "model": arguments.model,
++        "think": think,
++        "repetitions": (
++            arguments.repetitions
++        ),
++        "case_count": len(CASES),
++        "sample_count": len(results),
++        "summary": build_summary(results),
++        "results": results,
++    }
++    arguments.output.parent.mkdir(
++        parents=True,
++        exist_ok=True,
++    )
++    arguments.output.write_text(
++        json.dumps(report, indent=2),
++        encoding="utf-8",
++    )
++    markdown_path = (
++        arguments.output.with_suffix(".md")
++    )
++    write_markdown(
++        markdown_path,
++        report,
++    )
++    print(
++        json.dumps(
++            report["summary"],
++            indent=2,
++        ),
++        flush=True,
++    )
++    print(
++        f"JSON report: {arguments.output}",
++        flush=True,
++    )
++    print(
++        f"Markdown report: {markdown_path}",
++        flush=True,
++    )
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/backend_python/server.py b/backend_python/server.py
+index 6c7cc778..cbf547ee 100644
+--- a/backend_python/server.py
++++ b/backend_python/server.py
+@@ -36,9 +36,8 @@ from conversation_core.api.routes_utterance_router import (
+ from docent.api.routes_artworks import router as artworks_router
+ from docent.api.routes_docent_index import router as docent_index_router
+ from docent.api.routes_docent_retrieval import router as docent_retrieval_router
+-from docent.services.docent_query_service import docent_query_engine
+-from docent.services.docent_utterance_classifier import (
+-    classify_docent_utterance,
++from docent.services.docent_query_service import (
++    docent_model_routing_query_engine,
+ )
+ from docent.api.routes_docent_embeddings import router as docent_embeddings_router
+ from docent.api.routes_docent_vector import router as docent_vector_router
+@@ -72,15 +71,21 @@ app.add_middleware(
+ )
+ 
+ query_router = create_query_router(
+-    query_engine=docent_query_engine,
++    query_engine=(
++        docent_model_routing_query_engine
++    ),
+ )
+ turn_buffer_router = create_turn_buffer_router(
+-    query_engine=docent_query_engine,
+-    utterance_classifier=classify_docent_utterance,
++    query_engine=(
++        docent_model_routing_query_engine
++    ),
++    utterance_classifier=None,
+ )
+ turn_buffer_stream_router = create_turn_buffer_stream_router(
+-    query_engine=docent_query_engine,
+-    utterance_classifier=classify_docent_utterance,
++    query_engine=(
++        docent_model_routing_query_engine
++    ),
++    utterance_classifier=None,
+ )
+ transcription_router = create_transcription_router()
+ audio_stream_router = create_audio_stream_router()
+diff --git a/backend_python/tests/test_model_self_routing.py b/backend_python/tests/test_model_self_routing.py
+new file mode 100644
+index 00000000..8e776e34
+--- /dev/null
++++ b/backend_python/tests/test_model_self_routing.py
+@@ -0,0 +1,411 @@
++import json
++import sys
++import unittest
++from pathlib import Path
++from unittest.mock import Mock, patch
++
++
++BACKEND_ROOT = (
++    Path(__file__).resolve().parents[1]
++)
++
++if str(BACKEND_ROOT) not in sys.path:
++    sys.path.insert(0, str(BACKEND_ROOT))
++
++
++from conversation_core.memory.conversation_store import (  # noqa: E402
++    get_recent_conversation_history,
++)
++from conversation_core.schemas.llm_stream_schemas import (  # noqa: E402
++    LLMStreamEvent,
++)
++from conversation_core.schemas.query_schemas import (  # noqa: E402
++    ResolvedContext,
++)
++from conversation_core.services.model_route_parser import (  # noqa: E402
++    ModelRouteStreamParser,
++)
++from conversation_core.services.query_service import (  # noqa: E402
++    QueryEngine,
++)
++from conversation_core.api.routes_turn_buffer_stream import (  # noqa: E402
++    build_stream_websocket_message,
++)
++from docent.services.docent_query_service import (  # noqa: E402
++    docent_resolve_context_for_model_routing,
++)
++
++
++VALID_ROUTE_JSON = (
++    '{"route_type":"response_request",'
++    '"is_relevant":true,'
++    '"should_ignore":false,'
++    '"retrieval_required":true,'
++    '"retrieved_context_used":true,'
++    '"proposed_action":null,'
++    '"confidence":0.98,'
++    '"reason":"Artwork information requested."}'
++)
++
++
++def resolve_context(
++    subject_reference,
++    user_input,
++    utterance_route=None,
++):
++    return ResolvedContext(
++        context_source=(
++            "vector_retrieved_chunks"
++        ),
++        subject_reference=subject_reference,
++        debug_payload={
++            "model_routing_retrieval_prefetched": (
++                True
++            ),
++        },
++    )
++
++
++def build_prompt(
++    user_input,
++    dialogue_history,
++    resolved_context,
++    active_branch,
++):
++    return "model-routing prompt"
++
++
++class ModelRouteStreamParserTest(
++    unittest.TestCase
++):
++    def test_split_route_is_hidden_and_validated(
++        self,
++    ) -> None:
++        parser = ModelRouteStreamParser()
++
++        route, spoken = parser.consume(
++            "<rou"
++        )
++        self.assertIsNone(route)
++        self.assertEqual(spoken, "")
++
++        route, spoken = parser.consume(
++            "te>"
++            + VALID_ROUTE_JSON
++            + "</route>The Arab Tent "
++        )
++
++        self.assertIsNotNone(route)
++        self.assertEqual(
++            route.route_type,
++            "response_request",
++        )
++        self.assertEqual(
++            spoken,
++            "The Arab Tent ",
++        )
++
++        route, spoken = parser.consume(
++            "is an evocative painting."
++        )
++        self.assertIsNone(route)
++        self.assertEqual(
++            spoken,
++            "is an evocative painting.",
++        )
++
++    def test_malformed_route_releases_answer(
++        self,
++    ) -> None:
++        parser = ModelRouteStreamParser()
++
++        route, spoken = parser.consume(
++            "<route>{not valid}</route>"
++            "A valid spoken answer."
++        )
++
++        self.assertIsNone(route)
++        self.assertEqual(
++            spoken,
++            "A valid spoken answer.",
++        )
++        self.assertIsNotNone(
++            parser.validation_error
++        )
++
++    def test_missing_route_fails_open(
++        self,
++    ) -> None:
++        parser = ModelRouteStreamParser()
++
++        route, spoken = parser.consume(
++            "A normal spoken answer."
++        )
++
++        self.assertIsNone(route)
++        self.assertEqual(
++            spoken,
++            "A normal spoken answer.",
++        )
++
++
++class ModelRoutingQueryEngineTest(
++    unittest.TestCase
++):
++    def test_non_streamed_response_hides_route(
++        self,
++    ) -> None:
++        raw_response = (
++            "<route>"
++            + VALID_ROUTE_JSON
++            + "</route>"
++            + "A spoken response."
++        )
++        engine = QueryEngine(
++            subject_resolver=resolve_context,
++            prompt_builder=build_prompt,
++            response_generator=(
++                lambda prompt, conversation_id: (
++                    raw_response
++                )
++            ),
++            model_route_output_enabled=True,
++        )
++
++        result = engine.generate_response(
++            text="Question",
++            include_debug=True,
++        )
++
++        self.assertEqual(
++            result.response,
++            "A spoken response.",
++        )
++        self.assertTrue(
++            result.debug.debug_payload[
++                "model_route_valid"
++            ]
++        )
++
++    @patch(
++        "conversation_core.services."
++        "query_service."
++        "stream_tool_aware_llm_response"
++    )
++    def test_route_event_precedes_spoken_content(
++        self,
++        stream_response,
++    ) -> None:
++        stream_response.return_value = iter(
++            [
++                LLMStreamEvent(
++                    event_type="response_started",
++                ),
++                LLMStreamEvent(
++                    event_type="content_delta",
++                    text=(
++                        "<route>"
++                        + VALID_ROUTE_JSON[:70]
++                    ),
++                ),
++                LLMStreamEvent(
++                    event_type="content_delta",
++                    text=(
++                        VALID_ROUTE_JSON[70:]
++                        + "</route>"
++                        + "The Arab Tent "
++                    ),
++                ),
++                LLMStreamEvent(
++                    event_type="content_delta",
++                    text="is richly decorated.",
++                ),
++                LLMStreamEvent(
++                    event_type="response_complete",
++                    text="raw model response",
++                    done=True,
++                ),
++            ]
++        )
++        events = []
++        engine = QueryEngine(
++            subject_resolver=resolve_context,
++            prompt_builder=build_prompt,
++            model_route_output_enabled=True,
++        )
++
++        result = (
++            engine.generate_streaming_response(
++                text=(
++                    "Tell me about "
++                    "The Arab Tent."
++                ),
++                include_debug=True,
++                on_stream_event=events.append,
++            )
++        )
++
++        self.assertEqual(
++            result.response,
++            (
++                "The Arab Tent "
++                "is richly decorated."
++            ),
++        )
++        self.assertEqual(
++            [
++                event.event_type
++                for event in events
++            ],
++            [
++                "response_started",
++                "route_assessment",
++                "content_delta",
++                "content_delta",
++                "response_complete",
++            ],
++        )
++        self.assertNotIn(
++            "<route>",
++            result.response,
++        )
++        self.assertTrue(
++            result.debug.debug_payload[
++                "model_route_valid"
++            ]
++        )
++
++        history = (
++            get_recent_conversation_history(
++                conversation_id=(
++                    result.conversation_id
++                ),
++            )
++        )
++        self.assertEqual(
++            history[-1].content,
++            result.response,
++        )
++
++    @patch(
++        "conversation_core.services."
++        "query_service."
++        "stream_tool_aware_llm_response"
++    )
++    def test_missing_route_keeps_spoken_answer(
++        self,
++        stream_response,
++    ) -> None:
++        stream_response.return_value = iter(
++            [
++                LLMStreamEvent(
++                    event_type="response_started",
++                ),
++                LLMStreamEvent(
++                    event_type="content_delta",
++                    text="Hello there.",
++                ),
++                LLMStreamEvent(
++                    event_type="response_complete",
++                    text="Hello there.",
++                    done=True,
++                ),
++            ]
++        )
++        engine = QueryEngine(
++            subject_resolver=resolve_context,
++            prompt_builder=build_prompt,
++            model_route_output_enabled=True,
++        )
++
++        result = (
++            engine.generate_streaming_response(
++                text="Hello",
++                include_debug=True,
++            )
++        )
++
++        self.assertEqual(
++            result.response,
++            "Hello there.",
++        )
++        self.assertFalse(
++            result.debug.debug_payload[
++                "model_route_valid"
++            ]
++        )
++
++
++class ModelRouteWebSocketMessageTest(
++    unittest.TestCase
++):
++    def test_route_assessment_is_forwarded(
++        self,
++    ) -> None:
++        route = json.loads(
++            VALID_ROUTE_JSON
++        )
++        message = build_stream_websocket_message(
++            request_id="request-1",
++            event=LLMStreamEvent(
++                event_type="route_assessment",
++                route_assessment=route,
++            ),
++        )
++
++        self.assertEqual(
++            message["type"],
++            "route_assessment",
++        )
++        self.assertEqual(
++            message["payload"],
++            route,
++        )
++
++
++class ClassifierFreeResolverTest(
++    unittest.TestCase
++):
++    @patch(
++        "docent.services.docent_query_service."
++        "get_docent_retrieval_documents",
++        return_value=[],
++    )
++    @patch(
++        "docent.services.docent_query_service."
++        "retrieve_docent_chunks_by_vector_similarity"
++    )
++    @patch(
++        "docent.services.docent_query_service."
++        "route_utterance"
++    )
++    def test_model_routing_never_calls_classifier(
++        self,
++        route_utterance,
++        retrieve_chunks,
++        _get_documents,
++    ) -> None:
++        retrieval_result = Mock()
++        retrieval_result.results = []
++        retrieval_result.timings.model_dump.return_value = {}
++        retrieve_chunks.return_value = (
++            retrieval_result
++        )
++
++        resolved = (
++            docent_resolve_context_for_model_routing(
++                None,
++                "Hello",
++            )
++        )
++
++        route_utterance.assert_not_called()
++        self.assertTrue(
++            resolved.debug_payload[
++                "model_routing_retrieval_prefetched"
++            ]
++        )
++
++
++if __name__ == "__main__":
++    unittest.main(verbosity=2)
+diff --git a/backend_python/tmp/latency/model_self_routing_comparison.md b/backend_python/tmp/latency/model_self_routing_comparison.md
+new file mode 100644
+index 00000000..4658f698
+--- /dev/null
++++ b/backend_python/tmp/latency/model_self_routing_comparison.md
+@@ -0,0 +1,121 @@
++# Model self-routing experiment
++
++## Architecture
++
++This branch removes the utterance classifier from the active request flow:
++
++```text
++final transcript
++→ unconditional context/retrieval prefetch
++→ one main-model conversation
++→ hidden route header
++→ operational tools when requested
++→ streamed spoken response
++```
++
++The classifier implementation remains in the repository but is not wired into the query, turn-buffer, or streaming turn-buffer routes. A regression test patches `route_utterance()` and confirms that the model-routing resolver never calls it.
++
++The model must begin its first assistant output with:
++
++```text
++<route>{valid ModelRouteAssessment JSON}</route>
++```
++
++The route parser withholds this header from the user and TTS, emits a `route_assessment` streaming event, and releases only the following spoken text. Malformed or missing headers do not cause a retry or discard an otherwise valid answer.
++
++## Test design
++
++Each model profile processed three repetitions of four labelled cases:
++
++- artwork information requiring retrieved context;
++- a greeting not requiring retrieval;
++- a highlights-tour action requiring an operational branch tool;
++- an unintelligible noise transcript.
++
++Measurements begin at the finalised text request and include retrieval.
++
++## Summary
++
++| Profile | Valid route blocks | Strict route agreement | Tool correctness | Median route block | Median first speech | Median full response |
++|---|---:|---:|---:|---:|---:|---:|
++| **Gemma 4, thinking disabled** | **12/12** | **8/12** | **12/12** | **3.1167s** | **3.2880s** | **4.0289s** |
++| Gemma 4, thinking enabled | 12/12 | 7/12 | 12/12 | 8.0717s | 9.4632s | 12.6225s |
++| GPT-OSS 120B, thinking disabled | 12/12 | 6/12 | 9/12 | 5.3198s | 5.3198s | 6.5830s |
++
++All 36 responses produced schema-valid route blocks, and no route header leaked into the stored or spoken response.
++
++## Per-case median time to first speech
++
++| Case | Gemma 4, no thinking | Gemma 4, thinking | GPT-OSS 120B |
++|---|---:|---:|---:|
++| Artwork information | 5.3233s | 5.9383s | 5.3514s |
++| Greeting | **2.4721s** | 4.2585s | 5.0724s |
++| Highlights tour | **5.6359s** | 29.8578s | 6.0564s |
++| Noise | **3.1221s** | 24.6036s | 5.2685s |
++
++For the same three non-noise case types used in the preceding architecture experiment, Gemma 4 without thinking had a 4.1499-second median to first spoken content. The earlier sequential Gemma confirmation measured 4.5502 seconds to its first response token. This suggests a modest approximately 0.40-second advantage, but the runs occurred in different cloud windows and should not be treated as a controlled paired result.
++
++## Routing findings
++
++### Gemma 4 without thinking
++
++- Artwork and greeting routing agreed in all six samples.
++- It correctly labelled all three tour requests as `call_to_action`, populated `start_highlights_tour`, and successfully called `create_conversation_branch`.
++- It nevertheless reported `retrieval_required=false` and `retrieved_context_used=false` for every tour.
++- The generated tour branches contained subjects from the retrieved evidence, demonstrating that the model's self-report was inconsistent with its actual behavior.
++- Two of three noise samples were correct. One described the input as background noise but incorrectly used `response_request` with `should_ignore=false`.
++
++Strict agreement is therefore 8/12, while high-level route-type agreement is 11/12 and operational correctness is 12/12.
++
++### Gemma 4 with thinking
++
++- Protocol validity and tool execution remained perfect.
++- It did not improve routing agreement.
++- Tour latency became extreme: the median was 29.8578 seconds to first speech, with one sample taking 50.8205 seconds.
++- Thinking is not suitable for this latency-sensitive path.
++
++### GPT-OSS 120B without thinking
++
++- All route blocks were valid.
++- It failed to invoke the tour branch tool in all three action samples.
++- It produced inconsistent retrieval claims for one greeting and two noise samples.
++- Stable latency did not compensate for weaker routing and operational behavior.
++
++## Interpretation
++
++The single-request architecture is technically successful:
++
++- there is no separate classifier request;
++- metadata arrives before spoken content;
++- parsing adds no second model round;
++- operational tools remain controlled;
++- malformed metadata can fail open;
++- internal headers are not stored or spoken.
++
++However, model-generated routing metadata is not yet reliable enough to act as authoritative control state. The largest problem is not route type: it is the model's inconsistent account of whether prefetched context was required or used. For now, treat the assessment as observational/debug metadata and continue to let explicit operational tools control state mutation.
++
++## Recommendation
++
++Use **Gemma 4 Cloud with thinking disabled** for any further work on this architecture.
++
++It was the fastest profile, had perfect schema validity, executed all operational tools correctly, and achieved the best strict agreement. Before considering this a replacement for the sequential classifier, run a larger routing suite and clarify the semantics of:
++
++```text
++retrieval_required
++retrieved_context_used
++```
++
++A useful refinement would distinguish:
++
++```text
++retrieval_was_needed_for_answer
++supplied_context_was_used
++```
++
++and explicitly require the second field to reflect evidence actually used in the answer or tool arguments.
++
++## Raw reports
++
++- `model_self_routing_gemma4_think_false.json` and `.md`
++- `model_self_routing_gemma4_think_true.json` and `.md`
++- `model_self_routing_gpt_oss_think_false.json` and `.md`
+diff --git a/backend_python/tmp/latency/model_self_routing_gemma4_think_false.json b/backend_python/tmp/latency/model_self_routing_gemma4_think_false.json
+new file mode 100644
+index 00000000..b0466113
+--- /dev/null
++++ b/backend_python/tmp/latency/model_self_routing_gemma4_think_false.json
+@@ -0,0 +1,781 @@
++{
++  "model": "gemma4:cloud",
++  "think": false,
++  "repetitions": 3,
++  "case_count": 4,
++  "sample_count": 12,
++  "summary": {
++    "successful_samples": 12,
++    "route_valid_samples": 12,
++    "route_validity_rate": 1.0,
++    "route_agreement_samples": 8,
++    "route_agreement_rate": 0.6667,
++    "tool_correct_samples": 12,
++    "tool_correct_rate": 1.0,
++    "route_header_leaks": 0,
++    "median_time_to_route_event_seconds": 3.1167,
++    "median_time_to_first_spoken_token_seconds": 3.288,
++    "median_total_response_seconds": 4.0289,
++    "median_context_resolution_seconds": 0.9556
++  },
++  "results": [
++    {
++      "success": true,
++      "case_id": "artwork_information",
++      "text": "Tell me about The Arab Tent.",
++      "repetition": 1,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": true,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "The visitor is asking for information about a specific painting provided in the context."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 5.3232,
++      "time_to_first_spoken_token_seconds": 5.3233,
++      "context_resolution_seconds": 3.0432,
++      "model_route_block_seconds": 2.2795,
++      "response_generation_seconds": 4.9952,
++      "total_response_seconds": 8.0391,
++      "response": "*The Arab Tent* is a fascinating oil painting by Edwin Landseer, dating from around 1865 to 1866. It's a rare example of Landseer engaging with the \"Orientalist\" themes that were very fashionable at the time.\n\nIf you look closely, you'll see an Arab mare and her foal, along with two Persian greyhounds and two monkeys\u2014one of whom is even wearing an earring! Interestingly, the artist arranged it so that the animals become more intelligent the higher up the picture you look. While the owner isn't visible, their presence is suggested by two pipes sitting in a jar on the right.\n\nIt's also one of the most expensive artworks bought by the founders of the collection; Sir Richard Wallace purchased it from the Prince of Wales for the substantial sum of \u00a36,300.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 6
++    },
++    {
++      "success": true,
++      "case_id": "greeting",
++      "text": "Hi, how are you?",
++      "repetition": 1,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "Greeting from the visitor."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 3.1932,
++      "time_to_first_spoken_token_seconds": 3.1932,
++      "context_resolution_seconds": 1.1068,
++      "model_route_block_seconds": 2.0861,
++      "response_generation_seconds": 3.0519,
++      "total_response_seconds": 4.1591,
++      "response": "Hello! I'm doing very well, thank you for asking. Welcome to the museum! Is there anything in particular you'd like to see or learn about today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "highlights_tour",
++      "text": "Start a highlights tour.",
++      "repetition": 1,
++      "route": {
++        "route_type": "call_to_action",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": "start_highlights_tour",
++        "confidence": 1.0,
++        "reason": "The visitor explicitly requested to start a highlights tour."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [
++        "create_conversation_branch"
++      ],
++      "tool_results": [
++        {
++          "tool_name": "create_conversation_branch",
++          "success": true,
++          "message": "Created and activated the 'Highlights Tour' branch.",
++          "data": {
++            "active_branch": {
++              "branch_id": "4f0b39d4-b807-4eba-ae49-ac7528d2865e",
++              "name": "Highlights Tour",
++              "branch_type": "bounded",
++              "status": "active",
++              "previous_subjects": [],
++              "current_subjects": [],
++              "remaining_subjects": [
++                {
++                  "label": "Venus in Search of Cupid Surprises Diana",
++                  "reference": null
++                },
++                {
++                  "label": "Queen Victoria",
++                  "reference": null
++                }
++              ]
++            }
++          }
++        }
++      ],
++      "time_to_route_event_seconds": 3.1113,
++      "time_to_first_spoken_token_seconds": 5.6359,
++      "context_resolution_seconds": 0.9313,
++      "model_route_block_seconds": 2.1796,
++      "response_generation_seconds": 5.3947,
++      "total_response_seconds": 6.3267,
++      "response": "I'd be delighted to take you on a highlights tour of the collection! We have some wonderful pieces to see. Shall we start with William Hilton's painting of Venus and Diana, or perhaps the portrait of Queen Victoria?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "tool_call",
++        "tool_result",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 2
++    },
++    {
++      "success": true,
++      "case_id": "noise",
++      "text": "[unintelligible background noise]",
++      "repetition": 1,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": false,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 0.95,
++        "reason": "The user utterance consists only of background noise."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 3.3828,
++      "time_to_first_spoken_token_seconds": 3.3828,
++      "context_resolution_seconds": 0.9607,
++      "model_route_block_seconds": 2.4218,
++      "response_generation_seconds": 2.9375,
++      "total_response_seconds": 3.8986,
++      "response": "I'm sorry, I didn't quite catch that. Could you repeat it for me?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "artwork_information",
++      "text": "Tell me about The Arab Tent.",
++      "repetition": 2,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": true,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "The visitor is asking for information about a specific artwork provided in the context."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 2.5724,
++      "time_to_first_spoken_token_seconds": 2.5725,
++      "context_resolution_seconds": 0.9295,
++      "model_route_block_seconds": 1.6425,
++      "response_generation_seconds": 2.9392,
++      "total_response_seconds": 3.8693,
++      "response": "*The Arab Tent* is an oil painting by Edwin Landseer, dating from around 1865\u201366. It's a rare example of Landseer engaging with \"Orientalist\" themes.\n\nIf you look at the animals, you'll notice a clever detail: as you look higher up in the painting, the animals become more intelligent. It features an Arab mare and her foal at the bottom, followed by two Persian greyhounds, and finally two monkeys\u2014one of whom is even wearing an earring! \n\nInterestingly, while the painting was originally exhibited at the Royal Academy as \"Mare and Foal \u2013 Indian Tent etc.,\" the tent is actually Arab in origin. You can also see two pipes in a jar on the right, which suggest the presence of the owner.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 6
++    },
++    {
++      "success": true,
++      "case_id": "greeting",
++      "text": "Hi, how are you?",
++      "repetition": 2,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "Greeting from the visitor."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 2.4693,
++      "time_to_first_spoken_token_seconds": 2.4693,
++      "context_resolution_seconds": 0.9489,
++      "model_route_block_seconds": 1.5201,
++      "response_generation_seconds": 1.7876,
++      "total_response_seconds": 2.7369,
++      "response": "Hello! I'm doing well, thank you for asking. Welcome to the museum! How can I help you today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "highlights_tour",
++      "text": "Start a highlights tour.",
++      "repetition": 2,
++      "route": {
++        "route_type": "call_to_action",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": "start_highlights_tour",
++        "confidence": 1.0,
++        "reason": "The user explicitly requested to start a highlights tour."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [
++        "create_conversation_branch"
++      ],
++      "tool_results": [
++        {
++          "tool_name": "create_conversation_branch",
++          "success": true,
++          "message": "Created and activated the 'Highlights Tour' branch.",
++          "data": {
++            "active_branch": {
++              "branch_id": "6fd8aae9-fe6e-45cd-a21e-1dfafd659593",
++              "name": "Highlights Tour",
++              "branch_type": "bounded",
++              "status": "active",
++              "previous_subjects": [],
++              "current_subjects": [],
++              "remaining_subjects": [
++                {
++                  "label": "Venus in Search of Cupid Surprises Diana",
++                  "reference": "painting:474"
++                },
++                {
++                  "label": "Queen Victoria",
++                  "reference": "painting:900"
++                }
++              ]
++            }
++          }
++        }
++      ],
++      "time_to_route_event_seconds": 2.4231,
++      "time_to_first_spoken_token_seconds": 4.1499,
++      "context_resolution_seconds": 0.8729,
++      "model_route_block_seconds": 1.5499,
++      "response_generation_seconds": 3.7187,
++      "total_response_seconds": 4.592,
++      "response": "I'd be delighted to take you on a highlights tour of the collection! We have some wonderful pieces to see. Shall we start with William Hilton's \"Venus in Search of Cupid Surprises Diana\"?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "tool_call",
++        "tool_result",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 2
++    },
++    {
++      "success": true,
++      "case_id": "noise",
++      "text": "[unintelligible background noise]",
++      "repetition": 2,
++      "route": {
++        "route_type": "noise",
++        "is_relevant": false,
++        "should_ignore": true,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "The user utterance consists only of unintelligible background noise."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 2.9581,
++      "time_to_first_spoken_token_seconds": 2.9581,
++      "context_resolution_seconds": 1.0408,
++      "model_route_block_seconds": 1.9169,
++      "response_generation_seconds": 2.1051,
++      "total_response_seconds": 3.1464,
++      "response": "Hello there! How can I help you today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "artwork_information",
++      "text": "Tell me about The Arab Tent.",
++      "repetition": 3,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": true,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "The visitor is asking for information about a specific painting provided in the context."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 6.2406,
++      "time_to_first_spoken_token_seconds": 6.2406,
++      "context_resolution_seconds": 0.9505,
++      "model_route_block_seconds": 5.2894,
++      "response_generation_seconds": 7.0445,
++      "total_response_seconds": 7.9958,
++      "response": "*The Arab Tent* is an oil painting from around 1865\u201366 by Edwin Landseer, who was a very successful and fashionable painter during the early Victorian era.\n\nIt's a rare example of Landseer exploring \"Orientalist\" themes. If you look at the animals, you'll see an Arab mare and her foal, two Persian greyhounds, and two monkeys\u2014one of whom is even wearing an earring! Interestingly, the animals become more intelligent the higher up in the picture they are placed. You can also see two pipes in a jar on the right, which suggests the owner is nearby.\n\nIt's also one of the most expensive pieces Sir Richard Wallace acquired for the collection, buying it from the Prince of Wales for \u00a36,300.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 6
++    },
++    {
++      "success": true,
++      "case_id": "greeting",
++      "text": "Hi, how are you?",
++      "repetition": 3,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "The user is greeting the AI."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 2.4721,
++      "time_to_first_spoken_token_seconds": 2.4721,
++      "context_resolution_seconds": 0.9768,
++      "model_route_block_seconds": 1.4948,
++      "response_generation_seconds": 1.71,
++      "total_response_seconds": 2.6876,
++      "response": "Hello! I'm doing well, thank you for asking. How can I help you explore the collection today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "highlights_tour",
++      "text": "Start a highlights tour.",
++      "repetition": 3,
++      "route": {
++        "route_type": "call_to_action",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": "start_highlights_tour",
++        "confidence": 1.0,
++        "reason": "The visitor explicitly requested to start a highlights tour."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [
++        "create_conversation_branch"
++      ],
++      "tool_results": [
++        {
++          "tool_name": "create_conversation_branch",
++          "success": true,
++          "message": "Created and activated the 'Highlights Tour' branch.",
++          "data": {
++            "active_branch": {
++              "branch_id": "d1541457-70b6-4af9-be26-6091628639f0",
++              "name": "Highlights Tour",
++              "branch_type": "bounded",
++              "status": "active",
++              "previous_subjects": [],
++              "current_subjects": [],
++              "remaining_subjects": [
++                {
++                  "label": "Venus in Search of Cupid Surprises Diana",
++                  "reference": "painting:474"
++                },
++                {
++                  "label": "Queen Victoria",
++                  "reference": "painting:900"
++                }
++              ]
++            }
++          }
++        }
++      ],
++      "time_to_route_event_seconds": 4.721,
++      "time_to_first_spoken_token_seconds": 8.6694,
++      "context_resolution_seconds": 0.9417,
++      "model_route_block_seconds": 3.7789,
++      "response_generation_seconds": 7.9422,
++      "total_response_seconds": 8.8845,
++      "response": "I'd be delighted to take you on a highlights tour! We have some wonderful pieces to see. Shall we begin?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "tool_call",
++        "tool_result",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 2
++    },
++    {
++      "success": true,
++      "case_id": "noise",
++      "text": "[unintelligible background noise]",
++      "repetition": 3,
++      "route": {
++        "route_type": "noise",
++        "is_relevant": false,
++        "should_ignore": true,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "The input contains only unintelligible background noise."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 3.1221,
++      "time_to_first_spoken_token_seconds": 3.1221,
++      "context_resolution_seconds": 1.0249,
++      "model_route_block_seconds": 2.0969,
++      "response_generation_seconds": 2.5114,
++      "total_response_seconds": 3.5368,
++      "response": "Hello! I'm here to help you explore the collection. Is there a particular painting or artist you're interested in today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    }
++  ]
++}
+\ No newline at end of file
+diff --git a/backend_python/tmp/latency/model_self_routing_gemma4_think_false.md b/backend_python/tmp/latency/model_self_routing_gemma4_think_false.md
+new file mode 100644
+index 00000000..91862d5d
+--- /dev/null
++++ b/backend_python/tmp/latency/model_self_routing_gemma4_think_false.md
+@@ -0,0 +1,34 @@
++# Model self-routing benchmark
++
++Model: `gemma4:cloud`
++
++Thinking: `False`
++
++Architecture: retrieval prefetch followed by one main-model conversation that emits a hidden route header and the spoken answer.
++
++| Metric | Result |
++|---|---:|
++| Valid route blocks | 12/12 |
++| Label agreement | 8/12 |
++| Tool correctness | 12/12 |
++| Median time to route block | 3.1167s |
++| Median time to first spoken token | 3.288s |
++| Median full response time | 4.0289s |
++| Route-header leaks | 0 |
++
++## Samples
++
++| Case | Run | Valid | Agrees | Tool correct | Route | First spoken | Total |
++|---|---:|---:|---:|---:|---:|---:|---:|
++| artwork_information | 1 | True | True | True | response_request | 5.3233s | 8.0391s |
++| greeting | 1 | True | True | True | response_request | 3.1932s | 4.1591s |
++| highlights_tour | 1 | True | False | True | call_to_action | 5.6359s | 6.3267s |
++| noise | 1 | True | False | True | response_request | 3.3828s | 3.8986s |
++| artwork_information | 2 | True | True | True | response_request | 2.5725s | 3.8693s |
++| greeting | 2 | True | True | True | response_request | 2.4693s | 2.7369s |
++| highlights_tour | 2 | True | False | True | call_to_action | 4.1499s | 4.592s |
++| noise | 2 | True | True | True | noise | 2.9581s | 3.1464s |
++| artwork_information | 3 | True | True | True | response_request | 6.2406s | 7.9958s |
++| greeting | 3 | True | True | True | response_request | 2.4721s | 2.6876s |
++| highlights_tour | 3 | True | False | True | call_to_action | 8.6694s | 8.8845s |
++| noise | 3 | True | True | True | noise | 3.1221s | 3.5368s |
+diff --git a/backend_python/tmp/latency/model_self_routing_gemma4_think_true.json b/backend_python/tmp/latency/model_self_routing_gemma4_think_true.json
+new file mode 100644
+index 00000000..48adabde
+--- /dev/null
++++ b/backend_python/tmp/latency/model_self_routing_gemma4_think_true.json
+@@ -0,0 +1,761 @@
++{
++  "model": "gemma4:cloud",
++  "think": true,
++  "repetitions": 3,
++  "case_count": 4,
++  "sample_count": 12,
++  "summary": {
++    "successful_samples": 12,
++    "route_valid_samples": 12,
++    "route_validity_rate": 1.0,
++    "route_agreement_samples": 7,
++    "route_agreement_rate": 0.5833,
++    "tool_correct_samples": 12,
++    "tool_correct_rate": 1.0,
++    "route_header_leaks": 0,
++    "median_time_to_route_event_seconds": 8.0717,
++    "median_time_to_first_spoken_token_seconds": 9.4632,
++    "median_total_response_seconds": 12.6225,
++    "median_context_resolution_seconds": 1.007
++  },
++  "results": [
++    {
++      "success": true,
++      "case_id": "artwork_information",
++      "text": "Tell me about The Arab Tent.",
++      "repetition": 1,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "The user is asking for information about a specific artwork, and the information is present in the provided context."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 7.7511,
++      "time_to_first_spoken_token_seconds": 7.8026,
++      "context_resolution_seconds": 1.1935,
++      "model_route_block_seconds": 6.5571,
++      "response_generation_seconds": 8.3192,
++      "total_response_seconds": 9.5134,
++      "response": "The Arab Tent was painted by Edwin Landseer around 1865\u201366. It's a rare example of his work with Orientalist themes and features an Arab mare and her foal, along with two Persian greyhounds and two monkeys.\n\nInterestingly, Landseer arranged the animals so that the more intelligent they are, the higher up in the painting they appear. You'll also notice two pipes in a jar to the right, which suggest the presence of the animals' owner.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 6
++    },
++    {
++      "success": true,
++      "case_id": "greeting",
++      "text": "Hi, how are you?",
++      "repetition": 1,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "Greeting from the visitor."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 4.2329,
++      "time_to_first_spoken_token_seconds": 4.2329,
++      "context_resolution_seconds": 1.0196,
++      "model_route_block_seconds": 3.2129,
++      "response_generation_seconds": 3.4342,
++      "total_response_seconds": 4.4543,
++      "response": "Hello! I'm doing well, thank you for asking. How can I help you explore the collection today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "highlights_tour",
++      "text": "Start a highlights tour.",
++      "repetition": 1,
++      "route": {
++        "route_type": "call_to_action",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": "start_highlights_tour",
++        "confidence": 1.0,
++        "reason": "The user explicitly requested to start a highlights tour."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [
++        "create_conversation_branch"
++      ],
++      "tool_results": [
++        {
++          "tool_name": "create_conversation_branch",
++          "success": true,
++          "message": "Created and activated the 'Highlights Tour' branch.",
++          "data": {
++            "active_branch": {
++              "branch_id": "81f31b6a-979f-427a-8dfc-ccb4fe718ecd",
++              "name": "Highlights Tour",
++              "branch_type": "bounded",
++              "status": "active",
++              "previous_subjects": [],
++              "current_subjects": [
++                {
++                  "label": "Venus in search of Cupid surprises Diana",
++                  "reference": "painting:474"
++                }
++              ],
++              "remaining_subjects": [
++                {
++                  "label": "Queen Victoria",
++                  "reference": "painting:900"
++                }
++              ]
++            }
++          }
++        }
++      ],
++      "time_to_route_event_seconds": 50.8205,
++      "time_to_first_spoken_token_seconds": 50.8205,
++      "context_resolution_seconds": 0.9313,
++      "model_route_block_seconds": 49.8889,
++      "response_generation_seconds": 53.849,
++      "total_response_seconds": 54.7808,
++      "response": "<tool_call|>I'd be delighted to take you on a highlights tour! Let's start with this piece: William Hilton's *Venus in search of Cupid surprises Diana*. \n\nIt's a lovely scene inspired by Spenser's *The Faerie Queene*, showing Venus stumbling upon Diana and her attendants while they're bathing. It was actually exhibited at the Royal Academy back in 1820.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "tool_call",
++        "tool_result",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 2
++    },
++    {
++      "success": true,
++      "case_id": "noise",
++      "text": "[unintelligible background noise]",
++      "repetition": 1,
++      "route": {
++        "route_type": "noise",
++        "is_relevant": false,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "The user input consists only of background noise."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 24.6036,
++      "time_to_first_spoken_token_seconds": 24.6036,
++      "context_resolution_seconds": 1.0593,
++      "model_route_block_seconds": 23.544,
++      "response_generation_seconds": 23.7244,
++      "total_response_seconds": 24.7842,
++      "response": "Hello! Is there something I can help you with?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "artwork_information",
++      "text": "Tell me about The Arab Tent.",
++      "repetition": 2,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": true,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "Artwork information requested."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 5.9383,
++      "time_to_first_spoken_token_seconds": 5.9383,
++      "context_resolution_seconds": 0.9328,
++      "model_route_block_seconds": 5.0051,
++      "response_generation_seconds": 6.3972,
++      "total_response_seconds": 7.3305,
++      "response": "Painted around 1865\u201366, *The Arab Tent* is an oil on canvas by Edwin (Henry) Landseer. It's a rare example of the artist engaging with fashionable Orientalist themes.\n\nThe scene features an Arab mare and her foal, along with two Persian greyhounds and two monkeys. Interestingly, the animals are arranged so that the more intelligent ones are positioned higher up in the picture. While the owner isn't shown, their presence is suggested by two pipes in a jar on the right.\n\nIt is one of the most expensive artworks acquired by the founders of the collection; Sir Richard Wallace bought it from the Prince of Wales for the significant sum of \u00a36,300.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 6
++    },
++    {
++      "success": true,
++      "case_id": "greeting",
++      "text": "Hi, how are you?",
++      "repetition": 2,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 0.99,
++        "reason": "General greeting from the visitor."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 4.2585,
++      "time_to_first_spoken_token_seconds": 4.2585,
++      "context_resolution_seconds": 1.0034,
++      "model_route_block_seconds": 3.2547,
++      "response_generation_seconds": 3.4433,
++      "total_response_seconds": 4.4472,
++      "response": "I'm doing very well, thank you for asking! How can I help you explore the collection today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "highlights_tour",
++      "text": "Start a highlights tour.",
++      "repetition": 2,
++      "route": {
++        "route_type": "call_to_action",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": "start_highlights_tour",
++        "confidence": 1.0,
++        "reason": "User explicitly requested to start a highlights tour."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [
++        "create_conversation_branch"
++      ],
++      "tool_results": [
++        {
++          "tool_name": "create_conversation_branch",
++          "success": true,
++          "message": "Created and activated the 'Highlights Tour' branch.",
++          "data": {
++            "active_branch": {
++              "branch_id": "7e217bbf-fb1d-42ac-9b9e-875c38067833",
++              "name": "Highlights Tour",
++              "branch_type": "bounded",
++              "status": "active",
++              "previous_subjects": [],
++              "current_subjects": [
++                {
++                  "label": "Venus in Search of Cupid Surprises Diana",
++                  "reference": "painting:474"
++                }
++              ],
++              "remaining_subjects": [
++                {
++                  "label": "Queen Victoria",
++                  "reference": "painting:900"
++                }
++              ]
++            }
++          }
++        }
++      ],
++      "time_to_route_event_seconds": 7.2285,
++      "time_to_first_spoken_token_seconds": 29.8578,
++      "context_resolution_seconds": 0.8761,
++      "model_route_block_seconds": 6.352,
++      "response_generation_seconds": 34.6026,
++      "total_response_seconds": 35.4792,
++      "response": "FileNotFound: No such file or directory: 'painting:474'I'd be happy to take you on a highlights tour! Let's start with this piece by William Hilton: *Venus in Search of Cupid Surprises Diana*. \n\nIt's based on a scene from Spenser's *The Faerie Queene*, showing the moment Venus comes upon Diana and her attendants while they are bathing.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "tool_call",
++        "tool_result",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 2
++    },
++    {
++      "success": true,
++      "case_id": "noise",
++      "text": "[unintelligible background noise]",
++      "repetition": 2,
++      "route": {
++        "route_type": "noise",
++        "is_relevant": false,
++        "should_ignore": true,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "The input is unintelligible background noise."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 28.127,
++      "time_to_first_spoken_token_seconds": 28.127,
++      "context_resolution_seconds": 1.0105,
++      "model_route_block_seconds": 27.1162,
++      "response_generation_seconds": 28.0795,
++      "total_response_seconds": 29.0904,
++      "response": "I'm sorry, I didn't quite catch that. How can I help you?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "artwork_information",
++      "text": "Tell me about The Arab Tent.",
++      "repetition": 3,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "The user is asking for information about a specific painting provided in the context."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 4.759,
++      "time_to_first_spoken_token_seconds": 4.7591,
++      "context_resolution_seconds": 1.0394,
++      "model_route_block_seconds": 3.7194,
++      "response_generation_seconds": 4.7519,
++      "total_response_seconds": 5.7917,
++      "response": "*The Arab Tent* is a rare example of Orientalist themes by Edwin Landseer, painted around 1865\u201366. It depicts an Arab mare and her foal, alongside two Persian greyhounds and two monkeys\u2014one of whom is wearing an earring. \n\nIf you look closely, the owner's presence is subtly suggested by two pipes in a jar on the right. It's also one of the most expensive artworks bought by the founders of the collection, acquired by Sir Richard Wallace from the Prince of Wales for \u00a36,300.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 6
++    },
++    {
++      "success": true,
++      "case_id": "greeting",
++      "text": "Hi, how are you?",
++      "repetition": 3,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "The user is greeting the AI."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 8.3923,
++      "time_to_first_spoken_token_seconds": 9.5673,
++      "context_resolution_seconds": 1.0026,
++      "model_route_block_seconds": 7.3891,
++      "response_generation_seconds": 14.7094,
++      "total_response_seconds": 15.7127,
++      "response": "Hello! I'm doing well, thank you for asking. How can I help you today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "highlights_tour",
++      "text": "Start a highlights tour.",
++      "repetition": 3,
++      "route": {
++        "route_type": "call_to_action",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": "start_highlights_tour",
++        "confidence": 1.0,
++        "reason": "User explicitly requested to start a highlights tour."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [
++        "create_conversation_branch"
++      ],
++      "tool_results": [
++        {
++          "tool_name": "create_conversation_branch",
++          "success": true,
++          "message": "Created and activated the 'Highlights Tour' branch.",
++          "data": {
++            "active_branch": {
++              "branch_id": "3a045275-3d81-4606-9769-8db79485b2c0",
++              "name": "Highlights Tour",
++              "branch_type": "bounded",
++              "status": "active",
++              "previous_subjects": [],
++              "current_subjects": [
++                {
++                  "label": "Venus in search of Cupid surprises Diana",
++                  "reference": "painting:474"
++                }
++              ],
++              "remaining_subjects": [
++                {
++                  "label": "Queen Victoria",
++                  "reference": "painting:900"
++                }
++              ]
++            }
++          }
++        }
++      ],
++      "time_to_route_event_seconds": 9.3592,
++      "time_to_first_spoken_token_seconds": 9.3592,
++      "context_resolution_seconds": 0.9531,
++      "model_route_block_seconds": 8.4056,
++      "response_generation_seconds": 11.5542,
++      "total_response_seconds": 12.508,
++      "response": "I'd be delighted to take you on a highlights tour. Let's begin with this piece by William Hilton: *Venus in search of Cupid surprises Diana*. \n\nExhibited at the Royal Academy in 1820, it depicts a scene from Spenser's 'The Faerie Queene' where Venus, while searching for her son Cupid, happens upon Diana bathing with her attendants.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "tool_call",
++        "tool_result",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 2
++    },
++    {
++      "success": true,
++      "case_id": "noise",
++      "text": "[unintelligible background noise]",
++      "repetition": 3,
++      "route": {
++        "route_type": "noise",
++        "is_relevant": false,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 1.0,
++        "reason": "The input is unintelligible background noise."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 12.1927,
++      "time_to_first_spoken_token_seconds": 12.1927,
++      "context_resolution_seconds": 1.0356,
++      "model_route_block_seconds": 11.1567,
++      "response_generation_seconds": 11.7008,
++      "total_response_seconds": 12.7369,
++      "response": "Hello! Is there something I can help you with, or a particular piece of art you'd like to know more about?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    }
++  ]
++}
+\ No newline at end of file
+diff --git a/backend_python/tmp/latency/model_self_routing_gemma4_think_true.md b/backend_python/tmp/latency/model_self_routing_gemma4_think_true.md
+new file mode 100644
+index 00000000..e631df44
+--- /dev/null
++++ b/backend_python/tmp/latency/model_self_routing_gemma4_think_true.md
+@@ -0,0 +1,34 @@
++# Model self-routing benchmark
++
++Model: `gemma4:cloud`
++
++Thinking: `True`
++
++Architecture: retrieval prefetch followed by one main-model conversation that emits a hidden route header and the spoken answer.
++
++| Metric | Result |
++|---|---:|
++| Valid route blocks | 12/12 |
++| Label agreement | 7/12 |
++| Tool correctness | 12/12 |
++| Median time to route block | 8.0717s |
++| Median time to first spoken token | 9.4632s |
++| Median full response time | 12.6225s |
++| Route-header leaks | 0 |
++
++## Samples
++
++| Case | Run | Valid | Agrees | Tool correct | Route | First spoken | Total |
++|---|---:|---:|---:|---:|---:|---:|---:|
++| artwork_information | 1 | True | False | True | response_request | 7.8026s | 9.5134s |
++| greeting | 1 | True | True | True | response_request | 4.2329s | 4.4543s |
++| highlights_tour | 1 | True | False | True | call_to_action | 50.8205s | 54.7808s |
++| noise | 1 | True | True | True | noise | 24.6036s | 24.7842s |
++| artwork_information | 2 | True | True | True | response_request | 5.9383s | 7.3305s |
++| greeting | 2 | True | True | True | response_request | 4.2585s | 4.4472s |
++| highlights_tour | 2 | True | False | True | call_to_action | 29.8578s | 35.4792s |
++| noise | 2 | True | True | True | noise | 28.127s | 29.0904s |
++| artwork_information | 3 | True | False | True | response_request | 4.7591s | 5.7917s |
++| greeting | 3 | True | True | True | response_request | 9.5673s | 15.7127s |
++| highlights_tour | 3 | True | False | True | call_to_action | 9.3592s | 12.508s |
++| noise | 3 | True | True | True | noise | 12.1927s | 12.7369s |
+diff --git a/backend_python/tmp/latency/model_self_routing_gpt_oss_think_false.json b/backend_python/tmp/latency/model_self_routing_gpt_oss_think_false.json
+new file mode 100644
+index 00000000..05c2951e
+--- /dev/null
++++ b/backend_python/tmp/latency/model_self_routing_gpt_oss_think_false.json
+@@ -0,0 +1,1279 @@
++{
++  "model": "gpt-oss:120b-cloud",
++  "think": false,
++  "repetitions": 3,
++  "case_count": 4,
++  "sample_count": 12,
++  "summary": {
++    "successful_samples": 12,
++    "route_valid_samples": 12,
++    "route_validity_rate": 1.0,
++    "route_agreement_samples": 6,
++    "route_agreement_rate": 0.5,
++    "tool_correct_samples": 9,
++    "tool_correct_rate": 0.75,
++    "route_header_leaks": 0,
++    "median_time_to_route_event_seconds": 5.3198,
++    "median_time_to_first_spoken_token_seconds": 5.3198,
++    "median_total_response_seconds": 6.583,
++    "median_context_resolution_seconds": 1.0179
++  },
++  "results": [
++    {
++      "success": true,
++      "case_id": "artwork_information",
++      "text": "Tell me about The Arab Tent.",
++      "repetition": 1,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": true,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "Artwork information requested."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 6.7764,
++      "time_to_first_spoken_token_seconds": 6.7764,
++      "context_resolution_seconds": 1.5848,
++      "model_route_block_seconds": 5.191,
++      "response_generation_seconds": 7.7894,
++      "total_response_seconds": 9.3751,
++      "response": "\u201cThe Arab Tent\u201d is an oil\u2011on\u2011canvas painting by Edwin (Henry)\u202fLandseer, dated around\u202f1865\u201366.  It belongs to the English school and is catalogued in our collection as inventory\u202fP376, displayed in the Hall.\n\nThe work shows an Arab mare and her foal beneath a tent that, despite its original exhibition title \u201cMare and Foal \u2013 Indian Tent\u2026\u201d, is clearly an Arab tent.  Around them are two Persian greyhounds and two monkeys\u2014one with an earring\u2014arranged so that the animals become increasingly \u201cintelligent\u201d toward the top of the canvas.  A jar with two pipes on the right hints at the owner\u2019s presence.\n\nFirst shown at the Royal Academy in 1866, the painting was bought by the Prince of Wales from Landseer in 1867 and later acquired by Sir\u202fRichard\u202fWallace in 1878 for \u00a36,300, one of the most expensive purchases by a Wallace founder.  Its recent conservation in 2017 was funded by Henrietta, Duchess of Bedford.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 6
++    },
++    {
++      "success": true,
++      "case_id": "greeting",
++      "text": "Hi, how are you?",
++      "repetition": 1,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 0.99,
++        "reason": "Visitor greeted and asked how the docent is."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 5.0724,
++      "time_to_first_spoken_token_seconds": 5.0724,
++      "context_resolution_seconds": 1.046,
++      "model_route_block_seconds": 4.0259,
++      "response_generation_seconds": 4.3385,
++      "total_response_seconds": 5.3852,
++      "response": "I'm doing great, thank you! How can I assist you with the collection today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "highlights_tour",
++      "text": "Start a highlights tour.",
++      "repetition": 1,
++      "route": {
++        "route_type": "call_to_action",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": "start_highlights_tour",
++        "confidence": 0.99,
++        "reason": "Visitor requested a highlights tour."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": false,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 6.0564,
++      "time_to_first_spoken_token_seconds": 6.0564,
++      "context_resolution_seconds": 1.0329,
++      "model_route_block_seconds": 5.0232,
++      "response_generation_seconds": 5.5739,
++      "total_response_seconds": 6.6073,
++      "response": "Absolutely! Let\u2019s begin our highlights tour of the Wallace Collection. I\u2019ll guide you through a selection of the most celebrated works, sharing the stories behind each masterpiece. Follow me, and feel free to ask any questions along the way.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 2
++    },
++    {
++      "success": true,
++      "case_id": "noise",
++      "text": "[unintelligible background noise]",
++      "repetition": 1,
++      "route": {
++        "route_type": "noise",
++        "is_relevant": false,
++        "should_ignore": true,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "Unintelligible background noise."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 5.7415,
++      "time_to_first_spoken_token_seconds": 5.7415,
++      "context_resolution_seconds": 0.9754,
++      "model_route_block_seconds": 4.7658,
++      "response_generation_seconds": 4.9882,
++      "total_response_seconds": 5.964,
++      "response": "I'm sorry, I didn't catch that\u2014could you please repeat your question?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "artwork_information",
++      "text": "Tell me about The Arab Tent.",
++      "repetition": 2,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": true,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "Artwork information requested."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 5.3514,
++      "time_to_first_spoken_token_seconds": 5.3514,
++      "context_resolution_seconds": 1.0388,
++      "model_route_block_seconds": 4.3122,
++      "response_generation_seconds": 6.2405,
++      "total_response_seconds": 7.2799,
++      "response": "\"The Arab Tent\" is an oil\u2011on\u2011canvas painting by the English Victorian artist Edwin (Henry)\u202fLandseer, dated around\u202f1865\u201366. It depicts an Arab mare with her foal, flanked by two Persian greyhounds and two monkeys\u2014one sporting an earring. Above, a jar with two pipes hints at the owner\u2019s presence. The work was shown at the Royal Academy in 1866 under the title \u201cMare and Foal \u2013 Indian Tent\u2026\u201d, though the tent is clearly Arab. \n\nThe Prince of Wales purchased it from Landseer in 1867, and Sir\u202fRichard Wallace acquired it in 1878, placing it in the Wallace Collection\u2019s Hall, where you\u2019ll find it now. Conservation work in 2017 was funded by Henrietta, Duchess of Bedford.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 6
++    },
++    {
++      "success": true,
++      "case_id": "greeting",
++      "text": "Hi, how are you?",
++      "repetition": 2,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 0.99,
++        "reason": "Visitor greeting."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 4.4718,
++      "time_to_first_spoken_token_seconds": 4.4718,
++      "context_resolution_seconds": 0.9657,
++      "model_route_block_seconds": 3.5057,
++      "response_generation_seconds": 3.772,
++      "total_response_seconds": 4.7383,
++      "response": "Hello! I'm doing well, thank you. How can I help you explore the collection today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "highlights_tour",
++      "text": "Start a highlights tour.",
++      "repetition": 2,
++      "route": {
++        "route_type": "call_to_action",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": "start_highlights_tour",
++        "confidence": 0.99,
++        "reason": "Visitor wants to begin a highlights tour."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": false,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 5.2882,
++      "time_to_first_spoken_token_seconds": 5.2882,
++      "context_resolution_seconds": 0.8146,
++      "model_route_block_seconds": 4.4733,
++      "response_generation_seconds": 5.919,
++      "total_response_seconds": 6.734,
++      "response": "Absolutely! Let\u2019s get started with our highlights tour. I\u2019ll guide you through a selection of the Wallace Collection\u2019s most celebrated pieces, sharing the stories and details that make each work special. Follow me as we explore the gems that define this remarkable museum.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 2
++    },
++    {
++      "success": true,
++      "case_id": "noise",
++      "text": "[unintelligible background noise]",
++      "repetition": 2,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": null,
++        "confidence": 0.99,
++        "reason": "Visitor utterance unclear, need clarification."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 5.2685,
++      "time_to_first_spoken_token_seconds": 5.2685,
++      "context_resolution_seconds": 1.0029,
++      "model_route_block_seconds": 4.2652,
++      "response_generation_seconds": 4.5162,
++      "total_response_seconds": 5.5195,
++      "response": "I'm sorry, I couldn't catch that. Could you please repeat your question?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "artwork_information",
++      "text": "Tell me about The Arab Tent.",
++      "repetition": 3,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": true,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "Artwork information requested."
++      },
++      "model_route_valid": true,
++      "route_agreement": true,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 5.1084,
++      "time_to_first_spoken_token_seconds": 5.1084,
++      "context_resolution_seconds": 1.0523,
++      "model_route_block_seconds": 4.0557,
++      "response_generation_seconds": 5.5058,
++      "total_response_seconds": 6.5586,
++      "response": "\"The Arab Tent\" is an oil\u2011on\u2011canvas by the English Victorian painter Edwin (Henry) Landseer, dated around 1865\u201366. It shows an Arab mare with her foal beneath a patterned tent, accompanied by two Persian greyhounds and two monkeys\u2014one sporting an earring. A jar with two pipes on the right hints at the owners\u2019 presence. The work was exhibited at the Royal Academy in 1866 under the title \u201cMare and Foal \u2013 Indian Tent etc.\u201d and was later bought by Sir Richard Wallace in 1878 from the Prince of Wales for a considerable \u00a36,300. Today it hangs in the Hall of the Wallace Collection, and its recent conservation in 2017 was thanks to the generous support of Henrietta, Duchess of Bedford.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 6
++    },
++    {
++      "success": true,
++      "case_id": "greeting",
++      "text": "Hi, how are you?",
++      "repetition": 3,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": true,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "Artwork information requested."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 7.2088,
++      "time_to_first_spoken_token_seconds": 7.2088,
++      "context_resolution_seconds": 0.9853,
++      "model_route_block_seconds": 6.2231,
++      "response_generation_seconds": 6.4762,
++      "total_response_seconds": 7.462,
++      "response": "I'm doing well, thank you! How can I assist you today?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    },
++    {
++      "success": true,
++      "case_id": "highlights_tour",
++      "text": "Start a highlights tour.",
++      "repetition": 3,
++      "route": {
++        "route_type": "call_to_action",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": false,
++        "retrieved_context_used": false,
++        "proposed_action": "start_highlights_tour",
++        "confidence": 0.99,
++        "reason": "Visitor wants to begin a highlights tour."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": false,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 6.6224,
++      "time_to_first_spoken_token_seconds": 6.6224,
++      "context_resolution_seconds": 1.1043,
++      "model_route_block_seconds": 5.5178,
++      "response_generation_seconds": 6.4235,
++      "total_response_seconds": 7.5281,
++      "response": "Absolutely, let\u2019s begin our highlights tour! I\u2019ll guide you through a selection of the museum\u2019s most celebrated works, sharing the stories and details that make each piece special. Shall we start with the portrait of Queen Victoria by Thomas Sully or the myth\u2011laden scene \u201cVenus in Search of Cupid Surprises Diana\u201d by William Hilton? Let me know which intrigues you, and we\u2019ll dive right in.",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 2
++    },
++    {
++      "success": true,
++      "case_id": "noise",
++      "text": "[unintelligible background noise]",
++      "repetition": 3,
++      "route": {
++        "route_type": "response_request",
++        "is_relevant": true,
++        "should_ignore": false,
++        "retrieval_required": true,
++        "retrieved_context_used": true,
++        "proposed_action": null,
++        "confidence": 0.98,
++        "reason": "Artwork information requested."
++      },
++      "model_route_valid": true,
++      "route_agreement": false,
++      "tool_call_correct": true,
++      "tool_calls": [],
++      "tool_results": [],
++      "time_to_route_event_seconds": 5.1231,
++      "time_to_first_spoken_token_seconds": 5.1231,
++      "context_resolution_seconds": 0.9639,
++      "model_route_block_seconds": 4.159,
++      "response_generation_seconds": 4.4465,
++      "total_response_seconds": 5.4107,
++      "response": "I\u2019m sorry, I didn\u2019t catch that. Could you please repeat your question?",
++      "route_header_leaked": false,
++      "event_types": [
++        "response_started",
++        "route_assessment",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "content_delta",
++        "response_complete"
++      ],
++      "sources_count": 1
++    }
++  ]
++}
+\ No newline at end of file
+diff --git a/backend_python/tmp/latency/model_self_routing_gpt_oss_think_false.md b/backend_python/tmp/latency/model_self_routing_gpt_oss_think_false.md
+new file mode 100644
+index 00000000..2abf29ce
+--- /dev/null
++++ b/backend_python/tmp/latency/model_self_routing_gpt_oss_think_false.md
+@@ -0,0 +1,34 @@
++# Model self-routing benchmark
++
++Model: `gpt-oss:120b-cloud`
++
++Thinking: `False`
++
++Architecture: retrieval prefetch followed by one main-model conversation that emits a hidden route header and the spoken answer.
++
++| Metric | Result |
++|---|---:|
++| Valid route blocks | 12/12 |
++| Label agreement | 6/12 |
++| Tool correctness | 9/12 |
++| Median time to route block | 5.3198s |
++| Median time to first spoken token | 5.3198s |
++| Median full response time | 6.583s |
++| Route-header leaks | 0 |
++
++## Samples
++
++| Case | Run | Valid | Agrees | Tool correct | Route | First spoken | Total |
++|---|---:|---:|---:|---:|---:|---:|---:|
++| artwork_information | 1 | True | True | True | response_request | 6.7764s | 9.3751s |
++| greeting | 1 | True | True | True | response_request | 5.0724s | 5.3852s |
++| highlights_tour | 1 | True | False | False | call_to_action | 6.0564s | 6.6073s |
++| noise | 1 | True | True | True | noise | 5.7415s | 5.964s |
++| artwork_information | 2 | True | True | True | response_request | 5.3514s | 7.2799s |
++| greeting | 2 | True | True | True | response_request | 4.4718s | 4.7383s |
++| highlights_tour | 2 | True | False | False | call_to_action | 5.2882s | 6.734s |
++| noise | 2 | True | False | True | response_request | 5.2685s | 5.5195s |
++| artwork_information | 3 | True | True | True | response_request | 5.1084s | 6.5586s |
++| greeting | 3 | True | False | True | response_request | 7.2088s | 7.462s |
++| highlights_tour | 3 | True | False | False | call_to_action | 6.6224s | 7.5281s |
++| noise | 3 | True | False | True | response_request | 5.1231s | 5.4107s |
+diff --git a/client_side/src/api/turnStreamClient.js b/client_side/src/api/turnStreamClient.js
+index 4498f610..b28dbed6 100644
+--- a/client_side/src/api/turnStreamClient.js
++++ b/client_side/src/api/turnStreamClient.js
+@@ -20,6 +20,7 @@ export class TurnStreamClient {
+     onReady,
+     onTurnEvaluated,
+     onUtteranceClassified,
++    onRouteAssessment,
+     onQueryStarted,
+     onResponseStarted,
+     onResponseFirstDelta,
+@@ -38,6 +39,8 @@ export class TurnStreamClient {
+       onTurnEvaluated;
+     this.onUtteranceClassified =
+       onUtteranceClassified;
++    this.onRouteAssessment =
++      onRouteAssessment;
+     this.onQueryStarted =
+       onQueryStarted;
+     this.onResponseStarted =
+@@ -145,6 +148,14 @@ export class TurnStreamClient {
+         });
+         break;
+ 
++      case 'route_assessment':
++        this.onRouteAssessment?.({
++          requestId:
++            message.request_id,
++          payload,
++        });
++        break;
++
+       case 'query_started':
+         this.onQueryStarted?.({
+           requestId:
+diff --git a/client_side/src/components/MainApplication.jsx b/client_side/src/components/MainApplication.jsx
+index 45c2acc0..758b121e 100644
+--- a/client_side/src/components/MainApplication.jsx
++++ b/client_side/src/components/MainApplication.jsx
+@@ -923,6 +923,26 @@ export default function MainApplication() {
+         }
+       },
+ 
++      onRouteAssessment: ({
++        requestId,
++        payload,
++      }) => {
++        console.log(
++          'Model route assessment:',
++          payload,
++        );
++
++        const pendingRequest =
++          pendingTurnRequestsRef.current.get(
++            requestId,
++          );
++
++        if (pendingRequest) {
++          pendingRequest
++            .modelRouteAssessment = payload;
++        }
++      },
++
+       onQueryStarted: ({
+         requestId,
+         payload,
+@@ -1407,6 +1427,7 @@ export default function MainApplication() {
+             reject,
+             turn: null,
+             route: null,
++            modelRouteAssessment: null,
+             released: false,
+           },
+         );
+-- 
+2.53.0.windows.1
+
