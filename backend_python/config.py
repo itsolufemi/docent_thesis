@@ -7,17 +7,41 @@ load_dotenv()
 
 
 def _read_bool(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
+    value = _optional_boolean(name)
 
     if value is None:
         return default
 
-    return value.strip().lower() in {
+    return value
+
+
+def _optional_boolean(
+    name: str,
+) -> bool | None:
+    raw_value = os.getenv(name)
+
+    if raw_value is None:
+        return None
+
+    value = raw_value.strip().lower()
+
+    if value in {
         "1",
         "true",
         "yes",
         "on",
-    }
+    }:
+        return True
+
+    if value in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }:
+        return False
+
+    return None
 
 
 class Settings():
@@ -32,6 +56,11 @@ class Settings():
     ollama_embedding_model: str = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
     ollama_trp_model: str = os.getenv("OLLAMA_TRP_MODEL", "")
     ollama_classifier_model: str = os.getenv("OLLAMA_CLASSIFIER_MODEL", "")
+    ollama_main_think: bool | None = (
+        _optional_boolean(
+            "OLLAMA_MAIN_THINK"
+        )
+    )
 
     whisper_model: str = os.getenv("WHISPER_MODEL", "base.en")
     whisper_device: str = os.getenv("WHISPER_DEVICE", "cpu")

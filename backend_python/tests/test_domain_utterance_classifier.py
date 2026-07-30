@@ -1,14 +1,20 @@
+import json
 import os
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 BACKEND_PYTHON_ROOT = Path(__file__).resolve().parents[1]
 
 if str(BACKEND_PYTHON_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_PYTHON_ROOT))
 
-from conversation_core.services.utterance_router_service import route_utterance
+from conversation_core.services.utterance_router_service import (
+    build_utterance_route_prompt,
+    request_streaming_utterance_route,
+    route_utterance,
+)
 from docent.config.docent_classifier_profile import docent_classifier_profile
 
 
@@ -73,6 +79,133 @@ CLASSIFIER_CASES = [
         "proposed_action": None,
     },
 ]
+
+
+class _FakeStreamingResponse:
+    def __init__(self, lines: list[str]) -> None:
+        self.lines = lines
+        self.closed = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(
+        self,
+        exc_type,
+        exc_value,
+        traceback,
+    ) -> None:
+        return None
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def iter_lines(self):
+        yield from self.lines
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class StreamingClassifierRequestTest(
+    unittest.TestCase
+):
+    def test_uses_optimized_profile_and_returns_early(
+        self,
+    ) -> None:
+        route_json = (
+            '{"route_type":"response_request",'
+            '"floor_intent":"take_floor",'
+            '"requires_retrieval":true,'
+            '"proposed_action":null,'
+            '"candidate_subjects":["The Arab Tent"]}'
+        )
+        fake_response = _FakeStreamingResponse(
+            [
+                json.dumps(
+                    {
+                        "response": route_json[:80],
+                        "done": False,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "response": route_json[80:],
+                        "done": False,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "response": "unused",
+                        "done": True,
+                    }
+                ),
+            ]
+        )
+
+        with patch(
+            (
+                "conversation_core.services."
+                "utterance_router_service.httpx.stream"
+            ),
+            return_value=fake_response,
+        ) as stream_mock:
+            route = request_streaming_utterance_route(
+                prompt=build_utterance_route_prompt(
+                    text=(
+                        "Tell me about The Arab Tent."
+                    ),
+                    domain_profile=(
+                        docent_classifier_profile
+                    ),
+                    compact_response=True,
+                ),
+                domain_profile=(
+                    docent_classifier_profile
+                ),
+            )
+
+        request_payload = (
+            stream_mock.call_args.kwargs["json"]
+        )
+        self.assertTrue(
+            request_payload["stream"]
+        )
+        self.assertFalse(
+            request_payload["think"]
+        )
+        self.assertEqual(
+            request_payload["format"]["type"],
+            "object",
+        )
+        self.assertIn(
+            "route_type",
+            request_payload["format"][
+                "required"
+            ],
+        )
+        self.assertNotIn(
+            "reason",
+            request_payload["format"][
+                "properties"
+            ],
+        )
+        self.assertTrue(fake_response.closed)
+        self.assertEqual(
+            route.route_type,
+            "response_request",
+        )
+        self.assertTrue(
+            route.requires_retrieval
+        )
+        self.assertEqual(
+            route.confidence,
+            0.5,
+        )
+        self.assertEqual(
+            route.reason,
+            "No reason provided.",
+        )
 
 
 @unittest.skipUnless(

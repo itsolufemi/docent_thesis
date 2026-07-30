@@ -7,7 +7,10 @@ from conversation_core.schemas.source_schemas import QuerySource
 from conversation_core.schemas.utterance_route_schemas import (
     UtteranceRoute,
 )
-from conversation_core.services.query_service import QueryEngine
+from conversation_core.services.query_service import (
+    QueryEngine,
+    self_routing_response_generator,
+)
 from conversation_core.services.utterance_router_service import route_utterance
 from conversation_core.services.prompt_service import (
     format_conversation_branch_for_prompt,
@@ -451,7 +454,453 @@ def docent_build_prompt_from_context(
         retrieved_chunks=payload.get("retrieved_chunks", []),
     )
 
+
+def build_candidate_subjects_from_chunks(
+    retrieved_chunks,
+) -> list[dict]:
+    candidate_subjects: list[dict] = []
+    seen_references: set[str] = set()
+
+    for retrieved in retrieved_chunks:
+        chunk = retrieved.chunk
+        reference = (
+            chunk.parent_document_id
+        )
+
+        if (
+            not reference
+            or reference in seen_references
+        ):
+            continue
+
+        seen_references.add(reference)
+        candidate_subjects.append(
+            {
+                "reference": reference,
+                "label": (
+                    chunk.title
+                    or reference
+                ),
+                "score": float(
+                    retrieved.score
+                ),
+            }
+        )
+
+    return candidate_subjects
+
+
+def build_candidate_subjects_from_documents(
+    retrieved_documents,
+) -> list[dict]:
+    candidate_subjects: list[dict] = []
+    seen_references: set[str] = set()
+
+    for retrieved in retrieved_documents:
+        document = retrieved.document
+        reference = (
+            document.source_reference
+            or document.document_id
+        )
+
+        if (
+            not reference
+            or reference in seen_references
+        ):
+            continue
+
+        seen_references.add(reference)
+        candidate_subjects.append(
+            {
+                "reference": reference,
+                "label": (
+                    document.title
+                    or reference
+                ),
+                "score": float(
+                    retrieved.score
+                ),
+            }
+        )
+
+    return candidate_subjects
+
+
+def docent_resolve_self_routing_context(
+    subject_reference: str | None,
+    user_input: str,
+    utterance_route: UtteranceRoute | None = None,
+) -> ResolvedContext:
+    if subject_reference is not None:
+        painting_index = (
+            docent_parse_subject_reference(
+                subject_reference
+            )
+        )
+
+        if painting_index is not None:
+            artwork = get_painting_by_index(
+                painting_index
+            )
+
+            if artwork is not None:
+                return ResolvedContext(
+                    context_source=(
+                        "subject_reference"
+                    ),
+                    subject_reference=(
+                        subject_reference
+                    ),
+                    sources=[
+                        build_source_from_artwork(
+                            artwork=artwork,
+                            source_type=(
+                                "artwork_context"
+                            ),
+                        )
+                    ],
+                    prompt_payload={
+                        "artwork": artwork,
+                        "retrieved_chunks": [],
+                        "retrieved_documents": [],
+                        "candidate_subjects": [
+                            {
+                                "reference": (
+                                    subject_reference
+                                ),
+                                "label": (
+                                    artwork.title
+                                ),
+                                "score": 1.0,
+                            }
+                        ],
+                    },
+                    debug_payload={
+                        "self_routing_context_resolver": (
+                            True
+                        ),
+                        "painting_index": (
+                            painting_index
+                        ),
+                        "artwork_found": True,
+                    },
+                )
+
+    vector_retrieval_result = (
+        retrieve_docent_chunks_by_vector_similarity(
+            query=user_input,
+            limit=8,
+            expand_parent_documents=True,
+            use_hybrid_scoring=True,
+            apply_confidence_gate=True,
+            min_confidence_score=0.45,
+        )
+    )
+    retrieved_chunks = (
+        vector_retrieval_result.results
+    )
+
+    if retrieved_chunks:
+        candidate_subjects = (
+            build_candidate_subjects_from_chunks(
+                retrieved_chunks
+            )
+        )
+
+        return ResolvedContext(
+            context_source=(
+                "vector_retrieved_chunks"
+            ),
+            subject_reference=None,
+            sources=(
+                build_sources_from_retrieved_chunks(
+                    retrieved_chunks
+                )
+            ),
+            prompt_payload={
+                "artwork": None,
+                "retrieved_chunks": (
+                    retrieved_chunks
+                ),
+                "retrieved_documents": [],
+                "candidate_subjects": (
+                    candidate_subjects
+                ),
+            },
+            debug_payload={
+                "self_routing_context_resolver": (
+                    True
+                ),
+                "vector_retrieval_used": True,
+                "parent_document_expansion_used": (
+                    True
+                ),
+                "hybrid_scoring_used": True,
+                "confidence_gate_used": True,
+                "min_confidence_score": 0.45,
+                "retrieved_chunk_count": len(
+                    retrieved_chunks
+                ),
+                "candidate_subject_count": len(
+                    candidate_subjects
+                ),
+                "vector_retrieval_timings": (
+                    vector_retrieval_result
+                    .timings.model_dump()
+                ),
+            },
+        )
+
+    documents = get_docent_retrieval_documents()
+    retrieved_documents = (
+        retrieve_documents_by_keyword(
+            query=user_input,
+            documents=documents,
+            limit=3,
+        )
+    )
+
+    if retrieved_documents:
+        candidate_subjects = (
+            build_candidate_subjects_from_documents(
+                retrieved_documents
+            )
+        )
+
+        return ResolvedContext(
+            context_source="retrieved_documents",
+            subject_reference=None,
+            sources=(
+                build_sources_from_retrieved_documents(
+                    retrieved_documents
+                )
+            ),
+            prompt_payload={
+                "artwork": None,
+                "retrieved_chunks": [],
+                "retrieved_documents": (
+                    retrieved_documents
+                ),
+                "candidate_subjects": (
+                    candidate_subjects
+                ),
+            },
+            debug_payload={
+                "self_routing_context_resolver": (
+                    True
+                ),
+                "document_retrieval_used": True,
+                "retrieved_document_count": len(
+                    retrieved_documents
+                ),
+                "candidate_subject_count": len(
+                    candidate_subjects
+                ),
+                "vector_retrieval_timings": (
+                    vector_retrieval_result
+                    .timings.model_dump()
+                ),
+            },
+        )
+
+    return ResolvedContext(
+        context_source="no_external_context",
+        subject_reference=None,
+        sources=[],
+        prompt_payload={
+            "artwork": None,
+            "retrieved_chunks": [],
+            "retrieved_documents": [],
+            "candidate_subjects": [],
+        },
+        debug_payload={
+            "self_routing_context_resolver": (
+                True
+            ),
+            "candidate_subject_count": 0,
+            "vector_retrieval_timings": (
+                vector_retrieval_result
+                .timings.model_dump()
+            ),
+        },
+    )
+
+
+SELF_ROUTING_OUTPUT_INSTRUCTIONS = """
+SELF-ROUTING OUTPUT
+
+Before the spoken answer, output exactly one
+internal routing block:
+
+<route>{"route_type":"response_request","is_relevant":true,"should_ignore":false,"retrieval_available":true,"retrieval_used":true,"candidate_subject_reference":"painting:581","should_update_subject":false,"proposed_action":null,"confidence":0.98,"reason":"Artwork information was requested and matching evidence was supplied."}</route>
+
+The route block must contain valid JSON with exactly
+the supplied fields and must appear before any
+visitor-facing response. After </route>, respond
+naturally to the visitor.
+
+Always classify the original USER UTTERANCE. If an
+operational tool has already returned a result, do
+not reclassify the current post-tool stage.
+
+ROUTE RULES
+
+- noise: the original utterance contains no
+  meaningful conversational language. Set
+  is_relevant=false and should_ignore=true.
+- response_request: the original utterance expects a
+  spoken answer, including greetings, questions,
+  explanations, and ordinary follow-ups.
+- call_to_action: the original utterance explicitly
+  asks the system to begin, end, or change a
+  structured activity such as a guided tour. Keep
+  this route and proposed_action even after its tool
+  has executed.
+- interruption: the original utterance stops,
+  corrects, or redirects the assistant while it is
+  speaking.
+
+retrieval_available means retrieved evidence was
+supplied in this prompt. retrieval_used means the
+answer or operational tool arguments actually rely
+on that evidence. Do not claim retrieval was used
+merely because evidence was available.
+If a retrieved candidate reference or label appears
+in operational tool arguments, retrieval_used must
+be true.
+
+candidate_subject_reference must be null or one of
+the explicitly supplied current/candidate references.
+Set should_update_subject only when the user's focus
+should move to that candidate. This metadata is
+observational and does not itself mutate state.
+
+For an explicit request to begin or end a tour, use
+call_to_action, populate proposed_action, and call an
+appropriate registered conversation-tree tool when
+state actually needs to change.
+
+Emit this route block only once for the user turn.
+If a tool returns a result, continue without
+repeating the route block.
+""".strip()
+
+
+def docent_build_self_routing_prompt(
+    user_input: str,
+    dialogue_history: list[DialogueTurn],
+    resolved_context: ResolvedContext,
+    active_branch: ConversationBranch | None,
+) -> str:
+    payload = resolved_context.prompt_payload
+    current_subject = (
+        active_branch.current_subjects[0]
+        if (
+            active_branch is not None
+            and active_branch.current_subjects
+        )
+        else None
+    )
+    current_subject_section = (
+        "\n".join(
+            [
+                (
+                    "Reference: "
+                    f"{current_subject.reference or 'None'}"
+                ),
+                (
+                    "Label: "
+                    f"{current_subject.label}"
+                ),
+            ]
+        )
+        if current_subject is not None
+        else "Reference: None\nLabel: None"
+    )
+    candidate_subjects = payload.get(
+        "candidate_subjects",
+        [],
+    )
+    candidate_lines = [
+        (
+            f"- {candidate['reference']} | "
+            f"{candidate['label']} | "
+            f"score {candidate['score']:.4f}"
+        )
+        for candidate in candidate_subjects
+    ]
+    candidate_section = (
+        "\n".join(candidate_lines)
+        or "None"
+    )
+    retrieval_available = bool(
+        payload.get("artwork")
+        or payload.get("retrieved_chunks")
+        or payload.get("retrieved_documents")
+    )
+    branch_context = (
+        format_conversation_branch_for_prompt(
+            active_branch
+        )
+    )
+    routed_user_input = f"""
+{SELF_ROUTING_OUTPUT_INSTRUCTIONS}
+
+RETRIEVAL AVAILABLE
+
+{str(retrieval_available).lower()}
+
+CURRENT SUBJECT
+
+{current_subject_section}
+
+CANDIDATE SUBJECTS
+
+{candidate_section}
+
+ACTIVE CONVERSATION BRANCH
+
+{branch_context}
+
+The active branch is the current overarching
+conversational activity. A digression does not close
+a bounded branch. Use operational tools only when
+conversation-tree state genuinely needs to change.
+
+USER UTTERANCE
+
+{user_input}
+""".strip()
+
+    return docent_build_prompt(
+        user_input=routed_user_input,
+        dialogue_history=dialogue_history,
+        artwork=payload.get("artwork"),
+        retrieved_documents=payload.get(
+            "retrieved_documents",
+            [],
+        ),
+        retrieved_chunks=payload.get(
+            "retrieved_chunks",
+            [],
+        ),
+    )
+
+
 docent_query_engine = QueryEngine(
     subject_resolver=docent_resolve_context,
     prompt_builder=docent_build_prompt_from_context,
+)
+
+self_routing_docent_query_engine = QueryEngine(
+    subject_resolver=(
+        docent_resolve_self_routing_context
+    ),
+    prompt_builder=(
+        docent_build_self_routing_prompt
+    ),
+    response_generator=(
+        self_routing_response_generator
+    ),
+    self_routing_enabled=True,
 )

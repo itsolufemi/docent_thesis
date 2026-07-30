@@ -153,17 +153,29 @@ def parse_ollama_tool_calls(
 def send_ollama_chat_request(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
+    *,
+    model: str | None = None,
+    think: bool | None = None,
 ) -> dict[str, Any]:
     url = f"{settings.ollama_base_url}/api/chat"
 
     payload: dict[str, Any] = {
-        "model": settings.ollama_model,
+        "model": model or settings.ollama_model,
         "messages": messages,
         "stream": False,
     }
 
     if tools:
         payload["tools"] = tools
+
+    selected_think = (
+        settings.ollama_main_think
+        if think is None
+        else think
+    )
+
+    if selected_think is not None:
+        payload["think"] = selected_think
 
     response = httpx.post(
         url,
@@ -180,6 +192,9 @@ def stream_ollama_chat_request(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
     cancellation_token: CancellationToken | None = None,
+    *,
+    model: str | None = None,
+    think: bool | None = None,
 ) -> Iterator[dict[str, Any]]:
     url = (
         f"{settings.ollama_base_url}"
@@ -187,13 +202,22 @@ def stream_ollama_chat_request(
     )
 
     payload: dict[str, Any] = {
-        "model": settings.ollama_model,
+        "model": model or settings.ollama_model,
         "messages": messages,
         "stream": True,
     }
 
     if tools:
         payload["tools"] = tools
+
+    selected_think = (
+        settings.ollama_main_think
+        if think is None
+        else think
+    )
+
+    if selected_think is not None:
+        payload["think"] = selected_think
 
     if (
         cancellation_token is not None
@@ -235,6 +259,8 @@ def stream_tool_aware_llm_response(
     buffer_for_tool_decision: bool,
     cancellation_token: CancellationToken | None = None,
     max_tool_rounds: int = 5,
+    model: str | None = None,
+    think: bool | None = None,
 ) -> Iterator[LLMStreamEvent]:
     messages: list[dict[str, Any]] = [
         {
@@ -287,6 +313,8 @@ def stream_tool_aware_llm_response(
                 cancellation_token=(
                     cancellation_token
                 ),
+                model=model,
+                think=think,
             ):
                 response_message = (
                     chunk.get("message") or {}
@@ -509,6 +537,9 @@ def generate_tool_aware_llm_response(
     prompt: str,
     conversation_id: str,
     max_tool_rounds: int = 5,
+    *,
+    model: str | None = None,
+    think: bool | None = None,
 ) -> str:
     """
     Ask Ollama for a response while allowing it to call registered tools.
@@ -535,6 +566,8 @@ def generate_tool_aware_llm_response(
             response_data = send_ollama_chat_request(
                 messages=messages,
                 tools=tools,
+                model=model,
+                think=think,
             )
 
             response_message = response_data.get("message") or {}

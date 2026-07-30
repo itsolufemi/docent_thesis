@@ -1,0 +1,91 @@
+{
+  "case_count": 3,
+  "all_correct": true,
+  "results": [
+    {
+      "text": "Tell me about The Arab Tent.",
+      "correct": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": null,
+        "candidate_subjects": [
+          "The Arab Tent"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "audit": {
+        "classifier_call_count": 1,
+        "classifier_called_exactly_once": true,
+        "classifier_omitted": false,
+        "classifier_called_more_than_once": false,
+        "invalid_classifier_arguments": false,
+        "model_returned_content": false,
+        "model_to_tool_call_seconds": 16.2945,
+        "classifier_execution_seconds": 0.0003,
+        "total_seconds": 16.2949
+      }
+    },
+    {
+      "text": "Hi, how are you?",
+      "correct": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "none",
+        "requires_retrieval": false,
+        "proposed_action": null,
+        "candidate_subjects": [],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "audit": {
+        "classifier_call_count": 1,
+        "classifier_called_exactly_once": true,
+        "classifier_omitted": false,
+        "classifier_called_more_than_once": false,
+        "invalid_classifier_arguments": false,
+        "model_returned_content": false,
+        "model_to_tool_call_seconds": 17.0628,
+        "classifier_execution_seconds": 0.0001,
+        "total_seconds": 17.063
+      }
+    },
+    {
+      "text": "Start a highlights tour.",
+      "correct": true,
+      "route": {
+        "route_type": "call_to_action",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": "create_bounded_branch",
+        "candidate_subjects": [
+          "highlights tour"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "audit": {
+        "classifier_call_count": 1,
+        "classifier_called_exactly_once": true,
+        "classifier_omitted": false,
+        "classifier_called_more_than_once": false,
+        "invalid_classifier_arguments": false,
+        "model_returned_content": false,
+        "model_to_tool_call_seconds": 23.3346,
+        "classifier_execution_seconds": 0.0001,
+        "total_seconds": 23.3347
+      }
+    }
+  ]
+}

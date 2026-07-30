@@ -73,6 +73,21 @@ def build_stream_websocket_message(
             },
         }
 
+    if event.event_type == "self_routing":
+        return {
+            "type": "self_routing",
+            "request_id": request_id,
+            "payload": {
+                "valid": (
+                    event.route_assessment
+                    is not None
+                ),
+                "assessment": (
+                    event.route_assessment
+                ),
+            },
+        }
+
     if event.event_type == "tool_call":
         return {
             "type": "tool_call_started",

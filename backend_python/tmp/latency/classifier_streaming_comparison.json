@@ -1,0 +1,1375 @@
+{
+  "model": "gemma4:cloud",
+  "case_count": 20,
+  "legacy_profile": {
+    "stream": false,
+    "think": "unspecified",
+    "format": null,
+    "options": {
+      "temperature": 0,
+      "num_predict": 160
+    }
+  },
+  "optimized_profile": {
+    "stream": true,
+    "think": false,
+    "format": "utterance_route_json_schema",
+    "early_return": "first valid structured response",
+    "requested_fields": [
+      "candidate_subjects",
+      "floor_intent",
+      "proposed_action",
+      "requires_retrieval",
+      "route_type"
+    ],
+    "derived_fields": [
+      "is_relevant",
+      "should_ignore",
+      "confidence",
+      "reason"
+    ],
+    "options": {
+      "temperature": 0,
+      "num_predict": 160
+    }
+  },
+  "warmups": {
+    "legacy": {
+      "success": true,
+      "elapsed_seconds": 1.7324,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": false,
+        "proposed_action": null,
+        "candidate_subjects": [],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 1.0,
+        "reason": "The user is providing a greeting and a social question, which is a meaningful conversational turn expecting a response.",
+        "routing_seconds": 0.0
+      }
+    },
+    "optimized": {
+      "success": true,
+      "elapsed_seconds": 1.0371,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": false,
+        "proposed_action": null,
+        "candidate_subjects": [],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "No reason provided.",
+        "routing_seconds": 0.0
+      }
+    }
+  },
+  "summaries": {
+    "legacy": {
+      "mode": "legacy",
+      "total_cases": 20,
+      "valid_cases": 20,
+      "correct_cases": 20,
+      "accuracy": 1.0,
+      "median_seconds": 2.9459,
+      "mean_seconds": 3.2844,
+      "p95_seconds": 7.2669,
+      "minimum_seconds": 1.2893,
+      "maximum_seconds": 8.8581
+    },
+    "optimized": {
+      "mode": "optimized",
+      "total_cases": 20,
+      "valid_cases": 20,
+      "correct_cases": 20,
+      "accuracy": 1.0,
+      "median_seconds": 1.8014,
+      "mean_seconds": 2.9731,
+      "p95_seconds": 6.3747,
+      "minimum_seconds": 0.95,
+      "maximum_seconds": 18.2705
+    }
+  },
+  "paired_summary": {
+    "valid_pair_count": 20,
+    "median_saving_seconds": 0.3323,
+    "mean_saving_seconds": 0.3113,
+    "median_percentage_reduction": 15.41,
+    "optimized_faster_cases": 10
+  },
+  "paired_results": [
+    {
+      "case_id": "greeting",
+      "legacy_seconds": 4.0561,
+      "optimized_seconds": 1.2207,
+      "saving_seconds": 2.8354,
+      "percentage_reduction": 69.9,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "artwork_information",
+      "legacy_seconds": 3.3255,
+      "optimized_seconds": 1.2547,
+      "saving_seconds": 2.0708,
+      "percentage_reduction": 62.27,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "artist_information",
+      "legacy_seconds": 2.0367,
+      "optimized_seconds": 1.2734,
+      "saving_seconds": 0.7633,
+      "percentage_reduction": 37.48,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "next_artwork",
+      "legacy_seconds": 1.3269,
+      "optimized_seconds": 2.0233,
+      "saving_seconds": -0.6964,
+      "percentage_reduction": -52.48,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "highlights_tour",
+      "legacy_seconds": 4.2522,
+      "optimized_seconds": 18.2705,
+      "saving_seconds": -14.0183,
+      "percentage_reduction": -329.67,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "stop_tour",
+      "legacy_seconds": 2.5951,
+      "optimized_seconds": 3.6977,
+      "saving_seconds": -1.1026,
+      "percentage_reduction": -42.49,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "spoken_correction",
+      "legacy_seconds": 1.4809,
+      "optimized_seconds": 1.5795,
+      "saving_seconds": -0.0986,
+      "percentage_reduction": -6.66,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "artwork_comparison",
+      "legacy_seconds": 1.2893,
+      "optimized_seconds": 5.7486,
+      "saving_seconds": -4.4593,
+      "percentage_reduction": -345.87,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "painting_interpretation",
+      "legacy_seconds": 1.581,
+      "optimized_seconds": 2.3257,
+      "saving_seconds": -0.7447,
+      "percentage_reduction": -47.1,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "room_information",
+      "legacy_seconds": 3.6666,
+      "optimized_seconds": 1.2732,
+      "saving_seconds": 2.3934,
+      "percentage_reduction": 65.28,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "portrait_tour",
+      "legacy_seconds": 2.4971,
+      "optimized_seconds": 1.1965,
+      "saving_seconds": 1.3006,
+      "percentage_reduction": 52.08,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "close_current_tour",
+      "legacy_seconds": 3.0567,
+      "optimized_seconds": 3.4764,
+      "saving_seconds": -0.4197,
+      "percentage_reduction": -13.73,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "previous_artwork",
+      "legacy_seconds": 4.114,
+      "optimized_seconds": 1.1298,
+      "saving_seconds": 2.9842,
+      "percentage_reduction": 72.54,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "repeat_request",
+      "legacy_seconds": 3.095,
+      "optimized_seconds": 3.82,
+      "saving_seconds": -0.725,
+      "percentage_reduction": -23.42,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "museum_hours",
+      "legacy_seconds": 4.2421,
+      "optimized_seconds": 1.3997,
+      "saving_seconds": 2.8424,
+      "percentage_reduction": 67.0,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "artist_comparison",
+      "legacy_seconds": 2.3684,
+      "optimized_seconds": 0.95,
+      "saving_seconds": 1.4184,
+      "percentage_reduction": 59.89,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "interrupt_stop",
+      "legacy_seconds": 2.8352,
+      "optimized_seconds": 3.1609,
+      "saving_seconds": -0.3257,
+      "percentage_reduction": -11.49,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "interrupt_redirect",
+      "legacy_seconds": 7.1832,
+      "optimized_seconds": 1.0818,
+      "saving_seconds": 6.1014,
+      "percentage_reduction": 84.94,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "backchannel_right",
+      "legacy_seconds": 1.8281,
+      "optimized_seconds": 2.1272,
+      "saving_seconds": -0.2991,
+      "percentage_reduction": -16.36,
+      "legacy_correct": true,
+      "optimized_correct": true
+    },
+    {
+      "case_id": "backchannel_i_see",
+      "legacy_seconds": 8.8581,
+      "optimized_seconds": 2.4523,
+      "saving_seconds": 6.4058,
+      "percentage_reduction": 72.32,
+      "legacy_correct": true,
+      "optimized_correct": true
+    }
+  ],
+  "results_by_mode": {
+    "legacy": [
+      {
+        "mode": "legacy",
+        "case_id": "greeting",
+        "text": "Hello, how are you?",
+        "success": true,
+        "elapsed_seconds": 4.0561,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The utterance is a standard greeting and social inquiry, which is a meaningful conversational turn that expects a response but does not require factual retrieval.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "artwork_information",
+        "text": "Tell me about The Arab Tent.",
+        "success": true,
+        "elapsed_seconds": 3.3255,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "The Arab Tent"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "User is requesting factual/descriptive information about a specific artwork.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "stop_tour",
+        "text": "Stop the tour.",
+        "success": true,
+        "elapsed_seconds": 2.5951,
+        "route": {
+          "route_type": "call_to_action",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": "close_bounded_branch",
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "User explicitly requested to stop the tour, which matches the close_bounded_branch action.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "backchannel_right",
+        "text": "Right.",
+        "success": true,
+        "elapsed_seconds": 1.8281,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "backchannel",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The utterance is a brief acknowledgement ('Right') while the assistant was speaking, characterizing a backchannel response.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "artwork_comparison",
+        "text": "Compare The Arab Tent with Guernica.",
+        "success": true,
+        "elapsed_seconds": 1.2893,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "The Arab Tent",
+            "Guernica"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "User is asking for a comparison between two specific artworks, which requires retrieval of factual and interpretive information.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "portrait_tour",
+        "text": "Start a tour of the portraits.",
+        "success": true,
+        "elapsed_seconds": 2.4971,
+        "route": {
+          "route_type": "call_to_action",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": "create_bounded_branch",
+          "candidate_subjects": [
+            "portraits"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "User explicitly requests to start a tour of a specific subject, matching the create_bounded_branch action.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "interrupt_stop",
+        "text": "Stop, I have a question.",
+        "success": true,
+        "elapsed_seconds": 2.8352,
+        "route": {
+          "route_type": "interruption",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "User is explicitly stopping the assistant to ask a question while the assistant is speaking.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "close_current_tour",
+        "text": "End the current tour.",
+        "success": true,
+        "elapsed_seconds": 3.0567,
+        "route": {
+          "route_type": "call_to_action",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": "close_bounded_branch",
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The user explicitly requests to end the current tour, which matches the 'close_bounded_branch' action.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "painting_interpretation",
+        "text": "What makes The Arab Tent unusual?",
+        "success": true,
+        "elapsed_seconds": 1.581,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "The Arab Tent"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "User is asking for interpretive/factual information about a specific artwork.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "highlights_tour",
+        "text": "Give me a highlights tour.",
+        "success": true,
+        "elapsed_seconds": 4.2522,
+        "route": {
+          "route_type": "call_to_action",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": "create_bounded_branch",
+          "candidate_subjects": [
+            "highlights tour"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "User explicitly requested a highlights tour, which matches the create_bounded_branch action.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "museum_hours",
+        "text": "When does the museum close today?",
+        "success": true,
+        "elapsed_seconds": 4.2421,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "museum closing time"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The user is asking a factual question about the museum's operating hours, which requires retrieval of museum-specific information.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "interrupt_redirect",
+        "text": "No, tell me about The Arab Tent instead.",
+        "success": true,
+        "elapsed_seconds": 7.1832,
+        "route": {
+          "route_type": "interruption",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "The Arab Tent"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The user is cutting into the assistant's turn ('No') to redirect the conversation to a specific artwork ('The Arab Tent'), which requires factual retrieval.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "artist_information",
+        "text": "Who was Fragonard?",
+        "success": true,
+        "elapsed_seconds": 2.0367,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "Fragonard"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "User is asking for factual information about a specific artist, which requires retrieval.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "next_artwork",
+        "text": "Let's move to the next painting.",
+        "success": true,
+        "elapsed_seconds": 1.3269,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The user is requesting to move to the next subject within an existing conversation, which is defined as a response_request that does not require retrieval.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "backchannel_i_see",
+        "text": "I see.",
+        "success": true,
+        "elapsed_seconds": 8.8581,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "backchannel",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The utterance is a brief acknowledgement supporting the assistant's current turn.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "room_information",
+        "text": "What can I see in the Great Gallery?",
+        "success": true,
+        "elapsed_seconds": 3.6666,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "Great Gallery"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The user is asking for factual information about what is available in a specific room (Great Gallery), requiring retrieval from the curated collection.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "spoken_correction",
+        "text": "Wait, that's not what I meant.",
+        "success": true,
+        "elapsed_seconds": 1.4809,
+        "route": {
+          "route_type": "interruption",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The user is correcting the assistant while the assistant was speaking.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "previous_artwork",
+        "text": "Go back to the previous artwork.",
+        "success": true,
+        "elapsed_seconds": 4.114,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "Navigation to a previous subject in an existing conversation is a response_request and does not require retrieval.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "artist_comparison",
+        "text": "How does Fragonard differ from Boucher?",
+        "success": true,
+        "elapsed_seconds": 2.3684,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "Fragonard",
+            "Boucher"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The user is asking for a comparison between two artists, which requires factual and interpretive retrieval from the Docent domain.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "legacy",
+        "case_id": "repeat_request",
+        "text": "Could you repeat that?",
+        "success": true,
+        "elapsed_seconds": 3.095,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 1.0,
+          "reason": "The user is asking for a repetition of the previous turn, which is a standard response request that does not require external retrieval.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      }
+    ],
+    "optimized": [
+      {
+        "mode": "optimized",
+        "case_id": "greeting",
+        "text": "Hello, how are you?",
+        "success": true,
+        "elapsed_seconds": 1.2207,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "artwork_information",
+        "text": "Tell me about The Arab Tent.",
+        "success": true,
+        "elapsed_seconds": 1.2547,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "The Arab Tent"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "stop_tour",
+        "text": "Stop the tour.",
+        "success": true,
+        "elapsed_seconds": 3.6977,
+        "route": {
+          "route_type": "call_to_action",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": "close_bounded_branch",
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "backchannel_right",
+        "text": "Right.",
+        "success": true,
+        "elapsed_seconds": 2.1272,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "backchannel",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "artwork_comparison",
+        "text": "Compare The Arab Tent with Guernica.",
+        "success": true,
+        "elapsed_seconds": 5.7486,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "The Arab Tent",
+            "Guernica"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "portrait_tour",
+        "text": "Start a tour of the portraits.",
+        "success": true,
+        "elapsed_seconds": 1.1965,
+        "route": {
+          "route_type": "call_to_action",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": "create_bounded_branch",
+          "candidate_subjects": [
+            "portraits"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "interrupt_stop",
+        "text": "Stop, I have a question.",
+        "success": true,
+        "elapsed_seconds": 3.1609,
+        "route": {
+          "route_type": "interruption",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "close_current_tour",
+        "text": "End the current tour.",
+        "success": true,
+        "elapsed_seconds": 3.4764,
+        "route": {
+          "route_type": "call_to_action",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": "close_bounded_branch",
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "painting_interpretation",
+        "text": "What makes The Arab Tent unusual?",
+        "success": true,
+        "elapsed_seconds": 2.3257,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "The Arab Tent"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "highlights_tour",
+        "text": "Give me a highlights tour.",
+        "success": true,
+        "elapsed_seconds": 18.2705,
+        "route": {
+          "route_type": "call_to_action",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": "create_bounded_branch",
+          "candidate_subjects": [
+            "highlights tour"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "museum_hours",
+        "text": "When does the museum close today?",
+        "success": true,
+        "elapsed_seconds": 1.3997,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "museum closing time"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "interrupt_redirect",
+        "text": "No, tell me about The Arab Tent instead.",
+        "success": true,
+        "elapsed_seconds": 1.0818,
+        "route": {
+          "route_type": "interruption",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "The Arab Tent"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "artist_information",
+        "text": "Who was Fragonard?",
+        "success": true,
+        "elapsed_seconds": 1.2734,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "Fragonard"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "next_artwork",
+        "text": "Let's move to the next painting.",
+        "success": true,
+        "elapsed_seconds": 2.0233,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "backchannel_i_see",
+        "text": "I see.",
+        "success": true,
+        "elapsed_seconds": 2.4523,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "backchannel",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "room_information",
+        "text": "What can I see in the Great Gallery?",
+        "success": true,
+        "elapsed_seconds": 1.2732,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "Great Gallery"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "spoken_correction",
+        "text": "Wait, that's not what I meant.",
+        "success": true,
+        "elapsed_seconds": 1.5795,
+        "route": {
+          "route_type": "interruption",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "previous_artwork",
+        "text": "Go back to the previous artwork.",
+        "success": true,
+        "elapsed_seconds": 1.1298,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "artist_comparison",
+        "text": "How does Fragonard differ from Boucher?",
+        "success": true,
+        "elapsed_seconds": 0.95,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": true,
+          "proposed_action": null,
+          "candidate_subjects": [
+            "Fragonard",
+            "Boucher"
+          ],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      },
+      {
+        "mode": "optimized",
+        "case_id": "repeat_request",
+        "text": "Could you repeat that?",
+        "success": true,
+        "elapsed_seconds": 3.82,
+        "route": {
+          "route_type": "response_request",
+          "floor_intent": "take_floor",
+          "requires_retrieval": false,
+          "proposed_action": null,
+          "candidate_subjects": [],
+          "is_relevant": true,
+          "should_ignore": false,
+          "confidence": 0.5,
+          "reason": "No reason provided.",
+          "routing_seconds": 0.0
+        },
+        "correct": true,
+        "field_results": {
+          "route_type": true,
+          "requires_retrieval": true,
+          "proposed_action": true,
+          "floor_intent": true
+        }
+      }
+    ]
+  }
+}

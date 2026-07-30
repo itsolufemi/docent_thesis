@@ -120,3 +120,29 @@ uvicorn server:app --reload --port 8000
 ```
 
 3. The client expects CORS origins at `http://localhost:5173` (see `server.py`).
+
+## Context-resolver self-routing experiment
+
+On `experiment/context-resolver-self-routing`,
+the active request flow does not call the utterance
+classifier. The Docent resolver gathers the current
+subject, retrieval evidence, and deduplicated
+candidate subjects before one main-model request.
+
+The model begins its answer with an internal
+`<route>...</route>` block validated as
+`SelfRoutingAssessment`. The query engine emits a
+`self_routing` event and releases only the subsequent
+spoken text. Route JSON is never sent to TTS or stored
+in dialogue history.
+
+Self-routing metadata is debug-only. Conversation
+state can still be changed only through registered
+operational tools.
+
+Recommended experimental model profile:
+
+```text
+OLLAMA_MODEL=gemma4:cloud
+OLLAMA_MAIN_THINK=false
+```

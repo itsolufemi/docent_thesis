@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 LLMStreamEventType = Literal[
     "response_started",
+    "self_routing",
     "content_delta",
     "tool_call",
     "tool_result",
@@ -21,4 +22,5 @@ class LLMStreamEvent(BaseModel):
     )
     tool_name: str | None = None
     tool_result: dict[str, Any] | None = None
+    route_assessment: dict[str, Any] | None = None
     done: bool = False

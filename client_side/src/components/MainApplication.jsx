@@ -1093,6 +1093,26 @@ export default function MainApplication() {
         }
       },
 
+      onSelfRouting: ({
+        requestId,
+        payload,
+      }) => {
+        console.log(
+          'Model self-routing:',
+          payload,
+        );
+
+        const pendingRequest =
+          pendingTurnRequestsRef.current.get(
+            requestId,
+          );
+
+        if (pendingRequest) {
+          pendingRequest.selfRouting =
+            payload.assessment ?? null;
+        }
+      },
+
       onQueryStarted: ({
         requestId,
         payload,
@@ -1579,6 +1599,7 @@ export default function MainApplication() {
             reject,
             turn: null,
             route: null,
+            selfRouting: null,
             released: false,
           },
         );

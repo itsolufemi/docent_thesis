@@ -2,12 +2,13 @@ import json
 import re
 from time import perf_counter
 
+import httpx
+
 from config import settings
 from conversation_core.schemas.classifier_domain_schemas import (
     ClassifierDomainProfile,
 )
 from conversation_core.schemas.utterance_route_schemas import UtteranceRoute
-from conversation_core.services.llm_service import generate_llm_response
 
 
 VALID_ROUTE_TYPES = {
@@ -22,6 +23,226 @@ VALID_FLOOR_INTENTS = {
     "hold_floor",
     "take_floor",
 }
+CLASSIFIER_REQUEST_TIMEOUT_SECONDS = 20.0
+CLASSIFIER_REQUEST_OPTIONS = {
+    "temperature": 0,
+    "num_predict": 160,
+}
+CLASSIFIER_REQUIRED_FIELDS = {
+    "route_type",
+    "floor_intent",
+    "requires_retrieval",
+    "proposed_action",
+    "candidate_subjects",
+}
+
+
+def build_utterance_route_response_format(
+    domain_profile: ClassifierDomainProfile,
+) -> dict:
+    valid_actions = sorted(
+        get_valid_action_names(domain_profile)
+    )
+    proposed_action_options = [
+        {
+            "type": "null",
+        },
+    ]
+
+    if valid_actions:
+        proposed_action_options.insert(
+            0,
+            {
+                "type": "string",
+                "enum": valid_actions,
+            },
+        )
+
+    return {
+        "type": "object",
+        "properties": {
+            "route_type": {
+                "type": "string",
+                "enum": sorted(VALID_ROUTE_TYPES),
+            },
+            "floor_intent": {
+                "type": "string",
+                "enum": sorted(VALID_FLOOR_INTENTS),
+            },
+            "requires_retrieval": {
+                "type": "boolean",
+            },
+            "proposed_action": {
+                "anyOf": (
+                    proposed_action_options
+                ),
+            },
+            "candidate_subjects": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+        },
+        "required": sorted(
+            CLASSIFIER_REQUIRED_FIELDS
+        ),
+        "additionalProperties": False,
+    }
+
+
+def validate_utterance_route_payload(
+    payload: dict,
+) -> None:
+    missing_fields = (
+        CLASSIFIER_REQUIRED_FIELDS
+        - payload.keys()
+    )
+
+    if missing_fields:
+        raise ValueError(
+            "Classifier response is missing fields: "
+            + ", ".join(sorted(missing_fields))
+        )
+
+    if payload["route_type"] not in (
+        VALID_ROUTE_TYPES
+    ):
+        raise ValueError(
+            "Classifier returned an invalid route "
+            "type."
+        )
+
+    if payload["floor_intent"] not in (
+        VALID_FLOOR_INTENTS
+    ):
+        raise ValueError(
+            "Classifier returned an invalid floor "
+            "intent."
+        )
+
+    if not isinstance(
+        payload["requires_retrieval"],
+        bool,
+    ):
+        raise ValueError(
+            "Classifier retrieval decision must be "
+            "boolean."
+        )
+
+    if (
+        payload["proposed_action"] is not None
+        and not isinstance(
+            payload["proposed_action"],
+            str,
+        )
+    ):
+        raise ValueError(
+            "Classifier action must be a string or "
+            "null."
+        )
+
+    if (
+        not isinstance(
+            payload["candidate_subjects"],
+            list,
+        )
+        or not all(
+            isinstance(subject, str)
+            for subject
+            in payload["candidate_subjects"]
+        )
+    ):
+        raise ValueError(
+            "Classifier subjects must be a list of "
+            "strings."
+        )
+
+
+def request_streaming_utterance_route(
+    *,
+    prompt: str,
+    domain_profile: ClassifierDomainProfile,
+    model: str | None = None,
+    timeout: float = (
+        CLASSIFIER_REQUEST_TIMEOUT_SECONDS
+    ),
+) -> UtteranceRoute:
+    started_at = perf_counter()
+    request_payload = {
+        "model": (
+            model
+            or settings.ollama_classifier_model
+        ),
+        "prompt": prompt,
+        "stream": True,
+        "think": False,
+        "format": (
+            build_utterance_route_response_format(
+                domain_profile
+            )
+        ),
+        "options": CLASSIFIER_REQUEST_OPTIONS,
+    }
+    accumulated_response = ""
+
+    with httpx.stream(
+        "POST",
+        f"{settings.ollama_base_url}/api/generate",
+        json=request_payload,
+        timeout=timeout,
+    ) as response:
+        response.raise_for_status()
+
+        for line in response.iter_lines():
+            if (
+                perf_counter() - started_at
+                >= timeout
+            ):
+                response.close()
+                raise TimeoutError(
+                    "Classifier stream exceeded its "
+                    "absolute request deadline."
+                )
+
+            if not line:
+                continue
+
+            chunk = json.loads(line)
+            accumulated_response += (
+                chunk.get("response", "")
+            )
+
+            if accumulated_response:
+                try:
+                    payload = (
+                        parse_utterance_route_json(
+                            accumulated_response
+                        )
+                    )
+                    validate_utterance_route_payload(
+                        payload
+                    )
+                except (
+                    json.JSONDecodeError,
+                    ValueError,
+                ):
+                    pass
+                else:
+                    route = normalise_route_payload(
+                        payload=payload,
+                        domain_profile=domain_profile,
+                    )
+                    response.close()
+                    return route
+
+            if chunk.get("done"):
+                break
+
+    raise ValueError(
+        "Classifier stream ended without a valid "
+        "structured response."
+    )
 
 
 def add_routing_time(
@@ -116,9 +337,35 @@ def build_utterance_route_prompt(
     domain_profile: ClassifierDomainProfile,
     *,
     assistant_was_speaking: bool = False,
+    compact_response: bool = False,
 ) -> str:
     retrieval_policy = format_retrieval_policy(domain_profile)
     available_actions = format_available_actions(domain_profile)
+
+    if compact_response:
+        response_shape = """
+{
+  "route_type": "noise | response_request | call_to_action | interruption",
+  "floor_intent": "none | backchannel | hold_floor | take_floor",
+  "requires_retrieval": false,
+  "proposed_action": null,
+  "candidate_subjects": []
+}
+""".strip()
+    else:
+        response_shape = """
+{
+  "route_type": "noise | response_request | call_to_action | interruption",
+  "floor_intent": "none | backchannel | hold_floor | take_floor",
+  "requires_retrieval": false,
+  "proposed_action": null,
+  "candidate_subjects": [],
+  "is_relevant": true,
+  "should_ignore": false,
+  "confidence": 0.0,
+  "reason": "brief explanation"
+}
+""".strip()
 
     return f"""
 You are a fast utterance classifier for a general voice-led
@@ -219,17 +466,7 @@ USER UTTERANCE
 
 Return only one JSON object using this exact shape:
 
-{{
-  "route_type": "noise | response_request | call_to_action | interruption",
-  "floor_intent": "none | backchannel | hold_floor | take_floor",
-  "requires_retrieval": false,
-  "proposed_action": null,
-  "candidate_subjects": [],
-  "is_relevant": true,
-  "should_ignore": false,
-  "confidence": 0.0,
-  "reason": "brief explanation"
-}}
+{response_shape}
 """.strip()
 
 
@@ -422,34 +659,28 @@ def route_utterance(
         text=text,
         domain_profile=domain_profile,
         assistant_was_speaking=assistant_was_speaking,
+        compact_response=True,
     )
-    raw_response = generate_llm_response(
-        prompt=prompt,
-        model=settings.ollama_classifier_model,
-        timeout=20.0,
-        options={
-            "temperature": 0,
-            "num_predict": 160,
-        },
-    )
-
     try:
-        payload = parse_utterance_route_json(raw_response)
-    except json.JSONDecodeError:
-        return add_routing_time(
-            build_fallback_route(
-                reason=(
-                    "The LLM did not return valid JSON, so the utterance was "
-                    "treated as a response request."
-                ),
+        route = request_streaming_utterance_route(
+            prompt=prompt,
+            domain_profile=domain_profile,
+        )
+    except (
+        httpx.HTTPError,
+        json.JSONDecodeError,
+        TimeoutError,
+        ValueError,
+    ):
+        route = build_fallback_route(
+            reason=(
+                "The LLM did not return a valid "
+                "structured result, so the utterance "
+                "was treated as a response request."
             ),
-            started_at,
         )
 
     return add_routing_time(
-        normalise_route_payload(
-            payload=payload,
-            domain_profile=domain_profile,
-        ),
+        route,
         started_at,
     )
