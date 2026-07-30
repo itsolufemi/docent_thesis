@@ -57,6 +57,19 @@ class ToolRegistry:
             for registered_tool in self._tools.values()
         ]
 
+    def get_definition(
+        self,
+        tool_name: str,
+    ) -> ToolDefinition | None:
+        registered_tool = self._tools.get(
+            tool_name
+        )
+
+        if registered_tool is None:
+            return None
+
+        return registered_tool.definition
+
     def has_tool(self, tool_name: str) -> bool:
         return tool_name in self._tools
 

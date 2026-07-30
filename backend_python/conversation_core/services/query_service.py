@@ -16,6 +16,9 @@ from conversation_core.schemas.conversation_schemas import (
 from conversation_core.schemas.llm_stream_schemas import (
     LLMStreamEvent,
 )
+from conversation_core.schemas.classifier_tool_schemas import (
+    ClassifierToolRoundResult,
+)
 from conversation_core.schemas.prompt_schemas import (
     PromptProfile,
     PromptSection,
@@ -32,6 +35,10 @@ from conversation_core.services.llm_service import (
     generate_llm_response,
     generate_tool_aware_llm_response,
     stream_tool_aware_llm_response,
+    stream_tool_aware_llm_messages,
+)
+from conversation_core.services.classifier_tool_orchestration_service import (
+    build_classifier_tool_resume_messages,
 )
 from conversation_core.services.cancellation import (
     CancellationToken,
@@ -521,6 +528,260 @@ class QueryEngine:
                 ),
                 sources=resolved_context.sources,
                 debug_payload=timing_debug_payload,
+            )
+
+        return QueryResult(
+            request=text,
+            response=response,
+            conversation_id=conversation_id,
+            subject_reference=(
+                resolved_context.subject_reference
+            ),
+            sources=resolved_context.sources,
+            debug=debug,
+        )
+
+    def generate_classifier_tool_streaming_response(
+        self,
+        *,
+        text: str,
+        classifier_round: (
+            ClassifierToolRoundResult
+        ),
+        conversation_id: str | None = None,
+        subject_reference: str | None = None,
+        include_debug: bool = False,
+        on_stream_event: (
+            LLMStreamCallback | None
+        ) = None,
+        cancellation_token: (
+            CancellationToken | None
+        ) = None,
+    ) -> QueryResult:
+        response_stage_started_at = (
+            perf_counter()
+        )
+        conversation_created = False
+        conversation_state = None
+
+        if conversation_id is not None:
+            conversation_state = get_conversation(
+                conversation_id
+            )
+
+        if conversation_state is None:
+            conversation_state = (
+                create_conversation()
+            )
+            conversation_id = (
+                conversation_state
+                .conversation_id
+            )
+            conversation_created = True
+
+        dialogue_history = (
+            get_recent_conversation_history(
+                conversation_id=conversation_id,
+            )
+        )
+        active_branch = get_active_branch(
+            conversation_id=conversation_id,
+        )
+
+        if (
+            subject_reference is None
+            and active_branch is not None
+            and active_branch.current_subjects
+        ):
+            current_subject = (
+                active_branch.current_subjects[0]
+            )
+            subject_reference = (
+                current_subject.reference
+                or current_subject.label
+            )
+
+        context_started_at = perf_counter()
+        resolved_context = self.subject_resolver(
+            subject_reference,
+            text,
+            classifier_round.utterance_route,
+        )
+        context_resolution_seconds = (
+            perf_counter() - context_started_at
+        )
+        response_prompt = self.prompt_builder(
+            text,
+            dialogue_history,
+            resolved_context,
+            active_branch,
+        )
+        continuation_messages = (
+            build_classifier_tool_resume_messages(
+                classifier_round=(
+                    classifier_round
+                ),
+                response_prompt=response_prompt,
+            )
+        )
+
+        add_dialogue_turn(
+            conversation_id=conversation_id,
+            role="user",
+            content=text,
+        )
+
+        model_resume_started_at = (
+            perf_counter()
+        )
+        first_token_seconds = None
+        response_parts: list[str] = []
+        response_cancelled = False
+
+        for stream_event in (
+            stream_tool_aware_llm_messages(
+                messages=continuation_messages,
+                conversation_id=conversation_id,
+                buffer_for_tool_decision=(
+                    classifier_round
+                    .utterance_route
+                    .route_type
+                    == "call_to_action"
+                ),
+                cancellation_token=(
+                    cancellation_token
+                ),
+            )
+        ):
+            if (
+                stream_event.event_type
+                == "content_delta"
+            ):
+                if first_token_seconds is None:
+                    first_token_seconds = (
+                        perf_counter()
+                        - model_resume_started_at
+                    )
+
+                response_parts.append(
+                    stream_event.text
+                )
+
+            if (
+                stream_event.event_type
+                == "response_cancelled"
+            ):
+                response_cancelled = True
+
+            if on_stream_event is not None:
+                on_stream_event(stream_event)
+
+        response = "".join(
+            response_parts
+        ).strip()
+        model_response_seconds = (
+            perf_counter()
+            - model_resume_started_at
+        )
+
+        if not response_cancelled:
+            add_dialogue_turn(
+                conversation_id=conversation_id,
+                role="assistant",
+                content=response,
+            )
+
+        post_classifier_seconds = (
+            perf_counter()
+            - response_stage_started_at
+        )
+        total_request_seconds = (
+            classifier_round.audit.total_seconds
+            + post_classifier_seconds
+        )
+        timing_debug_payload = {
+            **resolved_context.debug_payload,
+            "conversation_created": (
+                conversation_created
+            ),
+            "utterance_routing_mode": (
+                "classifier_tool"
+            ),
+            "classifier_tool_audit": (
+                classifier_round.audit.model_dump(
+                    mode="json"
+                )
+            ),
+            "timings": {
+                "model_to_classifier_tool_seconds": (
+                    classifier_round.audit
+                    .model_to_tool_call_seconds
+                ),
+                "classifier_execution_seconds": (
+                    classifier_round.audit
+                    .classifier_execution_seconds
+                ),
+                "context_resolution_seconds": round(
+                    context_resolution_seconds,
+                    4,
+                ),
+                "model_resume_to_first_token_seconds": (
+                    round(
+                        first_token_seconds,
+                        4,
+                    )
+                    if (
+                        first_token_seconds
+                        is not None
+                    )
+                    else None
+                ),
+                "model_response_seconds": round(
+                    model_response_seconds,
+                    4,
+                ),
+                "total_request_seconds": round(
+                    total_request_seconds,
+                    4,
+                ),
+            },
+        }
+        debug = None
+
+        if include_debug:
+            debug = QueryDebugInfo(
+                conversation_found=True,
+                subject_reference=(
+                    resolved_context
+                    .subject_reference
+                ),
+                context_source=(
+                    resolved_context
+                    .context_source
+                ),
+                context_used=bool(
+                    resolved_context.sources
+                    or resolved_context
+                    .prompt_payload
+                ),
+                dialogue_turns_used=len(
+                    dialogue_history
+                ),
+                prompt=response_prompt,
+                retrieval_used=(
+                    resolved_context
+                    .context_source
+                    not in (
+                        NON_RETRIEVAL_CONTEXT_SOURCES
+                    )
+                ),
+                sources_count=len(
+                    resolved_context.sources
+                ),
+                sources=resolved_context.sources,
+                debug_payload=(
+                    timing_debug_payload
+                ),
             )
 
         return QueryResult(

@@ -15,6 +15,9 @@ from conversation_core.schemas.turn_buffer_schemas import (
 from conversation_core.schemas.utterance_route_schemas import (
     UtteranceRoute,
 )
+from conversation_core.schemas.classifier_tool_schemas import (
+    ClassifierToolRoundResult,
+)
 from conversation_core.services.query_service import (
     QueryEngine,
     default_query_engine,
@@ -27,11 +30,18 @@ UtteranceClassifier = Callable[
     [str, bool],
     UtteranceRoute,
 ]
+ClassifierToolRunner = Callable[
+    ...,
+    ClassifierToolRoundResult,
+]
 
 
 def create_turn_buffer_router(
     query_engine: QueryEngine | None = None,
     utterance_classifier: UtteranceClassifier | None = None,
+    classifier_tool_runner: (
+        ClassifierToolRunner | None
+    ) = None,
 ) -> APIRouter:
     router = APIRouter()
     active_query_engine = query_engine or default_query_engine
@@ -79,6 +89,9 @@ def create_turn_buffer_router(
             event=event,
             query_engine=active_query_engine,
             utterance_classifier=utterance_classifier,
+            classifier_tool_runner=(
+                classifier_tool_runner
+            ),
             include_debug=request.debug,
         )
 

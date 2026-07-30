@@ -1,0 +1,740 @@
+{
+  "main_model": "gpt-oss:120b-cloud",
+  "main_model_think": false,
+  "main_model_streaming": true,
+  "architectures": {
+    "sequential": "Separate Gemma utterance classifier, then a fresh main-model response request.",
+    "classifier_tool": "Main model supplies the classification as mandatory tool arguments; backend validates without a classifier-model call, then resumes the same main-model conversation."
+  },
+  "boundary": "finalized_text_request_to_first_main_model_response_token",
+  "case_count": 3,
+  "repetitions": 3,
+  "sample_count": 18,
+  "summaries": {
+    "sequential": {
+      "mode": "sequential",
+      "valid_samples": 9,
+      "correct_classifications": 9,
+      "classification_accuracy": 1.0,
+      "median_classifier_seconds": 1.0144,
+      "median_context_resolution_seconds": 0.3824,
+      "median_prompt_build_seconds": 0.0001,
+      "median_model_resume_to_first_token_seconds": 9.7215,
+      "median_total_to_first_token_seconds": 11.7966
+    },
+    "classifier_tool": {
+      "mode": "classifier_tool",
+      "valid_samples": 9,
+      "correct_classifications": 8,
+      "classification_accuracy": 0.8889,
+      "median_classifier_seconds": 0.0002,
+      "median_context_resolution_seconds": 0.3813,
+      "median_prompt_build_seconds": 0.0001,
+      "median_model_resume_to_first_token_seconds": 2.5047,
+      "median_total_to_first_token_seconds": 6.8083,
+      "median_model_to_classifier_tool_seconds": 3.87
+    }
+  },
+  "paired_summary": {
+    "valid_pairs": 9,
+    "classifier_tool_faster_pairs": 2,
+    "median_classifier_tool_saving_seconds": -1.8217,
+    "mean_classifier_tool_saving_seconds": 0.9245,
+    "classifier_tool_response_stage_faster_pairs": 6,
+    "median_classifier_tool_response_stage_saving_seconds": 0.4246,
+    "mean_classifier_tool_response_stage_saving_seconds": 3.4466,
+    "pairs": [
+      {
+        "case_id": "artwork_information",
+        "repetition": 1,
+        "sequential_seconds": 3.7018,
+        "classifier_tool_seconds": 6.8083,
+        "classifier_tool_saving_seconds": -3.1065,
+        "classifier_tool_faster": false,
+        "sequential_response_stage_seconds": 2.3046,
+        "classifier_tool_response_stage_seconds": 2.9722,
+        "classifier_tool_response_stage_saving_seconds": -0.6676
+      },
+      {
+        "case_id": "artwork_information",
+        "repetition": 2,
+        "sequential_seconds": 16.172,
+        "classifier_tool_seconds": 6.8842,
+        "classifier_tool_saving_seconds": 9.2878,
+        "classifier_tool_faster": true,
+        "sequential_response_stage_seconds": 13.4556,
+        "classifier_tool_response_stage_seconds": 2.5047,
+        "classifier_tool_response_stage_saving_seconds": 10.9509
+      },
+      {
+        "case_id": "artwork_information",
+        "repetition": 3,
+        "sequential_seconds": 18.4986,
+        "classifier_tool_seconds": 4.4197,
+        "classifier_tool_saving_seconds": 14.0789,
+        "classifier_tool_faster": true,
+        "sequential_response_stage_seconds": 17.136,
+        "classifier_tool_response_stage_seconds": 0.9685,
+        "classifier_tool_response_stage_saving_seconds": 16.1675
+      },
+      {
+        "case_id": "greeting",
+        "repetition": 1,
+        "sequential_seconds": 2.0141,
+        "classifier_tool_seconds": 3.8358,
+        "classifier_tool_saving_seconds": -1.8217,
+        "classifier_tool_faster": false,
+        "sequential_response_stage_seconds": 1.0549,
+        "classifier_tool_response_stage_seconds": 1.0043,
+        "classifier_tool_response_stage_saving_seconds": 0.0506
+      },
+      {
+        "case_id": "greeting",
+        "repetition": 2,
+        "sequential_seconds": 2.1957,
+        "classifier_tool_seconds": 4.8071,
+        "classifier_tool_saving_seconds": -2.6114,
+        "classifier_tool_faster": false,
+        "sequential_response_stage_seconds": 1.3606,
+        "classifier_tool_response_stage_seconds": 0.936,
+        "classifier_tool_response_stage_saving_seconds": 0.4246
+      },
+      {
+        "case_id": "greeting",
+        "repetition": 3,
+        "sequential_seconds": 2.9268,
+        "classifier_tool_seconds": 5.329,
+        "classifier_tool_saving_seconds": -2.4022,
+        "classifier_tool_faster": false,
+        "sequential_response_stage_seconds": 1.4561,
+        "classifier_tool_response_stage_seconds": 2.1127,
+        "classifier_tool_response_stage_saving_seconds": -0.6566
+      },
+      {
+        "case_id": "highlights_tour",
+        "repetition": 1,
+        "sequential_seconds": 15.9763,
+        "classifier_tool_seconds": 16.3006,
+        "classifier_tool_saving_seconds": -0.3243,
+        "classifier_tool_faster": false,
+        "sequential_response_stage_seconds": 14.3406,
+        "classifier_tool_response_stage_seconds": 10.5694,
+        "classifier_tool_response_stage_saving_seconds": 3.7712
+      },
+      {
+        "case_id": "highlights_tour",
+        "repetition": 2,
+        "sequential_seconds": 11.7966,
+        "classifier_tool_seconds": 12.9437,
+        "classifier_tool_saving_seconds": -1.1471,
+        "classifier_tool_faster": false,
+        "sequential_response_stage_seconds": 10.4212,
+        "classifier_tool_response_stage_seconds": 8.0123,
+        "classifier_tool_response_stage_saving_seconds": 2.4089
+      },
+      {
+        "case_id": "highlights_tour",
+        "repetition": 3,
+        "sequential_seconds": 12.4808,
+        "classifier_tool_seconds": 16.1142,
+        "classifier_tool_saving_seconds": -3.6334,
+        "classifier_tool_faster": false,
+        "sequential_response_stage_seconds": 9.7215,
+        "classifier_tool_response_stage_seconds": 11.1515,
+        "classifier_tool_response_stage_saving_seconds": -1.43
+      }
+    ]
+  },
+  "case_summaries": [
+    {
+      "case_id": "artwork_information",
+      "sequential": {
+        "median_total_to_first_token_seconds": 16.172,
+        "median_response_stage_seconds": 13.4556,
+        "median_classifier_seconds": 1.0144
+      },
+      "classifier_tool": {
+        "median_total_to_first_token_seconds": 6.8083,
+        "median_response_stage_seconds": 2.5047,
+        "median_classifier_seconds": 0.0002,
+        "median_model_to_classifier_tool_seconds": 3.2706
+      }
+    },
+    {
+      "case_id": "greeting",
+      "sequential": {
+        "median_total_to_first_token_seconds": 2.1957,
+        "median_response_stage_seconds": 1.3606,
+        "median_classifier_seconds": 0.9588
+      },
+      "classifier_tool": {
+        "median_total_to_first_token_seconds": 4.8071,
+        "median_response_stage_seconds": 1.0043,
+        "median_classifier_seconds": 0.0003,
+        "median_model_to_classifier_tool_seconds": 3.2151
+      }
+    },
+    {
+      "case_id": "highlights_tour",
+      "sequential": {
+        "median_total_to_first_token_seconds": 12.4808,
+        "median_response_stage_seconds": 10.4212,
+        "median_classifier_seconds": 1.2108
+      },
+      "classifier_tool": {
+        "median_total_to_first_token_seconds": 16.1142,
+        "median_response_stage_seconds": 10.5694,
+        "median_classifier_seconds": 0.0002,
+        "median_model_to_classifier_tool_seconds": 4.5268
+      }
+    }
+  ],
+  "results": [
+    {
+      "mode": "classifier_tool",
+      "case_id": "artwork_information",
+      "text": "Tell me about The Arab Tent.",
+      "repetition": 1,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": null,
+        "candidate_subjects": [
+          "The Arab Tent"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "classifier_seconds": 0.0003,
+      "model_to_classifier_tool_seconds": 3.2706,
+      "context_resolution_seconds": 0.5643,
+      "prompt_build_seconds": 0.0001,
+      "model_resume_to_first_token_seconds": 2.9722,
+      "total_to_first_token_seconds": 6.8083,
+      "classifier_called_exactly_once": true,
+      "first_token": "**",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    },
+    {
+      "mode": "sequential",
+      "case_id": "artwork_information",
+      "text": "Tell me about The Arab Tent.",
+      "repetition": 1,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": null,
+        "candidate_subjects": [
+          "The Arab Tent"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "No reason provided.",
+        "routing_seconds": 1.0143
+      },
+      "classifier_seconds": 1.0144,
+      "model_to_classifier_tool_seconds": null,
+      "context_resolution_seconds": 0.3824,
+      "prompt_build_seconds": 0.0001,
+      "model_resume_to_first_token_seconds": 2.3046,
+      "total_to_first_token_seconds": 3.7018,
+      "classifier_called_exactly_once": null,
+      "first_token": "Certainly",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    },
+    {
+      "mode": "sequential",
+      "case_id": "greeting",
+      "text": "Hi, how are you?",
+      "repetition": 1,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": false,
+        "proposed_action": null,
+        "candidate_subjects": [],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "No reason provided.",
+        "routing_seconds": 0.9588
+      },
+      "classifier_seconds": 0.9588,
+      "model_to_classifier_tool_seconds": null,
+      "context_resolution_seconds": 0.0,
+      "prompt_build_seconds": 0.0,
+      "model_resume_to_first_token_seconds": 1.0549,
+      "total_to_first_token_seconds": 2.0141,
+      "classifier_called_exactly_once": null,
+      "first_token": "I'm",
+      "context_source": "utterance_without_retrieval",
+      "classification_correct": true
+    },
+    {
+      "mode": "classifier_tool",
+      "case_id": "greeting",
+      "text": "Hi, how are you?",
+      "repetition": 1,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": false,
+        "proposed_action": null,
+        "candidate_subjects": [],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "classifier_seconds": 0.0001,
+      "model_to_classifier_tool_seconds": 2.8305,
+      "context_resolution_seconds": 0.0,
+      "prompt_build_seconds": 0.0,
+      "model_resume_to_first_token_seconds": 1.0043,
+      "total_to_first_token_seconds": 3.8358,
+      "classifier_called_exactly_once": true,
+      "first_token": "I",
+      "context_source": "utterance_without_retrieval",
+      "classification_correct": true
+    },
+    {
+      "mode": "classifier_tool",
+      "case_id": "highlights_tour",
+      "text": "Start a highlights tour.",
+      "repetition": 1,
+      "success": true,
+      "route": {
+        "route_type": "call_to_action",
+        "floor_intent": "take_floor",
+        "requires_retrieval": false,
+        "proposed_action": "create_bounded_branch",
+        "candidate_subjects": [
+          "highlights"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "classifier_seconds": 0.0002,
+      "model_to_classifier_tool_seconds": 5.7305,
+      "context_resolution_seconds": 0.0,
+      "prompt_build_seconds": 0.0001,
+      "model_resume_to_first_token_seconds": 10.5694,
+      "total_to_first_token_seconds": 16.3006,
+      "classifier_called_exactly_once": true,
+      "first_token": "Sure",
+      "context_source": "utterance_without_retrieval",
+      "classification_correct": false
+    },
+    {
+      "mode": "sequential",
+      "case_id": "highlights_tour",
+      "text": "Start a highlights tour.",
+      "repetition": 1,
+      "success": true,
+      "route": {
+        "route_type": "call_to_action",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": "create_bounded_branch",
+        "candidate_subjects": [
+          "highlights tour"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "No reason provided.",
+        "routing_seconds": 1.2107
+      },
+      "classifier_seconds": 1.2108,
+      "model_to_classifier_tool_seconds": null,
+      "context_resolution_seconds": 0.4244,
+      "prompt_build_seconds": 0.0,
+      "model_resume_to_first_token_seconds": 14.3406,
+      "total_to_first_token_seconds": 15.9763,
+      "classifier_called_exactly_once": null,
+      "first_token": "Welcome",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    },
+    {
+      "mode": "sequential",
+      "case_id": "artwork_information",
+      "text": "Tell me about The Arab Tent.",
+      "repetition": 2,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": null,
+        "candidate_subjects": [
+          "The Arab Tent"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "No reason provided.",
+        "routing_seconds": 2.3347
+      },
+      "classifier_seconds": 2.3347,
+      "model_to_classifier_tool_seconds": null,
+      "context_resolution_seconds": 0.3813,
+      "prompt_build_seconds": 0.0001,
+      "model_resume_to_first_token_seconds": 13.4556,
+      "total_to_first_token_seconds": 16.172,
+      "classifier_called_exactly_once": null,
+      "first_token": "The",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    },
+    {
+      "mode": "classifier_tool",
+      "case_id": "artwork_information",
+      "text": "Tell me about The Arab Tent.",
+      "repetition": 2,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": null,
+        "candidate_subjects": [
+          "The Arab Tent"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "classifier_seconds": 0.0001,
+      "model_to_classifier_tool_seconds": 3.9974,
+      "context_resolution_seconds": 0.3813,
+      "prompt_build_seconds": 0.0002,
+      "model_resume_to_first_token_seconds": 2.5047,
+      "total_to_first_token_seconds": 6.8842,
+      "classifier_called_exactly_once": true,
+      "first_token": "**",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    },
+    {
+      "mode": "classifier_tool",
+      "case_id": "greeting",
+      "text": "Hi, how are you?",
+      "repetition": 2,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": false,
+        "proposed_action": null,
+        "candidate_subjects": [],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "classifier_seconds": 0.0004,
+      "model_to_classifier_tool_seconds": 3.87,
+      "context_resolution_seconds": 0.0001,
+      "prompt_build_seconds": 0.0,
+      "model_resume_to_first_token_seconds": 0.936,
+      "total_to_first_token_seconds": 4.8071,
+      "classifier_called_exactly_once": true,
+      "first_token": "Hello",
+      "context_source": "utterance_without_retrieval",
+      "classification_correct": true
+    },
+    {
+      "mode": "sequential",
+      "case_id": "greeting",
+      "text": "Hi, how are you?",
+      "repetition": 2,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": false,
+        "proposed_action": null,
+        "candidate_subjects": [],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "No reason provided.",
+        "routing_seconds": 0.8347
+      },
+      "classifier_seconds": 0.8348,
+      "model_to_classifier_tool_seconds": null,
+      "context_resolution_seconds": 0.0001,
+      "prompt_build_seconds": 0.0,
+      "model_resume_to_first_token_seconds": 1.3606,
+      "total_to_first_token_seconds": 2.1957,
+      "classifier_called_exactly_once": null,
+      "first_token": "I'm",
+      "context_source": "utterance_without_retrieval",
+      "classification_correct": true
+    },
+    {
+      "mode": "sequential",
+      "case_id": "highlights_tour",
+      "text": "Start a highlights tour.",
+      "repetition": 2,
+      "success": true,
+      "route": {
+        "route_type": "call_to_action",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": "create_bounded_branch",
+        "candidate_subjects": [
+          "highlights tour"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "No reason provided.",
+        "routing_seconds": 0.9882
+      },
+      "classifier_seconds": 0.9882,
+      "model_to_classifier_tool_seconds": null,
+      "context_resolution_seconds": 0.3866,
+      "prompt_build_seconds": 0.0001,
+      "model_resume_to_first_token_seconds": 10.4212,
+      "total_to_first_token_seconds": 11.7966,
+      "classifier_called_exactly_once": null,
+      "first_token": "Welcome",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    },
+    {
+      "mode": "classifier_tool",
+      "case_id": "highlights_tour",
+      "text": "Start a highlights tour.",
+      "repetition": 2,
+      "success": true,
+      "route": {
+        "route_type": "call_to_action",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": "create_bounded_branch",
+        "candidate_subjects": [
+          "highlights"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "classifier_seconds": 0.0002,
+      "model_to_classifier_tool_seconds": 4.5268,
+      "context_resolution_seconds": 0.4035,
+      "prompt_build_seconds": 0.0001,
+      "model_resume_to_first_token_seconds": 8.0123,
+      "total_to_first_token_seconds": 12.9437,
+      "classifier_called_exactly_once": true,
+      "first_token": "Sure",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    },
+    {
+      "mode": "classifier_tool",
+      "case_id": "artwork_information",
+      "text": "Tell me about The Arab Tent.",
+      "repetition": 3,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": null,
+        "candidate_subjects": [
+          "The Arab Tent"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "classifier_seconds": 0.0002,
+      "model_to_classifier_tool_seconds": 3.0509,
+      "context_resolution_seconds": 0.3989,
+      "prompt_build_seconds": 0.0001,
+      "model_resume_to_first_token_seconds": 0.9685,
+      "total_to_first_token_seconds": 4.4197,
+      "classifier_called_exactly_once": true,
+      "first_token": "**",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    },
+    {
+      "mode": "sequential",
+      "case_id": "artwork_information",
+      "text": "Tell me about The Arab Tent.",
+      "repetition": 3,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": null,
+        "candidate_subjects": [
+          "The Arab Tent"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "No reason provided.",
+        "routing_seconds": 0.9421
+      },
+      "classifier_seconds": 0.9421,
+      "model_to_classifier_tool_seconds": null,
+      "context_resolution_seconds": 0.4197,
+      "prompt_build_seconds": 0.0001,
+      "model_resume_to_first_token_seconds": 17.136,
+      "total_to_first_token_seconds": 18.4986,
+      "classifier_called_exactly_once": null,
+      "first_token": "Certainly",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    },
+    {
+      "mode": "sequential",
+      "case_id": "greeting",
+      "text": "Hi, how are you?",
+      "repetition": 3,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": false,
+        "proposed_action": null,
+        "candidate_subjects": [],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "No reason provided.",
+        "routing_seconds": 1.4702
+      },
+      "classifier_seconds": 1.4702,
+      "model_to_classifier_tool_seconds": null,
+      "context_resolution_seconds": 0.0,
+      "prompt_build_seconds": 0.0,
+      "model_resume_to_first_token_seconds": 1.4561,
+      "total_to_first_token_seconds": 2.9268,
+      "classifier_called_exactly_once": null,
+      "first_token": "Hi",
+      "context_source": "utterance_without_retrieval",
+      "classification_correct": true
+    },
+    {
+      "mode": "classifier_tool",
+      "case_id": "greeting",
+      "text": "Hi, how are you?",
+      "repetition": 3,
+      "success": true,
+      "route": {
+        "route_type": "response_request",
+        "floor_intent": "take_floor",
+        "requires_retrieval": false,
+        "proposed_action": null,
+        "candidate_subjects": [],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "classifier_seconds": 0.0003,
+      "model_to_classifier_tool_seconds": 3.2151,
+      "context_resolution_seconds": 0.0,
+      "prompt_build_seconds": 0.0,
+      "model_resume_to_first_token_seconds": 2.1127,
+      "total_to_first_token_seconds": 5.329,
+      "classifier_called_exactly_once": true,
+      "first_token": "I",
+      "context_source": "utterance_without_retrieval",
+      "classification_correct": true
+    },
+    {
+      "mode": "classifier_tool",
+      "case_id": "highlights_tour",
+      "text": "Start a highlights tour.",
+      "repetition": 3,
+      "success": true,
+      "route": {
+        "route_type": "call_to_action",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": "create_bounded_branch",
+        "candidate_subjects": [
+          "highlights tour"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "Classification supplied by the main model through the mandatory tool call.",
+        "routing_seconds": 0.0
+      },
+      "classifier_seconds": 0.0004,
+      "model_to_classifier_tool_seconds": 4.1316,
+      "context_resolution_seconds": 0.8299,
+      "prompt_build_seconds": 0.0001,
+      "model_resume_to_first_token_seconds": 11.1515,
+      "total_to_first_token_seconds": 16.1142,
+      "classifier_called_exactly_once": true,
+      "first_token": "Certainly",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    },
+    {
+      "mode": "sequential",
+      "case_id": "highlights_tour",
+      "text": "Start a highlights tour.",
+      "repetition": 3,
+      "success": true,
+      "route": {
+        "route_type": "call_to_action",
+        "floor_intent": "take_floor",
+        "requires_retrieval": true,
+        "proposed_action": "create_bounded_branch",
+        "candidate_subjects": [
+          "highlights tour"
+        ],
+        "is_relevant": true,
+        "should_ignore": false,
+        "confidence": 0.5,
+        "reason": "No reason provided.",
+        "routing_seconds": 1.8731
+      },
+      "classifier_seconds": 1.8731,
+      "model_to_classifier_tool_seconds": null,
+      "context_resolution_seconds": 0.8854,
+      "prompt_build_seconds": 0.0001,
+      "model_resume_to_first_token_seconds": 9.7215,
+      "total_to_first_token_seconds": 12.4808,
+      "classifier_called_exactly_once": null,
+      "first_token": "Welcome",
+      "context_source": "vector_retrieved_chunks",
+      "classification_correct": true
+    }
+  ]
+}

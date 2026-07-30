@@ -19,6 +19,9 @@ from conversation_core.schemas.tool_schemas import (
 from conversation_core.tools.core_tool_registry import (
     core_tool_registry,
 )
+from conversation_core.tools.utterance_classifier_tool import (
+    CLASSIFY_UTTERANCE_TOOL_NAME,
+)
 
 def check_llm_status() -> dict:
     url = f"{settings.ollama_base_url}/api/tags"
@@ -102,11 +105,35 @@ def generate_llm_response(
     except Exception as error:
         return f"error: {error}"
     
-def build_ollama_tool_definitions() -> list[dict[str, Any]]:
+def build_ollama_tool_definitions(
+    *,
+    tool_names: set[str] | None = None,
+    include_classifier: bool = False,
+) -> list[dict[str, Any]]:
     """
     Convert the application's generic ToolDefinition objects
     into the function-tool format expected by Ollama.
     """
+
+    definitions = (
+        core_tool_registry.get_definitions()
+    )
+
+    if tool_names is not None:
+        definitions = [
+            definition
+            for definition in definitions
+            if definition.name in tool_names
+        ]
+    elif not include_classifier:
+        definitions = [
+            definition
+            for definition in definitions
+            if (
+                definition.name
+                != CLASSIFY_UTTERANCE_TOOL_NAME
+            )
+        ]
 
     return [
         {
@@ -117,7 +144,7 @@ def build_ollama_tool_definitions() -> list[dict[str, Any]]:
                 "parameters": definition.parameters,
             },
         }
-        for definition in core_tool_registry.get_definitions()
+        for definition in definitions
     ]
 
 def parse_ollama_tool_calls(
@@ -153,13 +180,23 @@ def parse_ollama_tool_calls(
 def send_ollama_chat_request(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
+    *,
+    model: str | None = None,
+    think: bool | None = None,
 ) -> dict[str, Any]:
     url = f"{settings.ollama_base_url}/api/chat"
 
     payload: dict[str, Any] = {
-        "model": settings.ollama_model,
+        "model": (
+            model or settings.ollama_model
+        ),
         "messages": messages,
         "stream": False,
+        "think": (
+            settings.ollama_main_think
+            if think is None
+            else think
+        ),
     }
 
     if tools:
@@ -180,6 +217,9 @@ def stream_ollama_chat_request(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
     cancellation_token: CancellationToken | None = None,
+    *,
+    model: str | None = None,
+    think: bool | None = None,
 ) -> Iterator[dict[str, Any]]:
     url = (
         f"{settings.ollama_base_url}"
@@ -187,9 +227,16 @@ def stream_ollama_chat_request(
     )
 
     payload: dict[str, Any] = {
-        "model": settings.ollama_model,
+        "model": (
+            model or settings.ollama_model
+        ),
         "messages": messages,
         "stream": True,
+        "think": (
+            settings.ollama_main_think
+            if think is None
+            else think
+        ),
     }
 
     if tools:
@@ -228,6 +275,75 @@ def stream_ollama_chat_request(
             yield chunk
 
 
+def collect_streamed_ollama_chat_response(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
+    *,
+    model: str | None = None,
+    think: bool | None = None,
+) -> dict[str, Any]:
+    content_parts: list[str] = []
+    thinking_parts: list[str] = []
+    raw_tool_calls: list[
+        dict[str, Any]
+    ] = []
+    stream = stream_ollama_chat_request(
+        messages=messages,
+        tools=tools,
+        model=model,
+        think=think,
+    )
+
+    try:
+        for chunk in stream:
+            message = chunk.get("message") or {}
+            content = (
+                message.get("content") or ""
+            )
+            thinking = (
+                message.get("thinking") or ""
+            )
+            chunk_tool_calls = (
+                message.get("tool_calls") or []
+            )
+
+            if content:
+                content_parts.append(content)
+
+            if thinking:
+                thinking_parts.append(thinking)
+
+            if chunk_tool_calls:
+                raw_tool_calls.extend(
+                    chunk_tool_calls
+                )
+                break
+
+            if chunk.get("done"):
+                break
+    finally:
+        stream.close()
+
+    response_message: dict[str, Any] = {
+        "role": "assistant",
+        "content": "".join(content_parts),
+    }
+
+    if thinking_parts:
+        response_message["thinking"] = "".join(
+            thinking_parts
+        )
+
+    if raw_tool_calls:
+        response_message["tool_calls"] = (
+            raw_tool_calls
+        )
+
+    return {
+        "message": response_message,
+    }
+
+
 def stream_tool_aware_llm_response(
     prompt: str,
     conversation_id: str,
@@ -235,12 +351,46 @@ def stream_tool_aware_llm_response(
     buffer_for_tool_decision: bool,
     cancellation_token: CancellationToken | None = None,
     max_tool_rounds: int = 5,
+    model: str | None = None,
+    think: bool | None = None,
 ) -> Iterator[LLMStreamEvent]:
     messages: list[dict[str, Any]] = [
         {
             "role": "user",
             "content": prompt,
         }
+    ]
+
+    yield from (
+        stream_tool_aware_llm_messages(
+            messages=messages,
+            conversation_id=conversation_id,
+            buffer_for_tool_decision=(
+                buffer_for_tool_decision
+            ),
+            cancellation_token=(
+                cancellation_token
+            ),
+            max_tool_rounds=max_tool_rounds,
+            model=model,
+            think=think,
+        )
+    )
+
+
+def stream_tool_aware_llm_messages(
+    messages: list[dict[str, Any]],
+    conversation_id: str,
+    *,
+    buffer_for_tool_decision: bool,
+    cancellation_token: CancellationToken | None = None,
+    max_tool_rounds: int = 5,
+    model: str | None = None,
+    think: bool | None = None,
+) -> Iterator[LLMStreamEvent]:
+    messages = [
+        dict(message)
+        for message in messages
     ]
     tools = build_ollama_tool_definitions()
     execution_context = ToolExecutionContext(
@@ -287,6 +437,8 @@ def stream_tool_aware_llm_response(
                 cancellation_token=(
                     cancellation_token
                 ),
+                model=model,
+                think=think,
             ):
                 response_message = (
                     chunk.get("message") or {}

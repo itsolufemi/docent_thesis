@@ -14,9 +14,22 @@ class Settings():
 
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
+    ollama_main_think: bool = os.getenv(
+        "OLLAMA_MAIN_THINK",
+        "false",
+    ).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     ollama_embedding_model: str = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
     ollama_trp_model: str = os.getenv("OLLAMA_TRP_MODEL", "")
     ollama_classifier_model: str = os.getenv("OLLAMA_CLASSIFIER_MODEL", "")
+    utterance_routing_mode: str = os.getenv(
+        "UTTERANCE_ROUTING_MODE",
+        "sequential",
+    ).strip().lower()
 
     whisper_model: str = os.getenv("WHISPER_MODEL", "base.en")
     whisper_device: str = os.getenv("WHISPER_DEVICE", "cpu")

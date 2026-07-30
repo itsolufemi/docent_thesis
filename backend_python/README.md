@@ -120,3 +120,26 @@ uvicorn server:app --reload --port 8000
 ```
 
 3. The client expects CORS origins at `http://localhost:5173` (see `server.py`).
+# Utterance-routing modes
+
+The voice turn pipeline supports two routing modes through:
+
+```text
+UTTERANCE_ROUTING_MODE=sequential
+```
+
+Available values:
+
+- `sequential` keeps the established classifier → context resolution → response path.
+- `classifier_tool` enables the experimental mandatory first-round `classify_utterance` tool.
+
+The `classifier_tool` implementation exposes only the classifier tool during the mandatory first round. The main model must place both the unchanged utterance and its classification in the tool arguments. The backend validates and normalises those arguments without making a separate classifier-model request, resolves context from the result, and resumes the same main-model conversation to stream the assistant response.
+
+The main Ollama model and reasoning profile are configured independently:
+
+```text
+OLLAMA_MODEL=gemma4:cloud
+OLLAMA_MAIN_THINK=false
+```
+
+Both the mandatory classifier-tool round and subsequent streamed response rounds use this profile unless an experiment explicitly supplies an override.

@@ -24,6 +24,9 @@ from conversation_core.schemas.llm_stream_schemas import (
 from conversation_core.schemas.utterance_route_schemas import (
     UtteranceRoute,
 )
+from conversation_core.schemas.classifier_tool_schemas import (
+    ClassifierToolRoundResult,
+)
 from conversation_core.services.query_service import (
     QueryEngine,
     default_query_engine,
@@ -39,6 +42,10 @@ from conversation_core.services.turn_buffer_service import (
 UtteranceClassifier = Callable[
     [str, bool],
     UtteranceRoute,
+]
+ClassifierToolRunner = Callable[
+    ...,
+    ClassifierToolRoundResult,
 ]
 
 
@@ -116,6 +123,9 @@ async def process_streamed_turn_event(
     payload: dict,
     query_engine: QueryEngine,
     utterance_classifier: UtteranceClassifier | None,
+    classifier_tool_runner: (
+        ClassifierToolRunner | None
+    ),
     cancellation_token: CancellationToken,
     send_lock: asyncio.Lock,
 ) -> None:
@@ -180,8 +190,69 @@ async def process_streamed_turn_event(
             return
 
         utterance_route = None
+        classifier_tool_result = None
 
-        if utterance_classifier is not None:
+        if classifier_tool_runner is not None:
+            await send_message(
+                {
+                    "type": (
+                        "classifier_tool_started"
+                    ),
+                    "request_id": request_id,
+                    "payload": {
+                        "utterance": (
+                            finalised_utterance
+                        ),
+                    },
+                }
+            )
+            classifier_tool_result = (
+                await asyncio.to_thread(
+                    classifier_tool_runner,
+                    text=finalised_utterance,
+                    conversation_id=(
+                        conversation_id
+                    ),
+                    assistant_was_speaking=(
+                        event
+                        .assistant_was_speaking
+                    ),
+                )
+            )
+            utterance_route = (
+                classifier_tool_result
+                .utterance_route
+            )
+
+            await send_message(
+                {
+                    "type": (
+                        "utterance_classified"
+                    ),
+                    "request_id": request_id,
+                    "payload": (
+                        utterance_route.model_dump(
+                            mode="json"
+                        )
+                    ),
+                }
+            )
+            await send_message(
+                {
+                    "type": (
+                        "classifier_tool_complete"
+                    ),
+                    "request_id": request_id,
+                    "payload": (
+                        classifier_tool_result
+                        .model_dump(
+                            mode="json"
+                        )
+                    ),
+                }
+            )
+
+        elif utterance_classifier is not None:
             utterance_route = await asyncio.to_thread(
                 utterance_classifier,
                 finalised_utterance,
@@ -225,6 +296,35 @@ async def process_streamed_turn_event(
 
         async def run_query():
             try:
+                if (
+                    classifier_tool_result
+                    is not None
+                ):
+                    return await asyncio.to_thread(
+                        query_engine
+                        .generate_classifier_tool_streaming_response,
+                        text=finalised_utterance,
+                        classifier_round=(
+                            classifier_tool_result
+                        ),
+                        conversation_id=(
+                            conversation_id
+                        ),
+                        subject_reference=None,
+                        include_debug=bool(
+                            payload.get(
+                                "debug",
+                                False,
+                            )
+                        ),
+                        on_stream_event=(
+                            handle_stream_event
+                        ),
+                        cancellation_token=(
+                            cancellation_token
+                        ),
+                    )
+
                 return await asyncio.to_thread(
                     query_engine
                     .generate_streaming_response,
@@ -333,13 +433,27 @@ async def process_streamed_turn_event(
         return
     except Exception as error:
         try:
+            error_payload = {
+                "detail": str(error),
+            }
+            error_audit = getattr(
+                error,
+                "audit",
+                None,
+            )
+
+            if error_audit is not None:
+                error_payload[
+                    "classifier_tool_audit"
+                ] = error_audit.model_dump(
+                    mode="json"
+                )
+
             await send_message(
                 {
                     "type": "turn_error",
                     "request_id": request_id,
-                    "payload": {
-                        "detail": str(error),
-                    },
+                    "payload": error_payload,
                 }
             )
         except (WebSocketDisconnect, RuntimeError):
@@ -349,6 +463,9 @@ async def process_streamed_turn_event(
 def create_turn_buffer_stream_router(
     query_engine: QueryEngine | None = None,
     utterance_classifier: UtteranceClassifier | None = None,
+    classifier_tool_runner: (
+        ClassifierToolRunner | None
+    ) = None,
 ) -> APIRouter:
     router = APIRouter()
     active_query_engine = (
@@ -513,6 +630,9 @@ def create_turn_buffer_stream_router(
                         ),
                         utterance_classifier=(
                             utterance_classifier
+                        ),
+                        classifier_tool_runner=(
+                            classifier_tool_runner
                         ),
                         cancellation_token=(
                             cancellation_token

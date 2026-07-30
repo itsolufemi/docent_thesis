@@ -32,6 +32,10 @@ from conversation_core.api.routes_turn_detection import (
 from conversation_core.api.routes_utterance_router import (
     router as utterance_router,
 )
+from conversation_core.services.classifier_tool_orchestration_service import (
+    run_required_classifier_tool_round,
+)
+from config import settings
 
 from docent.api.routes_artworks import router as artworks_router
 from docent.api.routes_docent_index import router as docent_index_router
@@ -74,13 +78,48 @@ app.add_middleware(
 query_router = create_query_router(
     query_engine=docent_query_engine,
 )
+if settings.utterance_routing_mode not in {
+    "sequential",
+    "classifier_tool",
+}:
+    raise ValueError(
+        "UTTERANCE_ROUTING_MODE must be "
+        "'sequential' or 'classifier_tool'."
+    )
+
+active_utterance_classifier = (
+    classify_docent_utterance
+    if (
+        settings.utterance_routing_mode
+        == "sequential"
+    )
+    else None
+)
+active_classifier_tool_runner = (
+    run_required_classifier_tool_round
+    if (
+        settings.utterance_routing_mode
+        == "classifier_tool"
+    )
+    else None
+)
 turn_buffer_router = create_turn_buffer_router(
     query_engine=docent_query_engine,
-    utterance_classifier=classify_docent_utterance,
+    utterance_classifier=(
+        active_utterance_classifier
+    ),
+    classifier_tool_runner=(
+        active_classifier_tool_runner
+    ),
 )
 turn_buffer_stream_router = create_turn_buffer_stream_router(
     query_engine=docent_query_engine,
-    utterance_classifier=classify_docent_utterance,
+    utterance_classifier=(
+        active_utterance_classifier
+    ),
+    classifier_tool_runner=(
+        active_classifier_tool_runner
+    ),
 )
 transcription_router = create_transcription_router()
 audio_stream_router = create_audio_stream_router()

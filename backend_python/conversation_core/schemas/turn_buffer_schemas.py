@@ -5,6 +5,9 @@ from conversation_core.schemas.turn_detection_schemas import TurnDecisionType
 from conversation_core.schemas.utterance_route_schemas import (
     UtteranceRoute,
 )
+from conversation_core.schemas.classifier_tool_schemas import (
+    ClassifierToolRoundResult,
+)
 
 
 class TurnBufferState(BaseModel):
@@ -44,4 +47,7 @@ class TurnBufferResult(BaseModel):
 class TurnProcessingResult(BaseModel):
     turn: TurnBufferResult
     utterance_route: UtteranceRoute | None = None
+    classifier_tool: (
+        ClassifierToolRoundResult | None
+    ) = None
     query: QueryResponse | None = None

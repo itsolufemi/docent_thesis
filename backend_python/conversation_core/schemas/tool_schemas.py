@@ -39,6 +39,7 @@ class ToolExecutionContext(BaseModel):
     """
 
     conversation_id: str
+    assistant_was_speaking: bool = False
 
 
 class ToolExecutionResult(BaseModel):
