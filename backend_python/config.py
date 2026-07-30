@@ -69,6 +69,11 @@ class Settings():
         "int8",
     )
 
+    warm_up_whisper_on_startup: bool = _read_bool(
+        "WARM_UP_WHISPER_ON_STARTUP",
+        True
+    )
+
     smart_turn_enabled: bool = _read_bool(
         "SMART_TURN_ENABLED",
         False,

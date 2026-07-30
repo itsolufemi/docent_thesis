@@ -1,7 +1,9 @@
 from pathlib import Path
 from threading import Lock
+from time import perf_counter
 
 import numpy as np
+
 from faster_whisper import WhisperModel
 
 from config import settings
@@ -47,6 +49,29 @@ class TranscriptionService:
                 )
 
         return self._model
+
+    def warm_up(self) -> float:
+        """
+        Load Whisper and run a short silent inference so that the first
+        real transcription does not pay model initialisation costs.
+
+        Returns the warm-up duration in seconds.
+        """
+        started_at = perf_counter()
+
+        self._get_model()
+
+        silence = np.zeros(
+            16_000,
+            dtype=np.float32,
+        )
+
+        self._transcribe_input(
+            silence,
+            language="en",
+        )
+
+        return perf_counter() - started_at
 
     def _transcribe_input(
         self,

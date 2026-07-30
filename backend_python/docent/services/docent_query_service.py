@@ -33,6 +33,7 @@ from extensions.retrieval.services.keyword_retrieval_service import (
 from docent.services.docent_vector_retrieval_service import (
     retrieve_docent_chunks_by_vector_similarity,
 )
+from docent.services.introduction_service import build_docent_introduction
 
 def docent_parse_subject_reference(
     subject_reference: str,
@@ -903,4 +904,7 @@ self_routing_docent_query_engine = QueryEngine(
         self_routing_response_generator
     ),
     self_routing_enabled=True,
+    introduction_provider=(
+        build_docent_introduction
+    )
 )

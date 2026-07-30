@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from threading import RLock
 from time import perf_counter
 
 from conversation_core.memory.conversation_store import (
@@ -6,7 +7,9 @@ from conversation_core.memory.conversation_store import (
     create_conversation,
     get_active_branch,
     get_conversation,
+    get_conversation_introduction,
     get_recent_conversation_history,
+    set_conversation_introduction,
 )
 from conversation_core.schemas.context_schemas import QueryDebugInfo
 from conversation_core.schemas.conversation_schemas import (
@@ -46,6 +49,10 @@ from conversation_core.services.prompt_service import (
 from conversation_core.services.self_routing_parser import (
     SelfRoutingStreamParser,
 )
+from conversation_core.services.introduction_service import (
+    IntroductionProvider,
+)
+
 
 NON_RETRIEVAL_CONTEXT_SOURCES = {
     "no_context",
@@ -82,6 +89,11 @@ ResponseGenerator = Callable[
 LLMStreamCallback = Callable[
     [LLMStreamEvent],
     None,
+]
+
+IntroductionResponseGenerator = Callable[
+    [str],
+    str,
 ]
 
 def default_response_generator(
@@ -124,6 +136,10 @@ class QueryEngine:
         prompt_builder: PromptBuilder,
         response_generator: ResponseGenerator | None = None,
         self_routing_enabled: bool = False,
+        introduction_provider: IntroductionProvider | None = None,
+        introduction_response_generator: (
+            IntroductionResponseGenerator | None
+        ) = None,
     ):
         self.subject_resolver = subject_resolver
         self.prompt_builder = prompt_builder
@@ -133,6 +149,93 @@ class QueryEngine:
         self.self_routing_enabled = (
             self_routing_enabled
         )
+        self.introduction_provider = (
+            introduction_provider
+        )
+        self.introduction_response_generator = (
+            introduction_response_generator
+            or generate_llm_response
+        )
+        self._introduction_lock = RLock()
+
+    def ensure_introduction(
+        self,
+        *,
+        conversation_id: str,
+    ) -> tuple[str | None, bool]:
+        """
+        Return this conversation's introduction, generating it once.
+
+        This is intentionally a direct, tool-free LLM request. It does
+        not invoke context resolution, retrieval, classification, TRP,
+        or the self-routing response parser.
+        """
+        with self._introduction_lock:
+            existing = get_conversation_introduction(
+                conversation_id
+            )
+
+            if existing is not None:
+                return existing, False
+
+            if get_conversation(conversation_id) is None:
+                return None, False
+
+            definition = (
+                self.introduction_provider()
+                if self.introduction_provider
+                is not None
+                else None
+            )
+
+            if definition is None:
+                return None, False
+
+            try:
+                response = (
+                    self.introduction_response_generator(
+                        definition.prompt
+                    )
+                    .strip()
+                )
+
+                if response.lower().startswith(
+                    ("error:", "ollama error:")
+                ):
+                    raise RuntimeError(response)
+            except Exception:
+                response = (
+                    definition.fallback_text
+                    or ""
+                ).strip()
+
+            if not response:
+                return None, False
+
+            if definition.store_as_dialogue_turn:
+                add_dialogue_turn(
+                    conversation_id=conversation_id,
+                    role="assistant",
+                    content=response,
+                )
+
+            set_conversation_introduction(
+                conversation_id,
+                response,
+            )
+
+            return response, True
+
+    def generate_introduction(
+        self,
+        *,
+        conversation_id: str,
+    ) -> str | None:
+        introduction, _ = self.ensure_introduction(
+            conversation_id=conversation_id
+        )
+        return introduction
+
 
     def generate_response(
         self,

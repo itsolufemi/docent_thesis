@@ -18,6 +18,72 @@ from conversation_core.services.transcription_service import (
 
 
 class TranscriptionServiceTest(unittest.TestCase):
+    def test_warm_up_loads_model_and_runs_silent_inference(
+        self,
+    ) -> None:
+        service = TranscriptionService(
+            model_name="base.en",
+            device="cpu",
+            compute_type="int8",
+        )
+        fake_model = Mock()
+        fake_model.transcribe.return_value = (
+            iter([]),
+            SimpleNamespace(
+                language="en",
+                language_probability=1.0,
+                duration=1.0,
+            ),
+        )
+        service._model = fake_model
+
+        duration = service.warm_up()
+
+        self.assertGreaterEqual(duration, 0.0)
+        audio_argument = (
+            fake_model.transcribe.call_args.args[0]
+        )
+        self.assertEqual(audio_argument.dtype, np.float32)
+        self.assertEqual(audio_argument.shape, (16_000,))
+        self.assertTrue(
+            np.all(audio_argument == 0.0)
+        )
+
+    def test_warm_up_can_be_called_twice_safely(
+        self,
+    ) -> None:
+        service = TranscriptionService(
+            model_name="base.en",
+            device="cpu",
+            compute_type="int8",
+        )
+        fake_model = Mock()
+        fake_model.transcribe.side_effect = [
+            (
+                iter([]),
+                SimpleNamespace(
+                    language="en",
+                    duration=1.0,
+                ),
+            ),
+            (
+                iter([]),
+                SimpleNamespace(
+                    language="en",
+                    duration=1.0,
+                ),
+            ),
+        ]
+        service._model = fake_model
+
+        service.warm_up()
+        service.warm_up()
+
+        self.assertEqual(
+            fake_model.transcribe.call_count,
+            2,
+        )
+
     @patch(
         "conversation_core.services.transcription_service."
         "WhisperModel"
