@@ -12,6 +12,8 @@ from ..schemas.conversation_schemas import (
 
 conversations: dict[str, ConversationState] = {}
 
+INTRODUCTION_TEXT_METADATA_KEY = "introduction_text"
+
 
 def generate_branch_name(tree: ConversationTree) -> str:
     return f"branch-{len(tree.branches) + 1}"
@@ -280,5 +282,41 @@ def get_recent_conversation_history(
         return []
     
     return state.dialogue_history[-limit:]
+
+
+def get_conversation_introduction(
+    conversation_id: str,
+) -> str | None:
+    state = get_conversation(conversation_id)
+
+    if state is None:
+        return None
+
+    introduction = state.metadata.get(
+        INTRODUCTION_TEXT_METADATA_KEY
+    )
+
+    return (
+        introduction
+        if isinstance(introduction, str)
+        else None
+    )
+
+
+def set_conversation_introduction(
+    conversation_id: str,
+    text: str,
+) -> ConversationState | None:
+    state = get_conversation(conversation_id)
+
+    if state is None:
+        return None
+
+    state.metadata[
+        INTRODUCTION_TEXT_METADATA_KEY
+    ] = text
+    conversations[conversation_id] = state
+
+    return state
 
 

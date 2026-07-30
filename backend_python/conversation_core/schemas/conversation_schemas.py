@@ -81,6 +81,10 @@ class ConversationState(BaseModel):
         default_factory=list
     )
 
+    metadata: dict[str, object] = Field(
+        default_factory=dict
+    )
+
 
 class StartConversationResponse(BaseModel):
     conversation_id: str

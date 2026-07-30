@@ -6,6 +6,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _read_bool(
+    name: str,
+    default: bool = False,
+) -> bool:
+    value = _optional_boolean(name)
+
+    if value is None:
+        return default
+
+    return value
+
+
 def _optional_boolean(
     name: str,
 ) -> bool | None:
@@ -58,6 +70,11 @@ class Settings():
     whisper_compute_type: str = os.getenv(
         "WHISPER_COMPUTE_TYPE",
         "int8",
+    )
+
+    warm_up_whisper_on_startup: bool = _read_bool(
+        "WARM_UP_WHISPER_ON_STARTUP",
+        True
     )
 
     docent_vector_store_directory: Path = (

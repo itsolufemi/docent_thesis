@@ -3,6 +3,9 @@ import StartScreen from './StartScreen';
 import MainApp from './MainApp';
 import { connectToServer, makeServerRequest } from './utils/server_functions';
 import { AudioStreamClient } from '../api/audioStreamClient';
+import {
+  requestConversationIntroduction,
+} from '../api/conversationApi';
 import { synthesiseSpeech } from '../api/ttsApi';
 import { TtsStreamClient } from '../api/ttsStreamClient';
 import { TurnStreamClient } from '../api/turnStreamClient';
@@ -598,9 +601,8 @@ export default function MainApplication() {
     };
   }, []);
 
-  const handleStartClick = () => {
+  const handleStartClick = async () => {
     setStarted(true);
-    makeServerRequest('introduction');
     setPanel('text');
 
     if (!speakAudioContextRef.current) {
@@ -610,6 +612,30 @@ export default function MainApplication() {
     }
 
     speakAudioContextRef.current.resume();
+
+    try {
+      const introduction =
+        await requestConversationIntroduction();
+
+      if (introduction.text) {
+        setStreamedAssistantResponse(
+          introduction.text,
+        );
+        void streamAssistantResponse(
+          introduction.text,
+        );
+      }
+    } catch (error) {
+      console.error(
+        'Could not generate the conversation introduction:',
+        error,
+      );
+      setAssistantAudioError(
+        error instanceof Error
+          ? error.message
+          : 'The introduction request failed.',
+      );
+    }
   };
 
   const sendChunkToServer = (chunk) => {

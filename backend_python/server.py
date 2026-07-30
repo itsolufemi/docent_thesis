@@ -1,11 +1,16 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from config import settings
 
 from conversation_core.api.routes_audio_stream import (
     create_audio_stream_router,
 )
 from conversation_core.api.routes_conversation import (
-    router as conversation_router,
+    create_conversation_router,
 )
 from conversation_core.api.routes_health import router as health_router
 from conversation_core.api.routes_llm import router as llm_router
@@ -32,6 +37,9 @@ from conversation_core.api.routes_turn_detection import (
 from conversation_core.api.routes_utterance_router import (
     router as utterance_router,
 )
+from conversation_core.services.transcription_service import (
+    default_transcription_service,
+)
 
 from docent.api.routes_artworks import router as artworks_router
 from docent.api.routes_docent_index import router as docent_index_router
@@ -43,9 +51,33 @@ from docent.api.routes_docent_embeddings import router as docent_embeddings_rout
 from docent.api.routes_docent_vector import router as docent_vector_router
 
 
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if settings.warm_up_whisper_on_startup:
+        try:
+            warm_up_seconds = await asyncio.to_thread(
+                default_transcription_service.warm_up
+            )
+            logger.info(
+                "Whisper warm-up completed in %.3f seconds.",
+                warm_up_seconds,
+            )
+        except Exception:
+            logger.exception(
+                "Whisper warm-up failed. "
+                "The service will continue with lazy loading."
+            )
+
+    yield
+
+
 app = FastAPI(
     title="docent backend",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 permitted_origins = [
@@ -71,6 +103,11 @@ app.add_middleware(
 )
 
 query_router = create_query_router(
+    query_engine=(
+        self_routing_docent_query_engine
+    ),
+)
+conversation_router = create_conversation_router(
     query_engine=(
         self_routing_docent_query_engine
     ),
