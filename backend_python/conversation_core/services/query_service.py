@@ -16,6 +16,9 @@ from conversation_core.schemas.conversation_schemas import (
 from conversation_core.schemas.llm_stream_schemas import (
     LLMStreamEvent,
 )
+from conversation_core.schemas.self_routing_schemas import (
+    SelfRoutingAssessment,
+)
 from conversation_core.schemas.prompt_schemas import (
     PromptProfile,
     PromptSection,
@@ -39,6 +42,9 @@ from conversation_core.services.cancellation import (
 from conversation_core.services.prompt_service import (
     build_prompt,
     format_conversation_branch_for_prompt,
+)
+from conversation_core.services.self_routing_parser import (
+    SelfRoutingStreamParser,
 )
 
 NON_RETRIEVAL_CONTEXT_SOURCES = {
@@ -91,17 +97,41 @@ def default_response_generator(
     )
 
 
+def self_routing_response_generator(
+    prompt: str,
+    conversation_id: str | None,
+) -> str:
+    if conversation_id is None:
+        return generate_llm_response(prompt)
+
+    response_parts: list[str] = []
+
+    for event in stream_tool_aware_llm_response(
+        prompt=prompt,
+        conversation_id=conversation_id,
+        buffer_for_tool_decision=False,
+    ):
+        if event.event_type == "content_delta":
+            response_parts.append(event.text)
+
+    return "".join(response_parts).strip()
+
+
 class QueryEngine:
     def __init__(
         self,
         subject_resolver: SubjectResolver,
         prompt_builder: PromptBuilder,
         response_generator: ResponseGenerator | None = None,
+        self_routing_enabled: bool = False,
     ):
         self.subject_resolver = subject_resolver
         self.prompt_builder = prompt_builder
         self.response_generator = (
             response_generator or default_response_generator
+        )
+        self.self_routing_enabled = (
+            self_routing_enabled
         )
 
     def generate_response(
@@ -195,6 +225,25 @@ class QueryEngine:
         response_generation_seconds = (
             perf_counter() - response_generation_started_at
         )
+        self_routing_assessment: (
+            SelfRoutingAssessment | None
+        ) = None
+        self_routing_validation_error: (
+            str | None
+        ) = None
+
+        if self.self_routing_enabled:
+            parser = SelfRoutingStreamParser()
+            response = parser.consume(
+                response
+            ) + parser.finish()
+            response = response.strip()
+            self_routing_assessment = (
+                parser.route
+            )
+            self_routing_validation_error = (
+                parser.validation_error
+            )
 
         # Store dialogue for newly created and existing conversations.
         if conversation_state is not None:
@@ -217,6 +266,21 @@ class QueryEngine:
         timing_debug_payload = {
             **resolved_context.debug_payload,
             "conversation_created": conversation_created,
+            "self_routing": (
+                self_routing_assessment.model_dump(
+                    mode="json"
+                )
+                if self_routing_assessment
+                is not None
+                else None
+            ),
+            "self_routing_valid": (
+                self_routing_assessment
+                is not None
+            ),
+            "self_routing_validation_error": (
+                self_routing_validation_error
+            ),
             "timings": {
                 "total_request_seconds": round(
                     total_request_seconds,
@@ -229,6 +293,14 @@ class QueryEngine:
                 "response_generation_seconds": round(
                     response_generation_seconds,
                     4,
+                ),
+                "self_routing_seconds": (
+                    round(
+                        response_generation_seconds,
+                        4,
+                    )
+                    if self.self_routing_enabled
+                    else None
                 ),
             },
         }
@@ -342,6 +414,18 @@ class QueryEngine:
             )
 
         response_generation_started_at = perf_counter()
+        self_routing_parser = (
+            SelfRoutingStreamParser()
+            if self.self_routing_enabled
+            else None
+        )
+        self_routing_assessment: (
+            SelfRoutingAssessment | None
+        ) = None
+        self_routing_seconds: float | None = None
+        first_spoken_token_seconds: (
+            float | None
+        ) = None
 
         response_cancelled = (
             cancellation_token is not None
@@ -403,6 +487,9 @@ class QueryEngine:
                 )
         else:
             response_parts: list[str] = []
+            deferred_tool_events: list[
+                LLMStreamEvent
+            ] = []
             buffer_for_tool_decision = (
                 utterance_route is not None
                 and utterance_route.route_type
@@ -425,15 +512,202 @@ class QueryEngine:
                     stream_event.event_type
                     == "content_delta"
                 ):
-                    response_parts.append(
+                    spoken_delta = (
                         stream_event.text
                     )
+
+                    if (
+                        self_routing_parser
+                        is not None
+                    ):
+                        spoken_delta = (
+                            self_routing_parser
+                            .consume(
+                                stream_event.text
+                            )
+                        )
+
+                        if (
+                            self_routing_parser
+                            .route_just_completed
+                            and self_routing_seconds
+                            is None
+                        ):
+                            self_routing_seconds = (
+                                perf_counter()
+                                - response_generation_started_at
+                            )
+                            self_routing_assessment = (
+                                self_routing_parser
+                                .route
+                            )
+
+                            if (
+                                on_stream_event
+                                is not None
+                            ):
+                                on_stream_event(
+                                    LLMStreamEvent(
+                                        event_type=(
+                                            "self_routing"
+                                        ),
+                                        route_assessment=(
+                                            self_routing_assessment
+                                            .model_dump(
+                                                mode="json"
+                                            )
+                                            if self_routing_assessment
+                                            is not None
+                                            else None
+                                        ),
+                                    )
+                                )
+
+                                for deferred_event in (
+                                    deferred_tool_events
+                                ):
+                                    on_stream_event(
+                                        deferred_event
+                                    )
+
+                                deferred_tool_events.clear()
+
+                    if spoken_delta:
+                        response_parts.append(
+                            spoken_delta
+                        )
+
+                        if (
+                            first_spoken_token_seconds
+                            is None
+                        ):
+                            first_spoken_token_seconds = (
+                                perf_counter()
+                                - response_generation_started_at
+                            )
+
+                        if on_stream_event is not None:
+                            on_stream_event(
+                                LLMStreamEvent(
+                                    event_type=(
+                                        "content_delta"
+                                    ),
+                                    text=spoken_delta,
+                                )
+                            )
+
+                    continue
+
+                if (
+                    stream_event.event_type
+                    == "response_complete"
+                    and self_routing_parser
+                    is not None
+                ):
+                    final_spoken_text = (
+                        self_routing_parser.finish()
+                    )
+
+                    if (
+                        self_routing_parser
+                        .route_just_completed
+                        and self_routing_seconds
+                        is None
+                    ):
+                        self_routing_seconds = (
+                            perf_counter()
+                            - response_generation_started_at
+                        )
+                        self_routing_assessment = (
+                            self_routing_parser.route
+                        )
+
+                        if on_stream_event is not None:
+                            on_stream_event(
+                                LLMStreamEvent(
+                                    event_type=(
+                                        "self_routing"
+                                    ),
+                                    route_assessment=(
+                                        self_routing_assessment
+                                        .model_dump(
+                                            mode="json"
+                                        )
+                                        if self_routing_assessment
+                                        is not None
+                                        else None
+                                    ),
+                                )
+                            )
+
+                            for deferred_event in (
+                                deferred_tool_events
+                            ):
+                                on_stream_event(
+                                    deferred_event
+                                )
+
+                            deferred_tool_events.clear()
+
+                    if final_spoken_text:
+                        response_parts.append(
+                            final_spoken_text
+                        )
+
+                        if (
+                            first_spoken_token_seconds
+                            is None
+                        ):
+                            first_spoken_token_seconds = (
+                                perf_counter()
+                                - response_generation_started_at
+                            )
+
+                        if on_stream_event is not None:
+                            on_stream_event(
+                                LLMStreamEvent(
+                                    event_type=(
+                                        "content_delta"
+                                    ),
+                                    text=final_spoken_text,
+                                )
+                            )
+
+                    if on_stream_event is not None:
+                        on_stream_event(
+                            LLMStreamEvent(
+                                event_type=(
+                                    "response_complete"
+                                ),
+                                text="".join(
+                                    response_parts
+                                ).strip(),
+                                done=True,
+                            )
+                        )
+                    continue
 
                 if (
                     stream_event.event_type
                     == "response_cancelled"
                 ):
                     response_cancelled = True
+
+                if (
+                    self_routing_parser
+                    is not None
+                    and not self_routing_parser
+                    .route_complete
+                    and stream_event.event_type
+                    in {
+                        "tool_call",
+                        "tool_result",
+                    }
+                ):
+                    deferred_tool_events.append(
+                        stream_event
+                    )
+                    continue
 
                 if on_stream_event is not None:
                     on_stream_event(
@@ -475,6 +749,25 @@ class QueryEngine:
         timing_debug_payload = {
             **resolved_context.debug_payload,
             "conversation_created": conversation_created,
+            "self_routing": (
+                self_routing_assessment.model_dump(
+                    mode="json"
+                )
+                if self_routing_assessment
+                is not None
+                else None
+            ),
+            "self_routing_valid": (
+                self_routing_assessment
+                is not None
+            ),
+            "self_routing_validation_error": (
+                self_routing_parser
+                .validation_error
+                if self_routing_parser
+                is not None
+                else None
+            ),
             "timings": {
                 "total_request_seconds": round(
                     total_request_seconds,
@@ -487,6 +780,24 @@ class QueryEngine:
                 "response_generation_seconds": round(
                     response_generation_seconds,
                     4,
+                ),
+                "self_routing_seconds": (
+                    round(
+                        self_routing_seconds,
+                        4,
+                    )
+                    if self_routing_seconds
+                    is not None
+                    else None
+                ),
+                "first_spoken_token_seconds": (
+                    round(
+                        first_spoken_token_seconds,
+                        4,
+                    )
+                    if first_spoken_token_seconds
+                    is not None
+                    else None
                 ),
             },
         }
