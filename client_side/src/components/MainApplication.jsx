@@ -923,6 +923,26 @@ export default function MainApplication() {
         }
       },
 
+      onRouteAssessment: ({
+        requestId,
+        payload,
+      }) => {
+        console.log(
+          'Model route assessment:',
+          payload,
+        );
+
+        const pendingRequest =
+          pendingTurnRequestsRef.current.get(
+            requestId,
+          );
+
+        if (pendingRequest) {
+          pendingRequest
+            .modelRouteAssessment = payload;
+        }
+      },
+
       onQueryStarted: ({
         requestId,
         payload,
@@ -1407,6 +1427,7 @@ export default function MainApplication() {
             reject,
             turn: null,
             route: null,
+            modelRouteAssessment: null,
             released: false,
           },
         );

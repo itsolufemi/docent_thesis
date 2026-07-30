@@ -16,6 +16,9 @@ from conversation_core.schemas.conversation_schemas import (
 from conversation_core.schemas.llm_stream_schemas import (
     LLMStreamEvent,
 )
+from conversation_core.schemas.model_route_schemas import (
+    ModelRouteAssessment,
+)
 from conversation_core.schemas.prompt_schemas import (
     PromptProfile,
     PromptSection,
@@ -39,6 +42,9 @@ from conversation_core.services.cancellation import (
 from conversation_core.services.prompt_service import (
     build_prompt,
     format_conversation_branch_for_prompt,
+)
+from conversation_core.services.model_route_parser import (
+    ModelRouteStreamParser,
 )
 
 NON_RETRIEVAL_CONTEXT_SOURCES = {
@@ -91,17 +97,41 @@ def default_response_generator(
     )
 
 
+def model_route_response_generator(
+    prompt: str,
+    conversation_id: str | None,
+) -> str:
+    if conversation_id is None:
+        return generate_llm_response(prompt)
+
+    response_parts: list[str] = []
+
+    for event in stream_tool_aware_llm_response(
+        prompt=prompt,
+        conversation_id=conversation_id,
+        buffer_for_tool_decision=False,
+    ):
+        if event.event_type == "content_delta":
+            response_parts.append(event.text)
+
+    return "".join(response_parts).strip()
+
+
 class QueryEngine:
     def __init__(
         self,
         subject_resolver: SubjectResolver,
         prompt_builder: PromptBuilder,
         response_generator: ResponseGenerator | None = None,
+        model_route_output_enabled: bool = False,
     ):
         self.subject_resolver = subject_resolver
         self.prompt_builder = prompt_builder
         self.response_generator = (
             response_generator or default_response_generator
+        )
+        self.model_route_output_enabled = (
+            model_route_output_enabled
         )
 
     def generate_response(
@@ -195,6 +225,25 @@ class QueryEngine:
         response_generation_seconds = (
             perf_counter() - response_generation_started_at
         )
+        route_assessment: (
+            ModelRouteAssessment | None
+        ) = None
+        route_validation_error: str | None = None
+
+        if self.model_route_output_enabled:
+            route_parser = (
+                ModelRouteStreamParser()
+            )
+            route_assessment, spoken_response = (
+                route_parser.consume(response)
+            )
+            spoken_response += (
+                route_parser.finish()
+            )
+            response = spoken_response.strip()
+            route_validation_error = (
+                route_parser.validation_error
+            )
 
         # Store dialogue for newly created and existing conversations.
         if conversation_state is not None:
@@ -217,6 +266,19 @@ class QueryEngine:
         timing_debug_payload = {
             **resolved_context.debug_payload,
             "conversation_created": conversation_created,
+            "model_route_assessment": (
+                route_assessment.model_dump(
+                    mode="json"
+                )
+                if route_assessment is not None
+                else None
+            ),
+            "model_route_valid": (
+                route_assessment is not None
+            ),
+            "model_route_validation_error": (
+                route_validation_error
+            ),
             "timings": {
                 "total_request_seconds": round(
                     total_request_seconds,
@@ -342,6 +404,18 @@ class QueryEngine:
             )
 
         response_generation_started_at = perf_counter()
+        route_parser = (
+            ModelRouteStreamParser()
+            if self.model_route_output_enabled
+            else None
+        )
+        route_assessment: (
+            ModelRouteAssessment | None
+        ) = None
+        route_block_seconds: float | None = None
+        first_spoken_token_seconds: (
+            float | None
+        ) = None
 
         response_cancelled = (
             cancellation_token is not None
@@ -425,9 +499,128 @@ class QueryEngine:
                     stream_event.event_type
                     == "content_delta"
                 ):
-                    response_parts.append(
+                    released_text = (
                         stream_event.text
                     )
+
+                    if route_parser is not None:
+                        (
+                            parsed_route,
+                            released_text,
+                        ) = route_parser.consume(
+                            stream_event.text
+                        )
+
+                        if (
+                            route_parser
+                            .route_boundary_reached
+                            and route_block_seconds
+                            is None
+                        ):
+                            route_block_seconds = (
+                                perf_counter()
+                                - response_generation_started_at
+                            )
+
+                        if (
+                            parsed_route is not None
+                            and route_assessment
+                            is None
+                        ):
+                            route_assessment = (
+                                parsed_route
+                            )
+
+                            if (
+                                on_stream_event
+                                is not None
+                            ):
+                                on_stream_event(
+                                    LLMStreamEvent(
+                                        event_type=(
+                                            "route_assessment"
+                                        ),
+                                        route_assessment=(
+                                            parsed_route
+                                            .model_dump(
+                                                mode="json"
+                                            )
+                                        ),
+                                    )
+                                )
+
+                    if released_text:
+                        response_parts.append(
+                            released_text
+                        )
+
+                        if (
+                            first_spoken_token_seconds
+                            is None
+                        ):
+                            first_spoken_token_seconds = (
+                                perf_counter()
+                                - response_generation_started_at
+                            )
+
+                        if on_stream_event is not None:
+                            on_stream_event(
+                                LLMStreamEvent(
+                                    event_type=(
+                                        "content_delta"
+                                    ),
+                                    text=released_text,
+                                )
+                            )
+
+                    continue
+
+                if (
+                    stream_event.event_type
+                    == "response_complete"
+                    and route_parser is not None
+                ):
+                    final_text = (
+                        route_parser.finish()
+                    )
+
+                    if final_text:
+                        response_parts.append(
+                            final_text
+                        )
+
+                        if (
+                            first_spoken_token_seconds
+                            is None
+                        ):
+                            first_spoken_token_seconds = (
+                                perf_counter()
+                                - response_generation_started_at
+                            )
+
+                        if on_stream_event is not None:
+                            on_stream_event(
+                                LLMStreamEvent(
+                                    event_type=(
+                                        "content_delta"
+                                    ),
+                                    text=final_text,
+                                )
+                            )
+
+                    if on_stream_event is not None:
+                        on_stream_event(
+                            LLMStreamEvent(
+                                event_type=(
+                                    "response_complete"
+                                ),
+                                text="".join(
+                                    response_parts
+                                ).strip(),
+                                done=True,
+                            )
+                        )
+                    continue
 
                 if (
                     stream_event.event_type
@@ -475,6 +668,21 @@ class QueryEngine:
         timing_debug_payload = {
             **resolved_context.debug_payload,
             "conversation_created": conversation_created,
+            "model_route_assessment": (
+                route_assessment.model_dump(
+                    mode="json"
+                )
+                if route_assessment is not None
+                else None
+            ),
+            "model_route_valid": (
+                route_assessment is not None
+            ),
+            "model_route_validation_error": (
+                route_parser.validation_error
+                if route_parser is not None
+                else None
+            ),
             "timings": {
                 "total_request_seconds": round(
                     total_request_seconds,
@@ -487,6 +695,24 @@ class QueryEngine:
                 "response_generation_seconds": round(
                     response_generation_seconds,
                     4,
+                ),
+                "model_route_block_seconds": (
+                    round(
+                        route_block_seconds,
+                        4,
+                    )
+                    if route_block_seconds
+                    is not None
+                    else None
+                ),
+                "first_spoken_token_seconds": (
+                    round(
+                        first_spoken_token_seconds,
+                        4,
+                    )
+                    if first_spoken_token_seconds
+                    is not None
+                    else None
                 ),
             },
         }

@@ -5,6 +5,36 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _optional_boolean(
+    name: str,
+) -> bool | None:
+    value = os.getenv(name)
+
+    if value is None:
+        return None
+
+    normalised = value.strip().lower()
+
+    if normalised in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        return True
+
+    if normalised in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }:
+        return False
+
+    return None
+
+
 class Settings():
     backend_root: Path = Path(__file__).resolve().parent
 
@@ -17,6 +47,11 @@ class Settings():
     ollama_embedding_model: str = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
     ollama_trp_model: str = os.getenv("OLLAMA_TRP_MODEL", "")
     ollama_classifier_model: str = os.getenv("OLLAMA_CLASSIFIER_MODEL", "")
+    ollama_main_think: bool | None = (
+        _optional_boolean(
+            "OLLAMA_MAIN_THINK"
+        )
+    )
 
     whisper_model: str = os.getenv("WHISPER_MODEL", "base.en")
     whisper_device: str = os.getenv("WHISPER_DEVICE", "cpu")

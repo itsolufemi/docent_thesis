@@ -73,6 +73,15 @@ def build_stream_websocket_message(
             },
         }
 
+    if event.event_type == "route_assessment":
+        return {
+            "type": "route_assessment",
+            "request_id": request_id,
+            "payload": (
+                event.route_assessment or {}
+            ),
+        }
+
     if event.event_type == "tool_call":
         return {
             "type": "tool_call_started",

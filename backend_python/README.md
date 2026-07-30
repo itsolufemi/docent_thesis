@@ -120,3 +120,29 @@ uvicorn server:app --reload --port 8000
 ```
 
 3. The client expects CORS origins at `http://localhost:5173` (see `server.py`).
+
+## Model self-routing experiment
+
+On `experiment/model-self-routing`, the active
+query and turn-buffer routes do not call the
+utterance classifier. They prefetch available
+retrieval context and make one main-model request.
+
+The model begins its first output with a hidden
+`<route>...</route>` JSON block. The backend
+validates it as `ModelRouteAssessment`, emits a
+`route_assessment` stream event, and sends only the
+following response text to the visitor and TTS.
+
+Malformed or missing route metadata does not trigger
+a retry and does not discard a valid spoken answer.
+Operational conversation-tree state is still changed
+only by registered tools.
+
+The main model and reasoning profile are configured
+with:
+
+```text
+OLLAMA_MODEL=gemma4:cloud
+OLLAMA_MAIN_THINK=false
+```

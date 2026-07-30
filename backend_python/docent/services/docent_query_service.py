@@ -7,7 +7,10 @@ from conversation_core.schemas.source_schemas import QuerySource
 from conversation_core.schemas.utterance_route_schemas import (
     UtteranceRoute,
 )
-from conversation_core.services.query_service import QueryEngine
+from conversation_core.services.query_service import (
+    QueryEngine,
+    model_route_response_generator,
+)
 from conversation_core.services.utterance_router_service import route_utterance
 from conversation_core.services.prompt_service import (
     format_conversation_branch_for_prompt,
@@ -164,22 +167,55 @@ def docent_resolve_context(
     subject_reference: str | None,
     user_input: str,
     utterance_route: UtteranceRoute | None = None,
+    *,
+    force_retrieval_without_route: bool = False,
 ) -> ResolvedContext:
     sources: list[QuerySource] = []
-    active_utterance_route = (
-        utterance_route
-        or route_utterance(
-            text=user_input,
-            domain_profile=docent_classifier_profile,
-        )
-    )
+    active_utterance_route = None
 
-    route_handled_context = build_route_handled_context(
-        active_utterance_route
+    if not force_retrieval_without_route:
+        active_utterance_route = (
+            utterance_route
+            or route_utterance(
+                text=user_input,
+                domain_profile=(
+                    docent_classifier_profile
+                ),
+            )
+        )
+
+    route_handled_context = (
+        build_route_handled_context(
+            active_utterance_route
+        )
+        if active_utterance_route is not None
+        else None
     )
 
     if route_handled_context is not None:
         return route_handled_context
+
+    route_prompt_payload = (
+        build_utterance_route_prompt_payload(
+            active_utterance_route
+        )
+        if active_utterance_route is not None
+        else {}
+    )
+    route_debug_payload = (
+        build_utterance_route_debug_payload(
+            utterance_route=(
+                active_utterance_route
+            ),
+            retrieval_skipped_by_utterance_route=False,
+        )
+        if active_utterance_route is not None
+        else {
+            "model_routing_retrieval_prefetched": (
+                True
+            ),
+        }
+    )
 
     if subject_reference is not None:
         painting_index = docent_parse_subject_reference(subject_reference)
@@ -200,18 +236,13 @@ def docent_resolve_context(
                     subject_reference=subject_reference,
                     sources=sources,
                     prompt_payload={
-                        **build_utterance_route_prompt_payload(
-                            active_utterance_route
-                        ),
+                        **route_prompt_payload,
                         "artwork": artwork,
                         "retrieved_chunks": [],
                         "retrieved_documents": [],
                     },
                     debug_payload={
-                        **build_utterance_route_debug_payload(
-                            utterance_route=active_utterance_route,
-                            retrieval_skipped_by_utterance_route=False,
-                        ),
+                        **route_debug_payload,
                         "painting_index": painting_index,
                         "artwork_found": True,
                     },
@@ -222,18 +253,13 @@ def docent_resolve_context(
                 subject_reference=subject_reference,
                 sources=[],
                 prompt_payload={
-                    **build_utterance_route_prompt_payload(
-                        active_utterance_route
-                    ),
+                    **route_prompt_payload,
                     "artwork": None,
                     "retrieved_chunks": [],
                     "retrieved_documents": [],
                 },
                 debug_payload={
-                    **build_utterance_route_debug_payload(
-                        utterance_route=active_utterance_route,
-                        retrieval_skipped_by_utterance_route=False,
-                    ),
+                    **route_debug_payload,
                     "painting_index": painting_index,
                     "artwork_found": False,
                 },
@@ -255,18 +281,13 @@ def docent_resolve_context(
             subject_reference=None,
             sources=build_sources_from_retrieved_chunks(retrieved_chunks),
             prompt_payload={
-                **build_utterance_route_prompt_payload(
-                    active_utterance_route
-                ),
+                **route_prompt_payload,
                 "artwork": None,
                 "retrieved_chunks": retrieved_chunks,
                 "retrieved_documents": [],
             },
             debug_payload={
-                **build_utterance_route_debug_payload(
-                    utterance_route=active_utterance_route,
-                    retrieval_skipped_by_utterance_route=False,
-                ),
+                **route_debug_payload,
                 "vector_retrieval_used": True,
                 "parent_document_expansion_used": True,
                 "hybrid_scoring_used": True,
@@ -293,18 +314,13 @@ def docent_resolve_context(
             subject_reference=None,
             sources=build_sources_from_retrieved_documents(retrieved_documents),
             prompt_payload={
-                **build_utterance_route_prompt_payload(
-                    active_utterance_route
-                ),
+                **route_prompt_payload,
                 "artwork": None,
                 "retrieved_chunks": [],
                 "retrieved_documents": retrieved_documents,
             },
             debug_payload={
-                **build_utterance_route_debug_payload(
-                    utterance_route=active_utterance_route,
-                    retrieval_skipped_by_utterance_route=False,
-                ),
+                **route_debug_payload,
                 "document_retrieval_used": True,
                 "retrieved_document_count": len(retrieved_documents),
                 "vector_retrieval_timings": (
@@ -318,18 +334,13 @@ def docent_resolve_context(
         subject_reference=None,
         sources=[],
         prompt_payload={
-            **build_utterance_route_prompt_payload(
-                active_utterance_route
-            ),
+            **route_prompt_payload,
             "artwork": None,
             "retrieved_chunks": [],
             "retrieved_documents": [],
         },
         debug_payload={
-            **build_utterance_route_debug_payload(
-                utterance_route=active_utterance_route,
-                retrieval_skipped_by_utterance_route=False,
-            ),
+            **route_debug_payload,
             "vector_retrieval_timings": (
                 vector_retrieval_result.timings.model_dump()
             ),
@@ -451,7 +462,113 @@ def docent_build_prompt_from_context(
         retrieved_chunks=payload.get("retrieved_chunks", []),
     )
 
+
+MODEL_ROUTE_OUTPUT_INSTRUCTIONS = """
+ROUTING OUTPUT
+
+Begin your first assistant output for this visitor
+turn with exactly one compact route block:
+
+<route>{"route_type":"response_request","is_relevant":true,"should_ignore":false,"retrieval_required":true,"retrieved_context_used":true,"proposed_action":null,"confidence":0.98,"reason":"Artwork information requested."}</route>
+
+The content inside the route block must be valid
+JSON with exactly these fields:
+- route_type: response_request, call_to_action,
+  interruption, or noise;
+- is_relevant: boolean;
+- should_ignore: boolean;
+- retrieval_required: boolean;
+- retrieved_context_used: boolean;
+- proposed_action: a short action name or null;
+- confidence: number from 0 to 1;
+- reason: one short sentence.
+
+The route block is internal metadata. Put it before
+any visitor-facing words. After </route>, answer the
+visitor naturally. If you call an operational tool,
+emit the route block before the tool call and do not
+repeat it after the tool result.
+
+Classify explicit requests to begin or end a guided
+tour as call_to_action and populate proposed_action.
+Reporting an action does not execute it: use the
+available conversation-tree tools when state must
+actually change.
+""".strip()
+
+
+def docent_resolve_context_for_model_routing(
+    subject_reference: str | None,
+    user_input: str,
+    utterance_route: UtteranceRoute | None = None,
+) -> ResolvedContext:
+    return docent_resolve_context(
+        subject_reference,
+        user_input,
+        force_retrieval_without_route=True,
+    )
+
+
+def docent_build_model_routing_prompt(
+    user_input: str,
+    dialogue_history: list[DialogueTurn],
+    resolved_context: ResolvedContext,
+    active_branch: ConversationBranch | None,
+) -> str:
+    payload = resolved_context.prompt_payload
+    branch_context = (
+        format_conversation_branch_for_prompt(
+            active_branch
+        )
+    )
+    routed_user_input = f"""
+{MODEL_ROUTE_OUTPUT_INSTRUCTIONS}
+
+ACTIVE CONVERSATION BRANCH
+
+{branch_context}
+
+CONVERSATION-TREE GUIDANCE
+
+The active branch is the current overarching
+conversational activity. A digression does not close
+a bounded branch. Use operational tools only when
+conversation-tree state genuinely needs to change.
+
+USER UTTERANCE
+
+{user_input}
+""".strip()
+
+    return docent_build_prompt(
+        user_input=routed_user_input,
+        dialogue_history=dialogue_history,
+        artwork=payload.get("artwork"),
+        retrieved_documents=payload.get(
+            "retrieved_documents",
+            [],
+        ),
+        retrieved_chunks=payload.get(
+            "retrieved_chunks",
+            [],
+        ),
+    )
+
+
 docent_query_engine = QueryEngine(
     subject_resolver=docent_resolve_context,
     prompt_builder=docent_build_prompt_from_context,
+)
+
+docent_model_routing_query_engine = QueryEngine(
+    subject_resolver=(
+        docent_resolve_context_for_model_routing
+    ),
+    prompt_builder=(
+        docent_build_model_routing_prompt
+    ),
+    response_generator=(
+        model_route_response_generator
+    ),
+    model_route_output_enabled=True,
 )

@@ -36,9 +36,8 @@ from conversation_core.api.routes_utterance_router import (
 from docent.api.routes_artworks import router as artworks_router
 from docent.api.routes_docent_index import router as docent_index_router
 from docent.api.routes_docent_retrieval import router as docent_retrieval_router
-from docent.services.docent_query_service import docent_query_engine
-from docent.services.docent_utterance_classifier import (
-    classify_docent_utterance,
+from docent.services.docent_query_service import (
+    docent_model_routing_query_engine,
 )
 from docent.api.routes_docent_embeddings import router as docent_embeddings_router
 from docent.api.routes_docent_vector import router as docent_vector_router
@@ -72,15 +71,21 @@ app.add_middleware(
 )
 
 query_router = create_query_router(
-    query_engine=docent_query_engine,
+    query_engine=(
+        docent_model_routing_query_engine
+    ),
 )
 turn_buffer_router = create_turn_buffer_router(
-    query_engine=docent_query_engine,
-    utterance_classifier=classify_docent_utterance,
+    query_engine=(
+        docent_model_routing_query_engine
+    ),
+    utterance_classifier=None,
 )
 turn_buffer_stream_router = create_turn_buffer_stream_router(
-    query_engine=docent_query_engine,
-    utterance_classifier=classify_docent_utterance,
+    query_engine=(
+        docent_model_routing_query_engine
+    ),
+    utterance_classifier=None,
 )
 transcription_router = create_transcription_router()
 audio_stream_router = create_audio_stream_router()
