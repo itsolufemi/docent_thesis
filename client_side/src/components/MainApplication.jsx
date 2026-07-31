@@ -14,7 +14,7 @@ import {
   extractSpeakableSentences,
 } from '../audio/sentenceBuffer';
 
-const FORCED_FINALISATION_SILENCE_MS = 1800;
+const FORCED_FINALISATION_SILENCE_MS = 3000;
 const INITIAL_VAD_SILENCE_MS = 500;
 const BARGE_IN_CONFIRMATION_MS = 200;
 const ASSISTANT_DUCK_GAIN = 0.3;
