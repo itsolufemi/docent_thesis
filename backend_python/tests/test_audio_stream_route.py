@@ -494,6 +494,31 @@ class AudioStreamRouteTest(unittest.TestCase):
 
             websocket.send_json(
                 {
+                    "type": "finalise_segment",
+                    "payload": {
+                        "segment_id": "segment-1",
+                        "candidate_id": 1,
+                        "silence_duration_ms": 500,
+                    },
+                }
+            )
+            premature_finalisation = (
+                websocket.receive_json()
+            )
+            self.assertEqual(
+                premature_finalisation["type"],
+                "audio_error",
+            )
+            self.assertIn(
+                "not current and confirmed complete",
+                premature_finalisation["payload"][
+                    "detail"
+                ],
+            )
+            self.assertEqual(self.service.calls, [])
+
+            websocket.send_json(
+                {
                     "type": "speech_resumed",
                     "payload": {
                         "segment_id": "segment-1",
@@ -534,11 +559,16 @@ class AudioStreamRouteTest(unittest.TestCase):
                 websocket.receive_json()["type"],
                 "transcription_started",
             )
-            self.receive_transcription(
+            transcription = self.receive_transcription(
                 websocket,
                 "segment-1",
             )
 
+        self.assertTrue(
+            transcription["payload"][
+                "turn_completion_confirmed"
+            ]
+        )
         self.assertEqual(
             self.service.calls[0]["pcm_bytes"],
             first_pcm + continuation_pcm,

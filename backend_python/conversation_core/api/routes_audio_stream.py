@@ -583,6 +583,16 @@ def create_audio_stream_router(
 
                     active_candidate_id = None
 
+                    if (
+                        last_complete_candidate
+                        is not None
+                        and last_complete_candidate[
+                            "segment_id"
+                        ]
+                        == active_segment_id
+                    ):
+                        last_complete_candidate = None
+
                 elif event_type == "candidate_segment":
                     requested_segment_id = payload.get(
                         "segment_id"
@@ -673,6 +683,17 @@ def create_audio_stream_router(
                         continue
 
                     active_candidate_id = candidate_id
+
+                    if (
+                        last_complete_candidate
+                        is not None
+                        and last_complete_candidate[
+                            "segment_id"
+                        ]
+                        == active_segment_id
+                    ):
+                        last_complete_candidate = None
+
                     candidate_pcm = active_buffer.to_bytes()
                     audio_duration_ms = round(
                         active_buffer.duration_seconds * 1_000
@@ -786,16 +807,33 @@ def create_audio_stream_router(
                         "candidate_id"
                     )
 
+                    candidate_was_confirmed = (
+                        last_complete_candidate
+                        is not None
+                        and last_complete_candidate[
+                            "segment_id"
+                        ]
+                        == active_segment_id
+                        and last_complete_candidate[
+                            "candidate_id"
+                        ]
+                        == requested_candidate_id
+                    )
+
                     if (
                         not forced_finalisation
                         and smart_turn_service is not None
-                        and requested_candidate_id
-                        != active_candidate_id
+                        and (
+                            requested_candidate_id
+                            != active_candidate_id
+                            or not candidate_was_confirmed
+                        )
                     ):
                         await send_audio_error(
                             (
-                                "The Smart Turn candidate is no "
-                                "longer current."
+                                "The Smart Turn candidate is "
+                                "not current and confirmed "
+                                "complete."
                             ),
                             segment_id=active_segment_id,
                         )

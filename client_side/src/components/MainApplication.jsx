@@ -130,6 +130,10 @@ export default function MainApplication() {
     useRef(new Map());
   const streamedResponsesRef =
     useRef(new Map());
+  const textDisplayReleasedRef =
+    useRef(false);
+  const textDisplayRequestIdRef =
+    useRef(null);
   const responseSentenceBuffersRef =
     useRef(new Map());
   const spokenResponseTextRef =
@@ -156,6 +160,33 @@ export default function MainApplication() {
   const smartTurnEnabledRef = useRef(false);
   const smartTurnCandidateIdRef = useRef(0);
   const smartTurnForcedTimerRef = useRef(null);
+
+  const releaseStreamedTextDisplay = (
+    requestId,
+    fallbackText = '',
+  ) => {
+    if (
+      !requestId ||
+      textDisplayRequestIdRef.current !==
+        requestId ||
+      isProgressiveResponseCancelled(
+        requestId,
+      )
+    ) {
+      return;
+    }
+
+    textDisplayReleasedRef.current = true;
+
+    const currentText =
+      streamedResponsesRef.current.get(
+        requestId,
+      ) || fallbackText;
+
+    setStreamedAssistantResponse(
+      currentText,
+    );
+  };
 
   const setAssistantGain = (
     targetGain,
@@ -427,6 +458,8 @@ export default function MainApplication() {
 
       pendingTurnRequestsRef.current.clear();
       streamedResponsesRef.current.clear();
+      textDisplayReleasedRef.current = false;
+      textDisplayRequestIdRef.current = null;
       responseSentenceBuffersRef.current.clear();
       spokenResponseTextRef.current.clear();
       progressiveTtsQueuesRef.current.clear();
@@ -991,6 +1024,14 @@ export default function MainApplication() {
         null;
     }
 
+    if (
+      textDisplayRequestIdRef.current ===
+      requestId
+    ) {
+      textDisplayReleasedRef.current = false;
+      textDisplayRequestIdRef.current = null;
+    }
+
     if (cancellingActiveResponse) {
       stopAssistantAudio();
     }
@@ -1195,8 +1236,12 @@ export default function MainApplication() {
           return;
         }
 
-        stopAssistantAudio();
+        textDisplayRequestIdRef.current =
+          requestId;
+        textDisplayReleasedRef.current =
+          false;
 
+        stopAssistantAudio();
         streamedResponsesRef.current.set(
           requestId,
           '',
@@ -1265,9 +1310,16 @@ export default function MainApplication() {
           requestId,
           updatedText,
         );
-        setStreamedAssistantResponse(
-          updatedText,
-        );
+
+        if (
+          textDisplayRequestIdRef.current ===
+            requestId &&
+          textDisplayReleasedRef.current
+        ) {
+          setStreamedAssistantResponse(
+            updatedText,
+          );
+        }
 
         const existingBuffer =
           responseSentenceBuffersRef
@@ -1371,7 +1423,8 @@ export default function MainApplication() {
           requestId,
           completedText,
         );
-        setStreamedAssistantResponse(
+        releaseStreamedTextDisplay(
+          requestId,
           completedText,
         );
 
@@ -1481,7 +1534,8 @@ export default function MainApplication() {
         pendingTurnRequestsRef.current.delete(
           requestId,
         );
-        setStreamedAssistantResponse(
+        releaseStreamedTextDisplay(
+          requestId,
           payload.response ?? streamedText,
         );
 
@@ -1525,6 +1579,9 @@ export default function MainApplication() {
         requestId,
       ) => {
         setTurnRequestPending(false);
+        releaseStreamedTextDisplay(
+          requestId,
+        );
 
         const pendingRequest =
           pendingTurnRequestsRef.current.get(
@@ -1902,6 +1959,10 @@ export default function MainApplication() {
                   return;
                 }
 
+                releaseStreamedTextDisplay(
+                  requestId,
+                );
+
                 playerNode.port.postMessage(
                   {
                     type: 'enqueue',
@@ -1941,6 +2002,9 @@ export default function MainApplication() {
                 removeTtsClientForRequest(
                   requestId,
                   ttsClient,
+                );
+                releaseStreamedTextDisplay(
+                  requestId,
                 );
 
                 console.error(
@@ -2034,6 +2098,9 @@ export default function MainApplication() {
         error instanceof Error
           ? error.message
           : 'Could not start TTS stream.',
+      );
+      releaseStreamedTextDisplay(
+        requestId,
       );
 
       throw error;
