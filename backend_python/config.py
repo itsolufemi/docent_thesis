@@ -71,6 +71,19 @@ class Settings():
         "WHISPER_COMPUTE_TYPE",
         "int8",
     )
+    whisper_no_speech_threshold: float = float(
+        os.getenv(
+            "WHISPER_NO_SPEECH_THRESHOLD",
+            "0.6",
+        )
+    )
+
+    whisper_log_prob_threshold: float = float(
+        os.getenv(
+            "WHISPER_LOG_PROB_THRESHOLD",
+            "-1.0",
+        )
+    )
 
     warm_up_whisper_on_startup: bool = _read_bool(
         "WARM_UP_WHISPER_ON_STARTUP",

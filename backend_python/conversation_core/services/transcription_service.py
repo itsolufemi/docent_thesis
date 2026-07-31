@@ -88,6 +88,12 @@ class TranscriptionService:
                 beam_size=1,
                 condition_on_previous_text=False,
                 vad_filter=False,
+                no_speech_threshold=(
+                    settings.whisper_no_speech_threshold
+                ),
+                log_prob_threshold=(
+                    settings.whisper_log_prob_threshold
+                ),
             )
 
             whisper_segments = list(segment_generator)
