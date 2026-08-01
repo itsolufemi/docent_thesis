@@ -26,6 +26,11 @@ from conversation_core.services.transcription_service import (
     default_transcription_service,
 )
 
+from conversation_core.services.moonshine_transcription_service import (
+    MoonshineStreamingSession,
+    MoonshineStreamingTranscriptionService,
+)
+
 
 DEFAULT_SAMPLE_RATE = 16_000
 DEFAULT_CHANNELS = 1
@@ -38,11 +43,18 @@ logger = logging.getLogger(__name__)
 def create_audio_stream_router(
     transcription_service: TranscriptionService | None = None,
     smart_turn_service: SmartTurnService | None = None,
-) -> APIRouter:
+    moonshine_transcription_service: (
+        MoonshineStreamingTranscriptionService | None
+    ) = None,
+) -> APIRouter:    
     router = APIRouter()
     active_transcription_service = (
         transcription_service
         or default_transcription_service
+    )
+
+    active_moonshine_service = (
+        moonshine_transcription_service
     )
 
     @router.websocket("/api/audio/stream")
@@ -54,6 +66,11 @@ def create_audio_stream_router(
         active_segment_id: str | None = None
         active_buffer: AudioStreamBuffer | None = None
         active_candidate_id: int | None = None
+
+        active_moonshine_session: (
+            MoonshineStreamingSession | None
+        ) = None
+
         known_segment_ids: set[str] = set()
         background_tasks: set[asyncio.Task[None]] = set()
         send_lock = asyncio.Lock()
@@ -101,40 +118,144 @@ def create_audio_stream_router(
             *,
             segment_id: str,
             audio_buffer: AudioStreamBuffer,
+            moonshine_session: (
+                MoonshineStreamingSession | None
+            ),
             silence_duration_ms: int,
             forced_finalisation: bool,
             turn_completion_confirmed: bool,
         ) -> None:
+            """
+            Produce the final transcript for one completed audio segment.
+
+            Moonshine is attempted first when a streaming session exists.
+            The original PCM buffer remains available so Whisper can
+            recover from an empty or failed Moonshine transcription.
+            """
+
             summary = audio_buffer.summary()
             pcm_bytes = audio_buffer.to_bytes()
 
-            try:
-                transcription = await run_in_threadpool(
-                    (
-                        active_transcription_service
-                        .transcribe_pcm16
-                    ),
-                    pcm_bytes,
-                    sample_rate=audio_buffer.sample_rate,
-                    channels=audio_buffer.channels,
-                )
-            except asyncio.CancelledError:
-                raise
-            except ValueError as error:
-                await send_audio_error(
-                    str(error),
-                    segment_id=segment_id,
-                )
-                return
-            except Exception as error:
-                await send_audio_error(
-                    (
-                        "The audio could not be "
-                        f"transcribed: {error}"
-                    ),
-                    segment_id=segment_id,
-                )
-                return
+            transcription = None
+            transcription_backend = "whisper"
+
+            if moonshine_session is not None:
+                try:
+                    moonshine_started_at = perf_counter()
+
+                    transcription = await run_in_threadpool(
+                        moonshine_session.finish
+                    )
+
+                    moonshine_seconds = (
+                        perf_counter()
+                        - moonshine_started_at
+                    )
+
+                    if transcription.text.strip():
+                        transcription_backend = "moonshine"
+
+                        logger.info(
+                            "moonshine_transcription_complete %s",
+                            json.dumps(
+                                {
+                                    "segment_id": segment_id,
+                                    "seconds": round(
+                                        moonshine_seconds,
+                                        4,
+                                    ),
+                                    "character_count": len(
+                                        transcription.text
+                                    ),
+                                }
+                            ),
+                        )
+
+                    else:
+                        logger.warning(
+                            "Moonshine returned an empty transcript "
+                            "for segment %s. Falling back to Whisper.",
+                            segment_id,
+                        )
+
+                        transcription = None
+
+                except asyncio.CancelledError:
+                    raise
+
+                except Exception:
+                    logger.exception(
+                        "Moonshine transcription failed for "
+                        "segment %s. Falling back to Whisper.",
+                        segment_id,
+                    )
+
+                    transcription = None
+
+            if transcription is None:
+                try:
+                    whisper_started_at = perf_counter()
+
+                    transcription = await run_in_threadpool(
+                        (
+                            active_transcription_service
+                            .transcribe_pcm16
+                        ),
+                        pcm_bytes,
+                        sample_rate=audio_buffer.sample_rate,
+                        channels=audio_buffer.channels,
+                    )
+
+                    whisper_seconds = (
+                        perf_counter()
+                        - whisper_started_at
+                    )
+
+                    transcription_backend = (
+                        "whisper_fallback"
+                        if moonshine_session is not None
+                        else "whisper"
+                    )
+
+                    logger.info(
+                        "whisper_transcription_complete %s",
+                        json.dumps(
+                            {
+                                "segment_id": segment_id,
+                                "seconds": round(
+                                    whisper_seconds,
+                                    4,
+                                ),
+                                "fallback": (
+                                    moonshine_session
+                                    is not None
+                                ),
+                                "character_count": len(
+                                    transcription.text
+                                ),
+                            }
+                        ),
+                    )
+
+                except asyncio.CancelledError:
+                    raise
+
+                except ValueError as error:
+                    await send_audio_error(
+                        str(error),
+                        segment_id=segment_id,
+                    )
+                    return
+
+                except Exception as error:
+                    await send_audio_error(
+                        (
+                            "The audio could not be "
+                            f"transcribed: {error}"
+                        ),
+                        segment_id=segment_id,
+                    )
+                    return
 
             await send_message(
                 "audio_transcription",
@@ -149,6 +270,9 @@ def create_audio_stream_router(
                     "turn_completion_confirmed": (
                         turn_completion_confirmed
                     ),
+                    "transcription_backend": (
+                        transcription_backend
+                    ),
                     "stream": summary.model_dump(),
                     "transcription": (
                         transcription.model_dump()
@@ -156,6 +280,30 @@ def create_audio_stream_router(
                 },
             )
 
+        async def cancel_moonshine_session(
+            session: MoonshineStreamingSession,
+        ) -> None:
+            """
+            Stop a Moonshine stream whose audio segment was abandoned.
+
+            Moonshine stop operations are synchronous, so they run in
+            the threadpool rather than blocking the FastAPI event loop.
+            """
+
+            try:
+                await run_in_threadpool(
+                    session.cancel
+                )
+
+            except asyncio.CancelledError:
+                raise
+
+            except Exception:
+                logger.exception(
+                    "Moonshine session cancellation failed."
+                )
+        
+                
         async def evaluate_smart_turn_candidate(
             *,
             segment_id: str,
@@ -286,6 +434,7 @@ def create_audio_stream_router(
             nonlocal active_segment_id
             nonlocal active_buffer
             nonlocal active_candidate_id
+            nonlocal active_moonshine_session
 
             if (
                 active_buffer is None
@@ -298,11 +447,26 @@ def create_audio_stream_router(
 
             detached_segment_id = active_segment_id
             detached_buffer = active_buffer
+            detached_moonshine_session = (
+                active_moonshine_session
+            )
+
             active_segment_id = None
             active_buffer = None
             active_candidate_id = None
+            active_moonshine_session = None
 
             if not detached_buffer.total_bytes:
+                if (
+                    detached_moonshine_session
+                    is not None
+                ):
+                    start_background_task(
+                        cancel_moonshine_session(
+                            detached_moonshine_session
+                        )
+                    )
+
                 await send_audio_error(
                     "No audio data was received.",
                     segment_id=detached_segment_id,
@@ -355,6 +519,9 @@ def create_audio_stream_router(
                     turn_completion_confirmed=(
                         smart_turn_service is not None
                     ),
+                    moonshine_session=(
+                        detached_moonshine_session
+                    ),
                 )
             )
 
@@ -392,7 +559,45 @@ def create_audio_stream_router(
                         )
                         return
 
-                    active_buffer.append(binary_chunk)
+                    active_buffer.append(
+                        binary_chunk
+                    )
+
+                    if (
+                        active_moonshine_session
+                        is not None
+                    ):
+                        try:
+                            active_moonshine_session.add_pcm16(
+                                binary_chunk,
+                                sample_rate=(
+                                    active_buffer.sample_rate
+                                ),
+                                channels=(
+                                    active_buffer.channels
+                                ),
+                            )
+
+                        except Exception:
+                            logger.exception(
+                                "Moonshine rejected an audio "
+                                "chunk for segment %s. "
+                                "The segment will use Whisper.",
+                                active_segment_id,
+                            )
+
+                            failed_session = (
+                                active_moonshine_session
+                            )
+
+                            active_moonshine_session = None
+
+                            start_background_task(
+                                cancel_moonshine_session(
+                                    failed_session
+                                )
+                            )
+
                     continue
 
                 text_message = message.get("text")
@@ -531,6 +736,7 @@ def create_audio_stream_router(
 
                     active_segment_id = segment_id
                     active_candidate_id = None
+
                     active_buffer = AudioStreamBuffer(
                         sample_rate=sample_rate,
                         channels=channels,
@@ -538,6 +744,26 @@ def create_audio_stream_router(
                             PCM16_SAMPLE_WIDTH_BYTES
                         ),
                     )
+
+                    active_moonshine_session = None
+
+                    if active_moonshine_service is not None:
+                        try:
+                            active_moonshine_session = (
+                                await run_in_threadpool(
+                                    active_moonshine_service
+                                    .create_session
+                                )
+                            )
+
+                        except Exception:
+                            logger.exception(
+                                "Could not create Moonshine "
+                                "session for segment %s. "
+                                "The segment will use Whisper.",
+                                segment_id,
+                            )
+
                     known_segment_ids.add(segment_id)
 
                     await send_message(
@@ -549,6 +775,12 @@ def create_audio_stream_router(
                             "sample_format": sample_format,
                             "smart_turn_enabled": (
                                 smart_turn_service is not None
+                            ),
+                            "transcription_backend": (
+                                "moonshine"
+                                if active_moonshine_session
+                                is not None
+                                else "whisper"
                             ),
                         },
                     )
@@ -879,10 +1111,28 @@ def create_audio_stream_router(
                         )
                         continue
 
-                    cancelled_segment_id = active_segment_id
+                    cancelled_segment_id = (
+                        active_segment_id
+                    )
+
+                    cancelled_moonshine_session = (
+                        active_moonshine_session
+                    )
+
                     active_segment_id = None
                     active_buffer = None
                     active_candidate_id = None
+                    active_moonshine_session = None
+
+                    if (
+                        cancelled_moonshine_session
+                        is not None
+                    ):
+                        start_background_task(
+                            cancel_moonshine_session(
+                                cancelled_moonshine_session
+                            )
+                        )
 
                     await send_message(
                         "audio_segment_cancelled",
@@ -901,6 +1151,18 @@ def create_audio_stream_router(
         except WebSocketDisconnect:
             pass
         finally:
+            if active_moonshine_session is not None:
+                try:
+                    await run_in_threadpool(
+                        active_moonshine_session.cancel
+                    )
+
+                except Exception:
+                    logger.exception(
+                        "Could not cancel the active "
+                        "Moonshine session during "
+                        "WebSocket shutdown."
+                    )
             connection_open = False
 
             for task in background_tasks:

@@ -56,50 +56,62 @@ from docent.api.routes_docent_embeddings import router as docent_embeddings_rout
 from docent.api.routes_docent_vector import router as docent_vector_router
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if settings.warm_up_whisper_on_startup:
-        try:
-            warm_up_seconds = await asyncio.to_thread(
-                default_transcription_service.warm_up
-            )
-            logger.info(
-                "Whisper warm-up completed in %.3f seconds.",
-                warm_up_seconds,
-            )
-        except Exception:
-            logger.exception(
-                "Whisper warm-up failed. "
-                "The service will continue with lazy loading."
-            )
+    """
+    Load the selected speech-recognition model before FastAPI begins
+    accepting requests.
+
+    Code before `yield` is application startup.
+    Code after `yield` is application shutdown.
+    """
+
+    if settings.transcription_backend == "moonshine":
+        if settings.warm_up_moonshine_on_startup:
+            try:
+                warm_up_seconds = await asyncio.to_thread(
+                    default_moonshine_transcription_service.warm_up
+                )
+
+                logger.info(
+                    "Moonshine warm-up completed in %.3f seconds.",
+                    warm_up_seconds,
+                )
+
+            except Exception:
+                logger.exception(
+                    "Moonshine warm-up failed. "
+                    "The service will continue with lazy loading."
+                )
+
+    elif settings.transcription_backend == "whisper":
+        if settings.warm_up_whisper_on_startup:
+            try:
+                warm_up_seconds = await asyncio.to_thread(
+                    default_transcription_service.warm_up
+                )
+
+                logger.info(
+                    "Whisper warm-up completed in %.3f seconds.",
+                    warm_up_seconds,
+                )
+
+            except Exception:
+                logger.exception(
+                    "Whisper warm-up failed. "
+                    "The service will continue with lazy loading."
+                )
+
+    else:
+        logger.warning(
+            "Unknown transcription backend configured: %s",
+            settings.transcription_backend,
+        )
 
     yield
-
-    if (
-    settings.transcription_backend
-    == "moonshine"
-    and settings.warm_up_moonshine_on_startup
-    ):
-        try:
-            warm_up_seconds = await asyncio.to_thread(
-                default_moonshine_transcription_service
-                .warm_up
-            )
-
-            logger.info(
-                "Moonshine warm-up completed in %.3f seconds.",
-                warm_up_seconds,
-            )
-
-        except Exception:
-            logger.exception(
-                "Moonshine warm-up failed. "
-                "The service will continue with lazy loading."
-            )
-
 
 app = FastAPI(
     title="docent backend",
@@ -163,9 +175,20 @@ smart_turn_service = (
     if settings.smart_turn_enabled
     else None
 )
+
 audio_stream_router = create_audio_stream_router(
+    transcription_service=(
+        default_transcription_service
+    ),
     smart_turn_service=smart_turn_service,
+    moonshine_transcription_service=(
+        default_moonshine_transcription_service
+        if settings.transcription_backend
+        == "moonshine"
+        else None
+    ),
 )
+
 tts_router = create_tts_router()
 tts_stream_router = create_tts_stream_router()
 
@@ -187,3 +210,13 @@ app.include_router(transcription_router)
 app.include_router(audio_stream_router)
 app.include_router(tts_router)
 app.include_router(tts_stream_router)
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host=settings.backend_host,
+        port=settings.backend_port,
+        log_level="info",
+    )
