@@ -43,7 +43,9 @@ from conversation_core.services.smart_turn_service import (
 from conversation_core.services.transcription_service import (
     default_transcription_service,
 )
-
+from conversation_core.services.moonshine_transcription_service import (
+    default_moonshine_transcription_service,
+)
 from docent.api.routes_artworks import router as artworks_router
 from docent.api.routes_docent_index import router as docent_index_router
 from docent.api.routes_docent_retrieval import router as docent_retrieval_router
@@ -75,6 +77,28 @@ async def lifespan(app: FastAPI):
             )
 
     yield
+
+    if (
+    settings.transcription_backend
+    == "moonshine"
+    and settings.warm_up_moonshine_on_startup
+    ):
+        try:
+            warm_up_seconds = await asyncio.to_thread(
+                default_moonshine_transcription_service
+                .warm_up
+            )
+
+            logger.info(
+                "Moonshine warm-up completed in %.3f seconds.",
+                warm_up_seconds,
+            )
+
+        except Exception:
+            logger.exception(
+                "Moonshine warm-up failed. "
+                "The service will continue with lazy loading."
+            )
 
 
 app = FastAPI(

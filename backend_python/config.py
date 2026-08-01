@@ -87,6 +87,39 @@ class Settings():
         True
     )
 
+    transcription_backend: str = os.getenv(
+        "TRANSCRIPTION_BACKEND",
+        "whisper",
+    ).strip().lower()
+
+    moonshine_language: str = os.getenv(
+        "MOONSHINE_LANGUAGE",
+        "en",
+    )
+
+    moonshine_model_arch_raw: str = os.getenv(
+        "MOONSHINE_MODEL_ARCH",
+        "",
+    ).strip()
+
+    moonshine_model_arch: int | None = (
+        int(moonshine_model_arch_raw)
+        if moonshine_model_arch_raw
+        else None
+    )
+
+    moonshine_update_interval: float = float(
+        os.getenv(
+            "MOONSHINE_UPDATE_INTERVAL",
+            "0.2",
+        )
+    )
+
+    warm_up_moonshine_on_startup: bool = _read_bool(
+        "WARM_UP_MOONSHINE_ON_STARTUP",
+        True,
+    )
+
     smart_turn_enabled: bool = _read_bool(
         "SMART_TURN_ENABLED",
         False,
