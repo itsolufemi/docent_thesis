@@ -23,7 +23,26 @@ def format_dialogue_history_for_prompt(
         else:
             speaker = "System"
 
-        formatted_turns.append(f"{speaker}: {turn.content}")
+        turn_lines = [
+            f"{speaker}: {turn.content}",
+        ]
+
+        if (
+            turn.previous_subject is not None
+            or turn.current_subject is not None
+            or turn.current_subject_reference is not None
+        ):
+            turn_lines.append(
+                "Subject state: "
+                f"previous={turn.previous_subject!r}; "
+                f"current={turn.current_subject!r}; "
+                "current_reference="
+                f"{turn.current_subject_reference!r}"
+            )
+
+        formatted_turns.append(
+            "\n".join(turn_lines)
+        )
 
     return "\n".join(formatted_turns)
 

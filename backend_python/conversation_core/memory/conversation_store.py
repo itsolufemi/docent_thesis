@@ -252,18 +252,26 @@ def get_branch(
     return state.conversation_tree.branches.get(branch_id)
 
 def add_dialogue_turn(
-        conversation_id: str,
-        role: DialogueRole,
-        content: str,
-    ) -> ConversationState | None:
+    conversation_id: str,
+    role: DialogueRole,
+    content: str,
+    previous_subject: str | None = None,
+    current_subject: str | None = None,
+    current_subject_reference: str | None = None,
+) -> ConversationState | None:
     state = get_conversation(conversation_id)
 
     if state is None:
         return None
-    
+
     turn = DialogueTurn(
         role=role,
-        content=content
+        content=content,
+        previous_subject=previous_subject,
+        current_subject=current_subject,
+        current_subject_reference=(
+            current_subject_reference
+        ),
     )
 
     state.dialogue_history.append(turn)

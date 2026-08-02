@@ -16,6 +16,10 @@ class DialogueTurn(BaseModel):
     role: DialogueRole
     content: str
 
+    previous_subject: str | None = None
+    current_subject: str | None = None
+    current_subject_reference: str | None = None
+
 
 class ConversationSubject(BaseModel):
     """
