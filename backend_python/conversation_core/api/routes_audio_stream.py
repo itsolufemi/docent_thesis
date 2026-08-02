@@ -124,6 +124,8 @@ def create_audio_stream_router(
             silence_duration_ms: int,
             forced_finalisation: bool,
             turn_completion_confirmed: bool,
+            smart_turn_confirmed_at: float | None,
+            finalisation_received_at: float,
         ) -> None:
             """
             Produce the final transcript for one completed audio segment.
@@ -139,6 +141,11 @@ def create_audio_stream_router(
             transcription = None
             transcription_backend = "whisper"
 
+            transcription_task_started_at = perf_counter()
+
+            moonshine_finish_seconds: float | None = None
+            whisper_transcription_seconds: float | None = None
+
             if moonshine_session is not None:
                 try:
                     moonshine_started_at = perf_counter()
@@ -147,7 +154,7 @@ def create_audio_stream_router(
                         moonshine_session.finish
                     )
 
-                    moonshine_seconds = (
+                    moonshine_finish_seconds = (
                         perf_counter()
                         - moonshine_started_at
                     )
@@ -161,7 +168,7 @@ def create_audio_stream_router(
                                 {
                                     "segment_id": segment_id,
                                     "seconds": round(
-                                        moonshine_seconds,
+                                        moonshine_finish_seconds,
                                         4,
                                     ),
                                     "character_count": len(
@@ -206,7 +213,7 @@ def create_audio_stream_router(
                         channels=audio_buffer.channels,
                     )
 
-                    whisper_seconds = (
+                    whisper_transcription_seconds = (
                         perf_counter()
                         - whisper_started_at
                     )
@@ -223,7 +230,7 @@ def create_audio_stream_router(
                             {
                                 "segment_id": segment_id,
                                 "seconds": round(
-                                    whisper_seconds,
+                                    whisper_transcription_seconds,
                                     4,
                                 ),
                                 "fallback": (
@@ -256,6 +263,63 @@ def create_audio_stream_router(
                         segment_id=segment_id,
                     )
                     return
+                
+            transcription_completed_at = perf_counter()
+
+            timing = {
+                "transcription_task_seconds": round(
+                    transcription_completed_at
+                    - transcription_task_started_at,
+                    4,
+                ),
+                "finalisation_to_transcript_seconds": round(
+                    transcription_completed_at
+                    - finalisation_received_at,
+                    4,
+                ),
+            }
+
+            if smart_turn_confirmed_at is not None:
+                timing[
+                    "smart_turn_to_finalisation_seconds"
+                ] = round(
+                    finalisation_received_at
+                    - smart_turn_confirmed_at,
+                    4,
+                )
+
+                timing[
+                    "smart_turn_to_transcript_seconds"
+                ] = round(
+                    transcription_completed_at
+                    - smart_turn_confirmed_at,
+                    4,
+                )
+
+            if moonshine_finish_seconds is not None:
+                timing["moonshine_finish_seconds"] = round(
+                    moonshine_finish_seconds,
+                    4,
+                )
+
+            if whisper_transcription_seconds is not None:
+                timing[
+                    "whisper_transcription_seconds"
+                ] = round(
+                    whisper_transcription_seconds,
+                    4,
+                )
+
+            logger.info(
+                "transcription_pipeline_timing %s",
+                json.dumps(
+                    {
+                        "segment_id": segment_id,
+                        "backend": transcription_backend,
+                        **timing,
+                    }
+                ),
+            )
 
             await send_message(
                 "audio_transcription",
@@ -273,6 +337,7 @@ def create_audio_stream_router(
                     "transcription_backend": (
                         transcription_backend
                     ),
+                    "timing": timing,
                     "stream": summary.model_dump(),
                     "transcription": (
                         transcription.model_dump()
@@ -430,6 +495,8 @@ def create_audio_stream_router(
             *,
             silence_duration_ms: int,
             forced_finalisation: bool,
+            smart_turn_confirmed_at: float | None,
+            finalisation_received_at: float,
         ) -> None:
             nonlocal active_segment_id
             nonlocal active_buffer
@@ -521,6 +588,12 @@ def create_audio_stream_router(
                     ),
                     moonshine_session=(
                         detached_moonshine_session
+                    ),
+                    smart_turn_confirmed_at=(
+                        smart_turn_confirmed_at
+                    ),
+                    finalisation_received_at=(
+                        finalisation_received_at
                     ),
                 )
             )
@@ -1052,6 +1125,14 @@ def create_audio_stream_router(
                         == requested_candidate_id
                     )
 
+                    finalisation_received_at = perf_counter()
+
+                    smart_turn_confirmed_at = (
+                        last_complete_candidate["returned_at"]
+                        if candidate_was_confirmed
+                        else None
+                    )
+
                     if (
                         not forced_finalisation
                         and smart_turn_service is not None
@@ -1077,6 +1158,12 @@ def create_audio_stream_router(
                         ),
                         forced_finalisation=(
                             forced_finalisation
+                        ),
+                        smart_turn_confirmed_at=(
+                            smart_turn_confirmed_at
+                        ),
+                        finalisation_received_at=(
+                            finalisation_received_at
                         ),
                     )
 
