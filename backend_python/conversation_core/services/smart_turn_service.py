@@ -72,6 +72,19 @@ class SmartTurnService:
             chunk_length=max_audio_seconds,
         )
 
+    def warm_up(self) -> float:
+        started_at = perf_counter()
+        silence_samples = np.zeros(
+            round(SMART_TURN_SAMPLE_RATE * 0.25),
+            dtype="<i2",
+        )
+        self.predict(
+            silence_samples.tobytes(),
+            sample_rate=SMART_TURN_SAMPLE_RATE,
+            channels=1,
+        )
+        return perf_counter() - started_at
+
     @staticmethod
     def _decode_pcm16(
         pcm_audio: bytes,

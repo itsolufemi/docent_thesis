@@ -1,6 +1,9 @@
 import asyncio
 import logging
+from collections.abc import Callable
 from contextlib import asynccontextmanager
+from time import perf_counter
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,6 +43,15 @@ from conversation_core.api.routes_utterance_router import (
 from conversation_core.services.smart_turn_service import (
     SmartTurnService,
 )
+from conversation_core.services.google_tts_service import (
+    google_tts_service,
+)
+from conversation_core.services.llm_service import (
+    warm_up_main_llm,
+)
+from conversation_core.services.ollama_http_client import (
+    close_ollama_http_client,
+)
 from conversation_core.services.transcription_service import (
     default_transcription_service,
 )
@@ -52,6 +64,9 @@ from docent.api.routes_docent_retrieval import router as docent_retrieval_router
 from docent.services.docent_query_service import (
     self_routing_docent_query_engine,
 )
+from docent.services.docent_vector_retrieval_service import (
+    warm_up_docent_retrieval,
+)
 from docent.api.routes_docent_embeddings import router as docent_embeddings_router
 from docent.api.routes_docent_vector import router as docent_vector_router
 
@@ -59,59 +74,132 @@ from docent.api.routes_docent_vector import router as docent_vector_router
 logger = logging.getLogger("uvicorn.error")
 
 
+async def run_warm_up(
+    name: str,
+    operation: Callable[[], Any],
+) -> dict:
+    started_at = perf_counter()
+
+    try:
+        detail = await asyncio.to_thread(operation)
+        result = {
+            "name": name,
+            "success": True,
+            "seconds": round(
+                perf_counter() - started_at,
+                4,
+            ),
+            "detail": detail,
+        }
+        logger.info(
+            "%s warm-up completed in %.3f seconds.",
+            name,
+            result["seconds"],
+        )
+        return result
+    except Exception as error:
+        elapsed_seconds = perf_counter() - started_at
+        logger.exception(
+            "%s warm-up failed after %.3f seconds. "
+            "The service will continue.",
+            name,
+            elapsed_seconds,
+        )
+        return {
+            "name": name,
+            "success": False,
+            "seconds": round(elapsed_seconds, 4),
+            "error": str(error),
+        }
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Load the selected speech-recognition model before FastAPI begins
+    Warm latency-sensitive application services before FastAPI begins
     accepting requests.
 
     Code before `yield` is application startup.
     Code after `yield` is application shutdown.
     """
 
-    if settings.transcription_backend == "moonshine":
-        if settings.warm_up_moonshine_on_startup:
-            try:
-                warm_up_seconds = await asyncio.to_thread(
-                    default_moonshine_transcription_service.warm_up
-                )
+    startup_started_at = perf_counter()
+    warm_up_operations: list[
+        tuple[str, Callable[[], Any]]
+    ] = []
 
-                logger.info(
-                    "Moonshine warm-up completed in %.3f seconds.",
-                    warm_up_seconds,
-                )
-
-            except Exception:
-                logger.exception(
-                    "Moonshine warm-up failed. "
-                    "The service will continue with lazy loading."
-                )
-
-    elif settings.transcription_backend == "whisper":
-        if settings.warm_up_whisper_on_startup:
-            try:
-                warm_up_seconds = await asyncio.to_thread(
-                    default_transcription_service.warm_up
-                )
-
-                logger.info(
-                    "Whisper warm-up completed in %.3f seconds.",
-                    warm_up_seconds,
-                )
-
-            except Exception:
-                logger.exception(
-                    "Whisper warm-up failed. "
-                    "The service will continue with lazy loading."
-                )
-
-    else:
+    if (
+        settings.transcription_backend == "moonshine"
+        and settings.warm_up_moonshine_on_startup
+    ):
+        warm_up_operations.append(
+            (
+                "Moonshine",
+                default_moonshine_transcription_service.warm_up,
+            )
+        )
+    elif (
+        settings.transcription_backend == "whisper"
+        and settings.warm_up_whisper_on_startup
+    ):
+        warm_up_operations.append(
+            (
+                "Whisper",
+                default_transcription_service.warm_up,
+            )
+        )
+    elif settings.transcription_backend not in {
+        "moonshine",
+        "whisper",
+    }:
         logger.warning(
             "Unknown transcription backend configured: %s",
             settings.transcription_backend,
         )
 
-    yield
+    if (
+        smart_turn_service is not None
+        and settings.warm_up_smart_turn_on_startup
+    ):
+        warm_up_operations.append(
+            ("Smart Turn", smart_turn_service.warm_up)
+        )
+
+    if settings.warm_up_retrieval_on_startup:
+        warm_up_operations.append(
+            ("Docent retrieval", warm_up_docent_retrieval)
+        )
+
+    if settings.warm_up_llm_on_startup:
+        warm_up_operations.append(
+            ("Main LLM", warm_up_main_llm)
+        )
+
+    if settings.warm_up_tts_on_startup:
+        warm_up_operations.append(
+            (
+                "Google streaming TTS",
+                google_tts_service.warm_up,
+            )
+        )
+
+    results = await asyncio.gather(
+        *[
+            run_warm_up(name, operation)
+            for name, operation in warm_up_operations
+        ]
+    )
+    logger.info(
+        "Application warm-up completed in %.3f seconds: %s",
+        perf_counter() - startup_started_at,
+        results,
+    )
+
+    try:
+        yield
+    finally:
+        close_ollama_http_client()
+
 
 app = FastAPI(
     title="docent backend",

@@ -120,6 +120,23 @@ class Settings():
         True,
     )
 
+    warm_up_smart_turn_on_startup: bool = _read_bool(
+        "WARM_UP_SMART_TURN_ON_STARTUP",
+        True,
+    )
+    warm_up_retrieval_on_startup: bool = _read_bool(
+        "WARM_UP_RETRIEVAL_ON_STARTUP",
+        True,
+    )
+    warm_up_llm_on_startup: bool = _read_bool(
+        "WARM_UP_LLM_ON_STARTUP",
+        True,
+    )
+    warm_up_tts_on_startup: bool = _read_bool(
+        "WARM_UP_TTS_ON_STARTUP",
+        True,
+    )
+
     smart_turn_enabled: bool = _read_bool(
         "SMART_TURN_ENABLED",
         False,

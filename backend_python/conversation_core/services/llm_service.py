@@ -13,6 +13,9 @@ from conversation_core.schemas.llm_stream_schemas import (
 from conversation_core.services.cancellation import (
     CancellationToken,
 )
+from conversation_core.services.ollama_http_client import (
+    ollama_http_client,
+)
 from conversation_core.schemas.tool_schemas import (
     ToolCall,
     ToolExecutionContext,
@@ -27,9 +30,11 @@ LLMTimingCallback = Callable[
 ]
 
 def check_llm_status() -> dict:
-    url = f"{settings.ollama_base_url}/api/tags"
     try:
-        response =httpx.get(url, timeout=10.0)
+        response = ollama_http_client.get(
+            "/api/tags",
+            timeout=10.0,
+        )
         response.raise_for_status()
 
         data = response.json()
@@ -83,8 +88,6 @@ def generate_llm_response(
     timeout: float = 120.0,
     options: dict[str, Any] | None = None,
 ) -> str:
-    url = f"{settings.ollama_base_url}/api/generate"
-
     payload = {
         "model": model or settings.ollama_model,
         "prompt": prompt,
@@ -93,7 +96,11 @@ def generate_llm_response(
     }
 
     try:
-        response = httpx.post(url, json=payload, timeout=timeout)
+        response = ollama_http_client.post(
+            "/api/generate",
+            json=payload,
+            timeout=timeout,
+        )
         response.raise_for_status()
 
         data = response.json()
@@ -163,8 +170,6 @@ def send_ollama_chat_request(
     model: str | None = None,
     think: bool | None = None,
 ) -> dict[str, Any]:
-    url = f"{settings.ollama_base_url}/api/chat"
-
     payload: dict[str, Any] = {
         "model": model or settings.ollama_model,
         "messages": messages,
@@ -183,8 +188,8 @@ def send_ollama_chat_request(
     if selected_think is not None:
         payload["think"] = selected_think
 
-    response = httpx.post(
-        url,
+    response = ollama_http_client.post(
+        "/api/chat",
         json=payload,
         timeout=120.0,
     )
@@ -204,11 +209,6 @@ def stream_ollama_chat_request(
     timing_callback: LLMTimingCallback | None = None,
     round_number: int = 1,
 ) -> Iterator[dict[str, Any]]:
-    url = (
-        f"{settings.ollama_base_url}"
-        "/api/chat"
-    )
-
     payload: dict[str, Any] = {
         "model": model or settings.ollama_model,
         "messages": messages,
@@ -235,9 +235,9 @@ def stream_ollama_chat_request(
 
     request_started_at = perf_counter()
 
-    with httpx.stream(
+    with ollama_http_client.stream(
         method="POST",
-        url=url,
+        url="/api/chat",
         json=payload,
         timeout=120.0,
     ) as response:
@@ -279,6 +279,38 @@ def stream_ollama_chat_request(
                     )
 
             yield chunk
+
+
+def warm_up_main_llm() -> dict:
+    started_at = perf_counter()
+    response_data = send_ollama_chat_request(
+        messages=[
+            {
+                "role": "user",
+                "content": "Reply with exactly: ready",
+            }
+        ],
+        tools=None,
+        think=False,
+    )
+    content = (
+        response_data.get("message", {})
+        .get("content", "")
+        .strip()
+    )
+
+    if not content:
+        raise RuntimeError(
+            "The LLM warm-up returned no content."
+        )
+
+    return {
+        "seconds": round(
+            perf_counter() - started_at,
+            4,
+        ),
+        "response": content[:50],
+    }
 
 
 def stream_tool_aware_llm_response(

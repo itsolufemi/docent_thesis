@@ -222,6 +222,10 @@ class LifespanTest(unittest.TestCase):
         async def enter_and_exit() -> None:
             with (
                 patch(
+                    "server.settings.transcription_backend",
+                    "whisper",
+                ),
+                patch(
                     "server.settings."
                     "warm_up_whisper_on_startup",
                     True,
@@ -233,9 +237,34 @@ class LifespanTest(unittest.TestCase):
                         "warm-up failed"
                     ),
                 ),
+                patch(
+                    "server.settings."
+                    "warm_up_smart_turn_on_startup",
+                    False,
+                ),
+                patch(
+                    "server.settings."
+                    "warm_up_retrieval_on_startup",
+                    False,
+                ),
+                patch(
+                    "server.settings."
+                    "warm_up_llm_on_startup",
+                    False,
+                ),
+                patch(
+                    "server.settings."
+                    "warm_up_tts_on_startup",
+                    False,
+                ),
+                patch(
+                    "server.close_ollama_http_client"
+                ) as close_client,
             ):
                 async with lifespan(app):
-                    return
+                    pass
+
+            close_client.assert_called_once_with()
 
         asyncio.run(enter_and_exit())
 
