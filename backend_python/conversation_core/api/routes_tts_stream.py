@@ -137,6 +137,7 @@ def create_tts_stream_router(
 
             chunk_index = 0
             audio_bytes = 0
+            first_chunk_seconds: float | None = None
 
             while True:
                 chunk = await asyncio.to_thread(
@@ -147,14 +148,32 @@ def create_tts_stream_router(
                 if chunk is None:
                     break
 
+                is_first_chunk = chunk_index == 0
+
+                if is_first_chunk:
+                    first_chunk_seconds = (
+                        perf_counter() - started_at
+                    )
+
                 await websocket.send_json({
                     "type": "tts_chunk",
                     "payload": {
                         "stream_id": stream_id,
                         "chunk_index": chunk_index,
                         "byte_length": len(chunk),
+                        "first_chunk": is_first_chunk,
+                        "request_to_first_chunk_seconds": (
+                            round(
+                                first_chunk_seconds,
+                                4,
+                            )
+                            if is_first_chunk
+                            and first_chunk_seconds is not None
+                            else None
+                        ),
                     },
                 })
+
                 await websocket.send_bytes(chunk)
 
                 audio_bytes += len(chunk)
@@ -173,6 +192,14 @@ def create_tts_stream_router(
                     "generation_seconds": round(
                         elapsed_seconds,
                         4,
+                    ),
+                    "first_chunk_seconds": (
+                        round(
+                            first_chunk_seconds,
+                            4,
+                        )
+                        if first_chunk_seconds is not None
+                        else None
                     ),
                 },
             })

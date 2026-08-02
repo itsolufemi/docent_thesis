@@ -63,6 +63,27 @@ function appendTranscriptSegment(
   return `${existing} ${incoming}`;
 }
 
+function elapsedSeconds(
+  startedAt,
+  completedAt,
+) {
+  if (
+    startedAt == null ||
+    completedAt == null
+  ) {
+    return null;
+  }
+
+  return Number(
+    (
+      (
+        completedAt
+        - startedAt
+      ) / 1000
+    ).toFixed(4),
+  );
+}
+
 export default function MainApplication() {
   const [loading, setLoading] = useState(true);
   const [started, setStarted] = useState(false);
@@ -160,6 +181,7 @@ export default function MainApplication() {
   const smartTurnEnabledRef = useRef(false);
   const smartTurnCandidateIdRef = useRef(0);
   const smartTurnForcedTimerRef = useRef(null);
+  const responseTimingsRef = useRef(new Map());
 
   const releaseStreamedTextDisplay = (
     requestId,
@@ -463,6 +485,7 @@ export default function MainApplication() {
       responseSentenceBuffersRef.current.clear();
       spokenResponseTextRef.current.clear();
       progressiveTtsQueuesRef.current.clear();
+      responseTimingsRef.current.clear();
       activeProgressiveResponseRef.current =
         null;
       cancelledProgressiveResponsesRef.current
@@ -1011,6 +1034,9 @@ export default function MainApplication() {
     spokenResponseTextRef.current.delete(
       requestId,
     );
+    responseTimingsRef.current.delete(
+      requestId,
+    );
 
     const cancellingActiveResponse = (
       activeProgressiveResponseRef.current
@@ -1201,6 +1227,19 @@ export default function MainApplication() {
             playbackComplete: true,
             cancelled: false,
           };
+          responseTimingsRef.current.set(
+            requestId,
+            {
+              queryStartedAt: performance.now(),
+              firstDeltaAt: null,
+              firstSentenceQueuedAt: null,
+              firstTtsRequestAt: null,
+              firstTtsAudioAt: null,
+              firstPlaybackAt: null,
+              serverFirstDeltaSeconds: null,
+              ttsTiming: null,
+            },
+          );
         }
 
         const pendingRequest =
@@ -1278,6 +1317,22 @@ export default function MainApplication() {
           )
         ) {
           return;
+        }
+
+        const timing =
+          responseTimingsRef.current.get(
+            requestId,
+          );
+
+        if (
+          timing &&
+          timing.firstDeltaAt === null
+        ) {
+          timing.firstDeltaAt =
+            performance.now();
+
+          timing.serverFirstDeltaSeconds =
+            payload.seconds ?? null;
         }
 
         console.log(
@@ -1583,6 +1638,12 @@ export default function MainApplication() {
           requestId,
         );
 
+        if (requestId) {
+          responseTimingsRef.current.delete(
+            requestId,
+          );
+        }
+
         const pendingRequest =
           pendingTurnRequestsRef.current.get(
             requestId,
@@ -1704,8 +1765,16 @@ export default function MainApplication() {
         return false;
       }
 
+      const completedRequestId =
+        activeResponse.requestId;
+
       activeProgressiveResponseRef.current =
         null;
+
+      responseTimingsRef.current.delete(
+        completedRequestId,
+      );
+
       isPlaying.current = false;
       activeTtsStreamIdRef.current = null;
       restoreAssistantAudio();
@@ -1777,8 +1846,49 @@ export default function MainApplication() {
         event,
       ) => {
         switch (event.data?.type) {
-          case 'playback_started':
+          case 'playback_started': {
             isPlaying.current = true;
+
+            const activeRequestId =
+              activeProgressiveResponseRef.current
+                ?.requestId;
+
+            if (activeRequestId) {
+              const responseTiming =
+                responseTimingsRef.current.get(
+                  activeRequestId,
+                );
+
+              if (
+                responseTiming &&
+                responseTiming.firstPlaybackAt
+                  === null
+              ) {
+                responseTiming.firstPlaybackAt =
+                  performance.now();
+
+                console.log(
+                  'Voice pipeline playback timing:',
+                  {
+                    requestId: activeRequestId,
+                    firstAudioToPlaybackSeconds:
+                      elapsedSeconds(
+                        responseTiming
+                          .firstTtsAudioAt,
+                        responseTiming
+                          .firstPlaybackAt,
+                      ),
+                    queryToPlaybackSeconds:
+                      elapsedSeconds(
+                        responseTiming
+                          .queryStartedAt,
+                        responseTiming
+                          .firstPlaybackAt,
+                      ),
+                  },
+                );
+              }
+            }
 
             if (
               activeProgressiveResponseRef.current
@@ -1792,6 +1902,7 @@ export default function MainApplication() {
               'playing',
             );
             break;
+          }
 
           case 'playback_complete':
             if (
@@ -1947,6 +2058,72 @@ export default function MainApplication() {
                 });
               },
 
+              onFirstAudio: (ttsTiming) => {
+                if (!requestId) {
+                  return;
+                }
+
+                const responseTiming =
+                  responseTimingsRef.current.get(
+                    requestId,
+                  );
+
+                if (
+                  !responseTiming ||
+                  responseTiming.firstTtsAudioAt
+                    !== null
+                ) {
+                  return;
+                }
+
+                responseTiming.firstTtsAudioAt =
+                  performance.now();
+
+                responseTiming.ttsTiming =
+                  ttsTiming;
+
+                console.log(
+                  'Voice pipeline first-audio timing:',
+                  {
+                    requestId,
+                    serverQueryToFirstDeltaSeconds:
+                      responseTiming
+                        .serverFirstDeltaSeconds,
+                    queryToFirstDeltaSeconds:
+                      elapsedSeconds(
+                        responseTiming.queryStartedAt,
+                        responseTiming.firstDeltaAt,
+                      ),
+                    firstDeltaToSentenceSeconds:
+                      elapsedSeconds(
+                        responseTiming.firstDeltaAt,
+                        responseTiming
+                          .firstSentenceQueuedAt,
+                      ),
+                    sentenceToTtsRequestSeconds:
+                      elapsedSeconds(
+                        responseTiming
+                          .firstSentenceQueuedAt,
+                        responseTiming
+                          .firstTtsRequestAt,
+                      ),
+                    ttsSocketConnectSeconds:
+                      ttsTiming.connectSeconds,
+                    ttsRequestToFirstAudioSeconds:
+                      ttsTiming
+                        .requestToFirstAudioSeconds,
+                    serverTtsFirstChunkSeconds:
+                      ttsTiming
+                        .serverRequestToFirstChunkSeconds,
+                    queryToFirstAudioSeconds:
+                      elapsedSeconds(
+                        responseTiming.queryStartedAt,
+                        responseTiming.firstTtsAudioAt,
+                      ),
+                  },
+                );
+              },
+
               onAudioChunk: ({
                 samples,
               }) => {
@@ -2071,6 +2248,22 @@ export default function MainApplication() {
           ttsStreamClientRef.current =
             ttsClient;
 
+          if (requestId) {
+            const responseTiming =
+              responseTimingsRef.current.get(
+                requestId,
+              );
+
+            if (
+              responseTiming &&
+              responseTiming
+                .firstTtsRequestAt === null
+            ) {
+              responseTiming.firstTtsRequestAt =
+                performance.now();
+            }
+          }
+
           ttsClient.connect({
             text: cleanedText,
           }).catch(rejectOnce);
@@ -2120,6 +2313,20 @@ export default function MainApplication() {
           requestId,
         ) ?? Promise.resolve()
       );
+    }
+    const responseTiming =
+      responseTimingsRef.current.get(
+        requestId,
+      );
+
+    if (
+      responseTiming &&
+      responseTiming
+        .firstSentenceQueuedAt === null
+    ) {
+      responseTiming
+        .firstSentenceQueuedAt =
+          performance.now();
     }
 
     const existingQueue =

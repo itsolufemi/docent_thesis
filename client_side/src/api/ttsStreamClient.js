@@ -43,6 +43,7 @@ function pcm16ToFloat32(arrayBuffer) {
 export class TtsStreamClient {
   constructor({
     onStarted,
+    onFirstAudio,
     onAudioChunk,
     onComplete,
     onError,
@@ -52,6 +53,7 @@ export class TtsStreamClient {
     this.pendingChunkMetadata = null;
 
     this.onStarted = onStarted;
+    this.onFirstAudio = onFirstAudio;
     this.onAudioChunk = onAudioChunk;
     this.onComplete = onComplete;
     this.onError = onError;
@@ -63,6 +65,13 @@ export class TtsStreamClient {
     voiceName = null,
     languageCode = null,
   }) {
+    const connectStartedAt =
+      performance.now();
+
+    let socketOpenedAt = null;
+    let requestSentAt = null;
+    let firstAudioReceived = false;
+
     return new Promise(
       (resolve, reject) => {
         const socketUrl =
@@ -77,6 +86,8 @@ export class TtsStreamClient {
         this.socket = socket;
 
         socket.onopen = () => {
+          socketOpenedAt = performance.now();
+
           socket.send(
             JSON.stringify({
               type: 'synthesise',
@@ -89,6 +100,8 @@ export class TtsStreamClient {
             }),
           );
 
+          requestSentAt = performance.now();
+
           resolve();
         };
 
@@ -97,14 +110,50 @@ export class TtsStreamClient {
             event.data instanceof
             ArrayBuffer
           ) {
+            const audioReceivedAt =
+              performance.now();
+
+            const chunkMetadata =
+              this.pendingChunkMetadata;
+
+            if (!firstAudioReceived) {
+              firstAudioReceived = true;
+
+              this.onFirstAudio?.({
+                connectSeconds: (
+                  socketOpenedAt !== null
+                    ? (
+                        socketOpenedAt
+                        - connectStartedAt
+                      ) / 1000
+                    : null
+                ),
+                requestToFirstAudioSeconds: (
+                  requestSentAt !== null
+                    ? (
+                        audioReceivedAt
+                        - requestSentAt
+                      ) / 1000
+                    : null
+                ),
+                connectToFirstAudioSeconds: (
+                  audioReceivedAt
+                  - connectStartedAt
+                ) / 1000,
+                serverRequestToFirstChunkSeconds:
+                  chunkMetadata
+                    ?.request_to_first_chunk_seconds
+                    ?? null,
+              });
+            }
+
             const samples =
               pcm16ToFloat32(
                 event.data,
               );
 
             this.onAudioChunk?.({
-              metadata:
-                this.pendingChunkMetadata,
+              metadata: chunkMetadata,
               samples,
             });
 
