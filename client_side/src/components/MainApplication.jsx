@@ -183,6 +183,32 @@ export default function MainApplication() {
   const smartTurnForcedTimerRef = useRef(null);
   const responseTimingsRef = useRef(new Map());
 
+  const ensurePersistentTtsClient = () => {
+    let client = ttsStreamClientRef.current;
+
+    if (client) {
+      return client;
+    }
+
+    client = new TtsStreamClient({
+      onReady: (metadata) => {
+        console.log(
+          'Persistent TTS ready:',
+          metadata,
+        );
+      },
+      onClose: () => {
+        if (
+          ttsStreamClientRef.current === client
+        ) {
+          ttsStreamClientRef.current = null;
+        }
+      },
+    });
+    ttsStreamClientRef.current = client;
+    return client;
+  };
+
   const releaseStreamedTextDisplay = (
     requestId,
     fallbackText = '',
@@ -455,6 +481,18 @@ export default function MainApplication() {
     assistantAudioStatusRef.current =
       assistantAudioStatus;
   }, [assistantAudioStatus]);
+
+  useEffect(() => {
+    const ttsClient = ensurePersistentTtsClient();
+
+    void ttsClient.connect().catch((error) => {
+      console.error(
+        'Could not connect persistent TTS:',
+        error,
+      );
+      setAssistantAudioError(error.message);
+    });
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -942,8 +980,9 @@ export default function MainApplication() {
     ttsAbortControllerRef.current?.abort();
     ttsAbortControllerRef.current = null;
 
-    ttsStreamClientRef.current?.close();
-    ttsStreamClientRef.current = null;
+    ttsStreamClientRef.current?.cancel(
+      activeTtsStreamIdRef.current,
+    );
 
     activeTtsStreamIdRef.current = null;
 
@@ -1013,14 +1052,9 @@ export default function MainApplication() {
       requestId,
     );
 
-    const clients =
-      activeTtsClientsByRequestRef.current.get(
-        requestId,
-      );
-
-    for (const client of [...(clients ?? [])]) {
-      client.close();
-    }
+    ttsStreamClientRef.current?.cancel(
+      activeTtsStreamIdRef.current,
+    );
 
     activeTtsClientsByRequestRef.current.delete(
       requestId,
@@ -2029,7 +2063,11 @@ export default function MainApplication() {
           };
 
           const ttsClient =
-            new TtsStreamClient({
+            ensurePersistentTtsClient();
+
+          const synthesisPromise =
+            ttsClient.synthesise({
+              text: cleanedText,
               onStarted: (metadata) => {
                 if (
                   requestId &&
@@ -2037,14 +2075,18 @@ export default function MainApplication() {
                     requestId,
                   )
                 ) {
-                  ttsClient.close();
+                  ttsClient.cancel(
+                    metadata.synthesis_id,
+                  );
                   return;
                 }
 
                 activeTtsStreamIdRef.current =
-                  metadata.stream_id;
+                  metadata.synthesis_id;
 
                 setLatestTtsMetadata({
+                  provider:
+                    metadata.provider,
                   voice:
                     metadata.voice_name,
                   language:
@@ -2109,6 +2151,8 @@ export default function MainApplication() {
                       ),
                     ttsSocketConnectSeconds:
                       ttsTiming.connectSeconds,
+                    ttsConnectionReused:
+                      ttsTiming.connectionReused,
                     ttsRequestToFirstAudioSeconds:
                       ttsTiming
                         .requestToFirstAudioSeconds,
@@ -2150,6 +2194,12 @@ export default function MainApplication() {
               },
 
               onComplete: (metadata) => {
+                if (
+                  activeTtsStreamIdRef.current ===
+                  metadata.synthesis_id
+                ) {
+                  activeTtsStreamIdRef.current = null;
+                }
                 removeTtsClientForRequest(
                   requestId,
                   ttsClient,
@@ -2202,27 +2252,18 @@ export default function MainApplication() {
                 rejectOnce(error);
               },
 
-              onClose: () => {
+              onCancelled: (metadata) => {
+                if (
+                  activeTtsStreamIdRef.current ===
+                  metadata.synthesis_id
+                ) {
+                  activeTtsStreamIdRef.current = null;
+                }
                 removeTtsClientForRequest(
                   requestId,
                   ttsClient,
                 );
-
-                if (
-                  ttsStreamClientRef.current ===
-                  ttsClient
-                ) {
-                  ttsStreamClientRef.current =
-                    null;
-                }
-
-                if (!settled) {
-                  rejectOnce(
-                    new Error(
-                      'TTS stream closed before completion.',
-                    ),
-                  );
-                }
+                resolveOnce(metadata);
               },
             });
 
@@ -2245,9 +2286,6 @@ export default function MainApplication() {
             requestClients.add(ttsClient);
           }
 
-          ttsStreamClientRef.current =
-            ttsClient;
-
           if (requestId) {
             const responseTiming =
               responseTimingsRef.current.get(
@@ -2264,9 +2302,7 @@ export default function MainApplication() {
             }
           }
 
-          ttsClient.connect({
-            text: cleanedText,
-          }).catch(rejectOnce);
+          synthesisPromise.catch(rejectOnce);
         },
       );
     } catch (error) {
@@ -2378,7 +2414,9 @@ export default function MainApplication() {
               const client
               of [...(clients ?? [])]
             ) {
-              client.close();
+              client.cancel(
+                activeTtsStreamIdRef.current,
+              );
             }
           }
         })

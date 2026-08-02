@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
 from threading import Lock
 from time import perf_counter
 
 from google.cloud import texttospeech
+
+from conversation_core.services.tts_service import (
+    SynthesisedSpeech,
+)
 
 
 DEFAULT_LANGUAGE_CODE = "en-GB"
@@ -13,18 +16,8 @@ DEFAULT_VOICE_NAME = "en-GB-Chirp3-HD-Aoede"
 DEFAULT_SAMPLE_RATE = 24_000
 
 
-@dataclass(frozen=True)
-class SynthesisedSpeech:
-    audio: bytes
-    text: str
-    voice_name: str
-    language_code: str
-    sample_rate: int
-    generation_seconds: float
-    character_count: int
-
-
 class GoogleTextToSpeechService:
+    provider_name = "google"
     def __init__(
         self,
         *,
@@ -131,6 +124,7 @@ class GoogleTextToSpeechService:
             sample_rate=self.sample_rate,
             generation_seconds=generation_seconds,
             character_count=len(cleaned_text),
+            provider_name=self.provider_name,
         )
 
     def stream_synthesise(
@@ -251,6 +245,20 @@ class GoogleTextToSpeechService:
             "chunk_count": chunk_count,
             "audio_bytes": audio_bytes,
         }
+
+    def close(self) -> None:
+        with self._client_lock:
+            client = self._client
+            self._client = None
+
+        if client is None:
+            return
+
+        transport = getattr(client, "transport", None)
+        close = getattr(transport, "close", None)
+
+        if callable(close):
+            close()
 
 
 google_tts_service = GoogleTextToSpeechService()

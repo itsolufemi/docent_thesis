@@ -22,6 +22,7 @@ moonshine-voice==0.1.0
 numpy==2.5.1
 onnxruntime==1.27.0
 packaging==26.2
+pocket-tts==2.1.0
 protobuf==7.35.1
 pydantic==2.13.4
 pydantic_core==2.46.4

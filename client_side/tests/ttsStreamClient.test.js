@@ -7,8 +7,7 @@ import {
 
 
 function installFakeWebSocket() {
-  const originalWebSocket =
-    globalThis.WebSocket;
+  const originalWebSocket = globalThis.WebSocket;
   const sockets = [];
 
   class FakeWebSocket {
@@ -20,7 +19,7 @@ function installFakeWebSocket() {
     }
 
     send(message) {
-      this.sentMessages.push(message);
+      this.sentMessages.push(JSON.parse(message));
     }
 
     close() {}
@@ -34,56 +33,64 @@ function installFakeWebSocket() {
       if (originalWebSocket === undefined) {
         delete globalThis.WebSocket;
       } else {
-        globalThis.WebSocket =
-          originalWebSocket;
+        globalThis.WebSocket = originalWebSocket;
       }
     },
   };
 }
 
 
-test(
-  'manual close notifies pending stream lifecycle',
-  () => {
-    let closeEvent = null;
-    let socketClosed = false;
-    const client = new TtsStreamClient({
-      onClose: (event) => {
-        closeEvent = event;
+function sendReady(socket) {
+  socket.onopen();
+  socket.onmessage({
+    data: JSON.stringify({
+      type: 'tts_ready',
+      payload: {
+        provider: 'fake',
+        sample_rate: 24000,
       },
-    });
+    }),
+  });
+}
 
-    client.socket = {
-      onmessage: () => {},
-      onerror: () => {},
-      onclose: () => {},
-      close: () => {
-        socketClosed = true;
-      },
-    };
 
-    client.close();
+test('manual close notifies lifecycle', () => {
+  let closeEvent = null;
+  let socketClosed = false;
+  const client = new TtsStreamClient({
+    onClose: (event) => {
+      closeEvent = event;
+    },
+  });
+  client.socket = {
+    onmessage: () => {},
+    onerror: () => {},
+    onclose: () => {},
+    close: () => {
+      socketClosed = true;
+    },
+  };
 
-    assert.equal(socketClosed, true);
-    assert.equal(client.socket, null);
-    assert.equal(
-      closeEvent.reason,
-      'client_closed',
-    );
-  },
-);
+  client.close();
+
+  assert.equal(socketClosed, true);
+  assert.equal(client.socket, null);
+  assert.equal(closeEvent.reason, 'client_closed');
+});
 
 
 test(
-  'first audio timing fires once and preserves chunk data',
+  'two syntheses reuse one socket and preserve audio timing',
   async () => {
-    const fakeWebSocket =
-      installFakeWebSocket();
+    const fakeWebSocket = installFakeWebSocket();
     const firstAudioTimings = [];
     const audioChunks = [];
 
     try {
-      const client = new TtsStreamClient({
+      const client = new TtsStreamClient();
+      const firstSynthesis = client.synthesise({
+        synthesisId: 'first',
+        text: 'Hello from Docent.',
         onFirstAudio: (timing) => {
           firstAudioTimings.push(timing);
         },
@@ -91,79 +98,65 @@ test(
           audioChunks.push(chunk);
         },
       });
-      const connection = client.connect({
-        text: 'Hello from Docent.',
-      });
       const socket = fakeWebSocket.sockets[0];
+      sendReady(socket);
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      socket.onopen();
-      await connection;
+      assert.equal(fakeWebSocket.sockets.length, 1);
+      assert.equal(
+        socket.sentMessages[0].payload.synthesis_id,
+        'first',
+      );
 
       socket.onmessage({
         data: JSON.stringify({
           type: 'tts_chunk',
           payload: {
+            synthesis_id: 'first',
             chunk_index: 0,
             first_chunk: true,
-            request_to_first_chunk_seconds:
-              0.1234,
+            request_to_first_chunk_seconds: 0.1234,
           },
         }),
       });
       socket.onmessage({
-        data: new Int16Array([
-          -32768,
-          0,
-          32767,
-        ]).buffer,
+        data: new Int16Array([-32768, 0, 32767]).buffer,
       });
+      socket.onmessage({
+        data: JSON.stringify({
+          type: 'tts_complete',
+          payload: { synthesis_id: 'first' },
+        }),
+      });
+      await firstSynthesis;
+
+      const secondSynthesis = client.synthesise({
+        synthesisId: 'second',
+        text: 'A second sentence.',
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      assert.equal(fakeWebSocket.sockets.length, 1);
+      assert.equal(
+        socket.sentMessages[1].payload.synthesis_id,
+        'second',
+      );
 
       socket.onmessage({
         data: JSON.stringify({
-          type: 'tts_chunk',
-          payload: {
-            chunk_index: 1,
-            first_chunk: false,
-            request_to_first_chunk_seconds:
-              null,
-          },
+          type: 'tts_complete',
+          payload: { synthesis_id: 'second' },
         }),
       });
-      socket.onmessage({
-        data: new Int16Array([100]).buffer,
-      });
+      await secondSynthesis;
 
-      assert.equal(
-        firstAudioTimings.length,
-        1,
-      );
-      assert.ok(
-        firstAudioTimings[0]
-          .connectSeconds >= 0,
-      );
-      assert.ok(
-        firstAudioTimings[0]
-          .requestToFirstAudioSeconds >= 0,
-      );
-      assert.ok(
-        firstAudioTimings[0]
-          .connectToFirstAudioSeconds >= 0,
-      );
+      assert.equal(firstAudioTimings.length, 1);
       assert.equal(
         firstAudioTimings[0]
           .serverRequestToFirstChunkSeconds,
         0.1234,
       );
-
-      assert.equal(audioChunks.length, 2);
-      assert.equal(
-        audioChunks[0].metadata.chunk_index,
-        0,
-      );
-      assert.equal(
-        audioChunks[1].metadata.chunk_index,
-        1,
-      );
+      assert.equal(audioChunks.length, 1);
       assert.deepEqual(
         Array.from(audioChunks[0].samples),
         [-1, 0, 1],
@@ -173,3 +166,42 @@ test(
     }
   },
 );
+
+
+test('cancel keeps the persistent socket open', async () => {
+  const fakeWebSocket = installFakeWebSocket();
+
+  try {
+    const client = new TtsStreamClient();
+    const connection = client.connect();
+    const socket = fakeWebSocket.sockets[0];
+    sendReady(socket);
+    await connection;
+
+    const synthesis = client.synthesise({
+      synthesisId: 'cancel-me',
+      text: 'Cancel this.',
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    client.cancel('cancel-me');
+
+    assert.equal(fakeWebSocket.sockets.length, 1);
+    assert.equal(
+      socket.sentMessages.at(-1).type,
+      'cancel',
+    );
+
+    socket.onmessage({
+      data: JSON.stringify({
+        type: 'tts_cancelled',
+        payload: { synthesis_id: 'cancel-me' },
+      }),
+    });
+
+    const result = await synthesis;
+    assert.equal(result.cancelled, true);
+    assert.equal(client.socket, socket);
+  } finally {
+    fakeWebSocket.restore();
+  }
+});

@@ -43,8 +43,8 @@ from conversation_core.api.routes_utterance_router import (
 from conversation_core.services.smart_turn_service import (
     SmartTurnService,
 )
-from conversation_core.services.google_tts_service import (
-    google_tts_service,
+from conversation_core.services.tts_service_factory import (
+    default_tts_service,
 )
 from conversation_core.services.llm_service import (
     warm_up_main_llm,
@@ -178,8 +178,8 @@ async def lifespan(app: FastAPI):
     if settings.warm_up_tts_on_startup:
         warm_up_operations.append(
             (
-                "Google streaming TTS",
-                google_tts_service.warm_up,
+                "Selected streaming TTS",
+                default_tts_service.warm_up,
             )
         )
 
@@ -196,8 +196,13 @@ async def lifespan(app: FastAPI):
     )
 
     try:
+        logger.info(
+            "Selected TTS backend: %s",
+            default_tts_service.provider_name,
+        )
         yield
     finally:
+        default_tts_service.close()
         close_ollama_http_client()
 
 
@@ -213,6 +218,7 @@ permitted_origins = [
 ]
 
 tts_response_headers = [
+    "X-TTS-Provider",
     "X-TTS-Voice",
     "X-TTS-Language",
     "X-TTS-Sample-Rate",
@@ -277,8 +283,10 @@ audio_stream_router = create_audio_stream_router(
     ),
 )
 
-tts_router = create_tts_router()
-tts_stream_router = create_tts_stream_router()
+tts_router = create_tts_router(default_tts_service)
+tts_stream_router = create_tts_stream_router(
+    default_tts_service
+)
 
 app.include_router(health_router)
 app.include_router(query_router)

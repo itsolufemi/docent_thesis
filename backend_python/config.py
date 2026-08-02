@@ -137,6 +137,27 @@ class Settings():
         True,
     )
 
+    tts_backend: str = os.getenv(
+        "TTS_BACKEND",
+        "kyutai_pocket",
+    ).strip().lower()
+    tts_model: str = os.getenv(
+        "TTS_MODEL",
+        "english",
+    ).strip()
+    tts_voice: str = os.getenv(
+        "TTS_VOICE",
+        "alba",
+    ).strip()
+    tts_language_code: str = os.getenv(
+        "TTS_LANGUAGE_CODE",
+        "en-GB",
+    ).strip()
+    tts_quantize: bool = _read_bool(
+        "TTS_QUANTIZE",
+        False,
+    )
+
     smart_turn_enabled: bool = _read_bool(
         "SMART_TURN_ENABLED",
         False,
