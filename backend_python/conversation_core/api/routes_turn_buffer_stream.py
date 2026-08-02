@@ -272,6 +272,7 @@ async def process_streamed_turn_event(
         query_started_at = perf_counter()
         first_delta_sent = False
         cancellation_event_sent = False
+        query_timing_events: list[dict] = []
         query_task = asyncio.create_task(
             run_query()
         )
@@ -285,12 +286,28 @@ async def process_streamed_turn_event(
                 if stream_event is None:
                     break
 
+                if stream_event.event_type == "timing":
+                    query_timing_events.append(
+                        {
+                            "name": stream_event.timing_name,
+                            "seconds": (
+                                stream_event.timing_seconds
+                            ),
+                            **stream_event.timing_payload,
+                        }
+                    )
+                    continue
+
                 if (
                     stream_event.event_type
                     == "content_delta"
                     and not first_delta_sent
                 ):
                     first_delta_sent = True
+
+                    first_delta_seconds = (
+                        perf_counter() - query_started_at
+                    )
 
                     await send_message(
                         {
@@ -300,9 +317,11 @@ async def process_streamed_turn_event(
                             "request_id": request_id,
                             "payload": {
                                 "seconds": round(
-                                    perf_counter()
-                                    - query_started_at,
+                                    first_delta_seconds,
                                     4,
+                                ),
+                                "timings": (
+                                    query_timing_events.copy()
                                 ),
                             },
                         }

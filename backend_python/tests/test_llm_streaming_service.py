@@ -33,8 +33,13 @@ class LlmStreamingServiceTest(unittest.TestCase):
             )
         )
 
+        visible_events = [
+            event
+            for event in events
+            if event.event_type != "timing"
+        ]
         self.assertEqual(
-            [event.event_type for event in events],
+            [event.event_type for event in visible_events],
             ["response_cancelled"],
         )
 
@@ -71,8 +76,13 @@ class LlmStreamingServiceTest(unittest.TestCase):
             )
         )
 
+        visible_events = [
+            event
+            for event in events
+            if event.event_type != "timing"
+        ]
         self.assertEqual(
-            [event.event_type for event in events],
+            [event.event_type for event in visible_events],
             [
                 "response_started",
                 "content_delta",
@@ -83,10 +93,19 @@ class LlmStreamingServiceTest(unittest.TestCase):
         self.assertEqual(
             "".join(
                 event.text
-                for event in events
+                for event in visible_events
                 if event.event_type == "content_delta"
             ),
             "The Swing was painted in 1767.",
+        )
+        timing_names = [
+            event.timing_name
+            for event in events
+            if event.event_type == "timing"
+        ]
+        self.assertIn(
+            "ollama_first_content_chunk_seconds",
+            timing_names,
         )
 
     @patch(
@@ -157,9 +176,14 @@ class LlmStreamingServiceTest(unittest.TestCase):
             )
         )
 
+        visible_events = [
+            event
+            for event in events
+            if event.event_type != "timing"
+        ]
         event_types = [
             event.event_type
-            for event in events
+            for event in visible_events
         ]
         self.assertEqual(
             event_types,
@@ -174,7 +198,7 @@ class LlmStreamingServiceTest(unittest.TestCase):
         )
         visible_text = "".join(
             event.text
-            for event in events
+            for event in visible_events
             if event.event_type == "content_delta"
         )
         self.assertEqual(
@@ -184,6 +208,15 @@ class LlmStreamingServiceTest(unittest.TestCase):
         self.assertNotIn(
             "Internal tool planning.",
             visible_text,
+        )
+        timing_names = [
+            event.timing_name
+            for event in events
+            if event.event_type == "timing"
+        ]
+        self.assertIn(
+            "ollama_first_content_chunk_seconds",
+            timing_names,
         )
 
 

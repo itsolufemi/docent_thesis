@@ -94,6 +94,7 @@ class QueryStreamingServiceTest(unittest.TestCase):
             [
                 event.event_type
                 for event in observed_events
+                if event.event_type != "timing"
             ],
             [
                 "response_started",
@@ -138,6 +139,7 @@ class QueryStreamingServiceTest(unittest.TestCase):
             [
                 event.event_type
                 for event in observed_events
+                if event.event_type != "timing"
             ],
             ["response_cancelled"],
         )

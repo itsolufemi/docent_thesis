@@ -1,7 +1,8 @@
 import httpx
 import json
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from time import perf_counter
 from typing import Any
 
 from config import settings
@@ -19,6 +20,11 @@ from conversation_core.schemas.tool_schemas import (
 from conversation_core.tools.core_tool_registry import (
     core_tool_registry,
 )
+
+LLMTimingCallback = Callable[
+    [str, float, dict[str, Any]],
+    None,
+]
 
 def check_llm_status() -> dict:
     url = f"{settings.ollama_base_url}/api/tags"
@@ -195,6 +201,8 @@ def stream_ollama_chat_request(
     *,
     model: str | None = None,
     think: bool | None = None,
+    timing_callback: LLMTimingCallback | None = None,
+    round_number: int = 1,
 ) -> Iterator[dict[str, Any]]:
     url = (
         f"{settings.ollama_base_url}"
@@ -225,6 +233,8 @@ def stream_ollama_chat_request(
     ):
         return
 
+    request_started_at = perf_counter()
+
     with httpx.stream(
         method="POST",
         url=url,
@@ -232,6 +242,15 @@ def stream_ollama_chat_request(
         timeout=120.0,
     ) as response:
         response.raise_for_status()
+
+        if timing_callback is not None:
+            timing_callback(
+                "ollama_response_headers_seconds",
+                perf_counter() - request_started_at,
+                {"round": round_number},
+            )
+
+        first_parsed_chunk_received = False
 
         for line in response.iter_lines():
             if (
@@ -248,6 +267,16 @@ def stream_ollama_chat_request(
                 chunk = json.loads(line)
             except json.JSONDecodeError:
                 continue
+
+            if not first_parsed_chunk_received:
+                first_parsed_chunk_received = True
+
+                if timing_callback is not None:
+                    timing_callback(
+                        "ollama_first_chunk_seconds",
+                        perf_counter() - request_started_at,
+                        {"round": round_number},
+                    )
 
             yield chunk
 
@@ -289,7 +318,8 @@ def stream_tool_aware_llm_response(
     )
 
     try:
-        for _ in range(max_tool_rounds):
+        for round_index in range(max_tool_rounds):
+            round_number = round_index + 1
             if (
                 cancellation_token is not None
                 and cancellation_token.is_cancelled
@@ -307,6 +337,29 @@ def stream_tool_aware_llm_response(
                 and not tool_has_executed
             )
 
+            pending_timing_events: list[
+                LLMStreamEvent
+            ] = []
+            first_content_chunk_received = False
+            round_started_at = perf_counter()
+
+            def record_llm_timing(
+                timing_name: str,
+                timing_seconds: float,
+                timing_payload: dict[str, Any],
+            ) -> None:
+                pending_timing_events.append(
+                    LLMStreamEvent(
+                        event_type="timing",
+                        timing_name=timing_name,
+                        timing_seconds=round(
+                            timing_seconds,
+                            4,
+                        ),
+                        timing_payload=timing_payload,
+                    )
+                )
+
             for chunk in stream_ollama_chat_request(
                 messages=messages,
                 tools=tools,
@@ -315,7 +368,12 @@ def stream_tool_aware_llm_response(
                 ),
                 model=model,
                 think=think,
+                timing_callback=record_llm_timing,
+                round_number=round_number,
             ):
+                while pending_timing_events:
+                    yield pending_timing_events.pop(0)
+
                 response_message = (
                     chunk.get("message") or {}
                 )
@@ -323,6 +381,25 @@ def stream_tool_aware_llm_response(
                     response_message.get("content")
                     or ""
                 )
+
+                if (
+                    content_delta
+                    and not first_content_chunk_received
+                ):
+                    first_content_chunk_received = True
+                    yield LLMStreamEvent(
+                        event_type="timing",
+                        timing_name=(
+                            "ollama_first_content_chunk_seconds"
+                        ),
+                        timing_seconds=round(
+                            perf_counter() - round_started_at,
+                            4,
+                        ),
+                        timing_payload={
+                            "round": round_number,
+                        },
+                    )
                 raw_tool_calls = (
                     response_message.get(
                         "tool_calls"
@@ -350,6 +427,9 @@ def stream_tool_aware_llm_response(
 
                 if chunk.get("done"):
                     break
+
+            while pending_timing_events:
+                yield pending_timing_events.pop(0)
 
             if (
                 cancellation_token is not None

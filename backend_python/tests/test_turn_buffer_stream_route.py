@@ -75,6 +75,25 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
                     event_type="response_started",
                 ),
                 LLMStreamEvent(
+                    event_type="timing",
+                    timing_name=(
+                        "context_resolution_seconds"
+                    ),
+                    timing_seconds=0.012,
+                    timing_payload={
+                        "context_source": (
+                            "vector_retrieved_chunks"
+                        ),
+                    },
+                ),
+                LLMStreamEvent(
+                    event_type="timing",
+                    timing_name=(
+                        "first_spoken_token_seconds"
+                    ),
+                    timing_seconds=1.75,
+                ),
+                LLMStreamEvent(
                     event_type="content_delta",
                     text="It was ",
                 ),
@@ -182,6 +201,23 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
         self.assertEqual(
             streamed_text,
             messages[-1]["payload"]["response"],
+        )
+        first_delta_message = next(
+            message
+            for message in messages
+            if message["type"] == "response_first_delta"
+        )
+        self.assertEqual(
+            first_delta_message["payload"]["timings"][0][
+                "name"
+            ],
+            "context_resolution_seconds",
+        )
+        self.assertEqual(
+            first_delta_message["payload"]["timings"][1][
+                "name"
+            ],
+            "first_spoken_token_seconds",
         )
 
     def test_invalid_message_type_returns_turn_error(

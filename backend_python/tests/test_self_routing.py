@@ -308,6 +308,7 @@ class SelfRoutingQueryEngineTest(
             [
                 event.event_type
                 for event in events
+                if event.event_type != "timing"
             ],
             [
                 "response_started",
@@ -458,6 +459,7 @@ class SelfRoutingQueryEngineTest(
             [
                 event.event_type
                 for event in events
+                if event.event_type != "timing"
             ],
             [
                 "response_started",

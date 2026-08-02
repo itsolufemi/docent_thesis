@@ -451,6 +451,24 @@ class QueryEngine:
     ) -> QueryResult:
         request_started_at = perf_counter()
 
+        def emit_timing(
+            name: str,
+            seconds: float,
+            **payload,
+        ) -> None:
+            if on_stream_event is None:
+                return
+
+            on_stream_event(
+                LLMStreamEvent(
+                    event_type="timing",
+                    timing_name=name,
+                    timing_seconds=round(seconds, 4),
+                    timing_payload=payload,
+                )
+            )
+
+        conversation_preparation_started_at = perf_counter()
         conversation_created = False
         dialogue_history: list[DialogueTurn] = []
         active_branch: ConversationBranch | None = None
@@ -487,6 +505,15 @@ class QueryEngine:
                     or current_subject.label
                 )
 
+        conversation_preparation_seconds = (
+            perf_counter()
+            - conversation_preparation_started_at
+        )
+        emit_timing(
+            "conversation_preparation_seconds",
+            conversation_preparation_seconds,
+        )
+
         context_resolution_started_at = perf_counter()
 
         resolved_context = self.subject_resolver(
@@ -500,11 +527,29 @@ class QueryEngine:
             - context_resolution_started_at
         )
 
+        emit_timing(
+            "context_resolution_seconds",
+            context_resolution_seconds,
+            context_source=resolved_context.context_source,
+            source_count=len(resolved_context.sources),
+        )
+
+        prompt_build_started_at = perf_counter()
         prompt = self.prompt_builder(
             text,
             dialogue_history,
             resolved_context,
             active_branch,
+        )
+
+        prompt_build_seconds = (
+            perf_counter() - prompt_build_started_at
+        )
+        emit_timing(
+            "prompt_build_seconds",
+            prompt_build_seconds,
+            prompt_characters=len(prompt),
+            dialogue_turns=len(dialogue_history),
         )
 
         if conversation_state is not None:
@@ -517,6 +562,10 @@ class QueryEngine:
             )
 
         response_generation_started_at = perf_counter()
+        emit_timing(
+            "pre_llm_total_seconds",
+            response_generation_started_at - request_started_at,
+        )
         self_routing_parser = (
             SelfRoutingStreamParser()
             if self.self_routing_enabled
@@ -640,6 +689,10 @@ class QueryEngine:
                                 perf_counter()
                                 - response_generation_started_at
                             )
+                            emit_timing(
+                                "self_routing_seconds",
+                                self_routing_seconds,
+                            )
                             self_routing_assessment = (
                                 self_routing_parser
                                 .route
@@ -688,6 +741,10 @@ class QueryEngine:
                                 perf_counter()
                                 - response_generation_started_at
                             )
+                            emit_timing(
+                                "first_spoken_token_seconds",
+                                first_spoken_token_seconds,
+                            )
 
                         if on_stream_event is not None:
                             on_stream_event(
@@ -720,6 +777,10 @@ class QueryEngine:
                         self_routing_seconds = (
                             perf_counter()
                             - response_generation_started_at
+                        )
+                        emit_timing(
+                            "self_routing_seconds",
+                            self_routing_seconds,
                         )
                         self_routing_assessment = (
                             self_routing_parser.route
@@ -764,6 +825,10 @@ class QueryEngine:
                             first_spoken_token_seconds = (
                                 perf_counter()
                                 - response_generation_started_at
+                            )
+                            emit_timing(
+                                "first_spoken_token_seconds",
+                                first_spoken_token_seconds,
                             )
 
                         if on_stream_event is not None:
