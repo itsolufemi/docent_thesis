@@ -1223,17 +1223,13 @@ export default function MainApplication() {
           if (activeResponse) {
             activeResponse.cancelled = true;
 
-            turnStreamClientRef.current
-              ?.cancelTurn(
-                activeResponse.requestId,
-              );
-
             cancelProgressiveTtsResponse(
               activeResponse.requestId,
             );
+          } else {
+            stopAssistantAudio();
           }
 
-          stopAssistantAudio();
           return;
         }
 
@@ -2289,8 +2285,6 @@ export default function MainApplication() {
                 console.log(
                   'TTS generation performance:',
                   {
-                    provider:
-                      latestTtsMetadata?.provider,
                     generationSeconds:
                       metadata.generation_seconds,
                     audioDurationSeconds:
