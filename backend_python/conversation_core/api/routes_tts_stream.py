@@ -77,6 +77,7 @@ def create_tts_stream_router(
                         "sample_rate": (
                             active_tts_service.sample_rate
                         ),
+                        "recommended_prebuffer_ms": (active_tts_service.recommended_prebuffer_ms),
                         "encoding": "pcm_s16le",
                         "character_count": len(text),
                     },
@@ -131,6 +132,25 @@ def create_tts_stream_router(
                 if cancelled.is_set():
                     return
 
+                generation_seconds = (
+                    perf_counter() - started_at
+                )
+
+                audio_duration_seconds = (
+                    audio_bytes
+                    / (
+                        active_tts_service.sample_rate
+                        * 2
+                    )
+                )
+
+                realtime_factor = (
+                    generation_seconds
+                    / audio_duration_seconds
+                    if audio_duration_seconds > 0
+                    else None
+                )
+
                 await send_json({
                     "type": "tts_complete",
                     "payload": {
@@ -139,8 +159,17 @@ def create_tts_stream_router(
                         "chunk_count": chunk_index,
                         "audio_bytes": audio_bytes,
                         "generation_seconds": round(
-                            perf_counter() - started_at,
+                            generation_seconds,
                             4,
+                        ),
+                        "audio_duration_seconds": round(
+                            audio_duration_seconds,
+                            4,
+                        ),
+                        "realtime_factor": (
+                            round(realtime_factor, 4)
+                            if realtime_factor is not None
+                            else None
                         ),
                         "first_chunk_seconds": (
                             round(first_chunk_seconds, 4)
@@ -149,6 +178,7 @@ def create_tts_stream_router(
                         ),
                     },
                 })
+
             except asyncio.CancelledError:
                 cancelled.set()
                 raise
@@ -173,6 +203,7 @@ def create_tts_stream_router(
             "payload": {
                 "provider": active_tts_service.provider_name,
                 "sample_rate": active_tts_service.sample_rate,
+                "recommended_prebuffer_ms": (active_tts_service.recommended_prebuffer_ms),
                 "voice_name": (
                     active_tts_service.default_voice_name
                 ),

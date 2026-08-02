@@ -50,6 +50,7 @@ def _pcm16_to_wav(
 
 class PocketTtsService:
     provider_name = "kyutai_pocket"
+    recommended_prebuffer_ms = 120
 
     def __init__(
         self,

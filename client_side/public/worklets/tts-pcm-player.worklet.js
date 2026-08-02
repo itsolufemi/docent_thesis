@@ -1,15 +1,43 @@
-class TtsPcmPlayerProcessor extends AudioWorkletProcessor {
+class TtsPcmPlayerProcessor
+  extends AudioWorkletProcessor {
   constructor() {
     super();
 
     this.queue = [];
     this.currentChunk = null;
     this.currentOffset = 0;
+
+    this.queuedSamples = 0;
+    this.prebufferSamples =
+      Math.round(sampleRate * 0.12);
+
     this.streamComplete = false;
     this.playbackStarted = false;
+    this.underrunActive = false;
+    this.underrunCount = 0;
 
     this.port.onmessage = (event) => {
       const message = event.data;
+
+      if (message?.type === 'configure') {
+        const prebufferMs = Number(
+          message.prebufferMs,
+        );
+
+        if (
+          Number.isFinite(prebufferMs) &&
+          prebufferMs >= 0
+        ) {
+          this.prebufferSamples =
+            Math.round(
+              sampleRate *
+              prebufferMs /
+              1000,
+            );
+        }
+
+        return;
+      }
 
       if (message?.type === 'enqueue') {
         const samples = message.samples;
@@ -19,6 +47,10 @@ class TtsPcmPlayerProcessor extends AudioWorkletProcessor {
           samples.length > 0
         ) {
           this.queue.push(samples);
+          this.queuedSamples +=
+            samples.length;
+
+          this.underrunActive = false;
         }
 
         return;
@@ -30,11 +62,7 @@ class TtsPcmPlayerProcessor extends AudioWorkletProcessor {
       }
 
       if (message?.type === 'flush') {
-        this.queue = [];
-        this.currentChunk = null;
-        this.currentOffset = 0;
-        this.streamComplete = false;
-        this.playbackStarted = false;
+        this.reset();
 
         this.port.postMessage({
           type: 'playback_flushed',
@@ -43,20 +71,53 @@ class TtsPcmPlayerProcessor extends AudioWorkletProcessor {
     };
   }
 
+  reset() {
+    this.queue = [];
+    this.currentChunk = null;
+    this.currentOffset = 0;
+    this.queuedSamples = 0;
+
+    this.streamComplete = false;
+    this.playbackStarted = false;
+    this.underrunActive = false;
+    this.underrunCount = 0;
+  }
+
+  shouldBeginPlayback() {
+    if (this.playbackStarted) {
+      return true;
+    }
+
+    if (this.streamComplete) {
+      return this.queuedSamples > 0;
+    }
+
+    return (
+      this.queuedSamples >=
+      this.prebufferSamples
+    );
+  }
+
   process(_inputs, outputs) {
-    const output = outputs[0];
-    const outputChannel = output[0];
+    const outputChannel =
+      outputs[0][0];
 
     outputChannel.fill(0);
+
+    if (!this.shouldBeginPlayback()) {
+      return true;
+    }
 
     let outputOffset = 0;
 
     while (
-      outputOffset < outputChannel.length
+      outputOffset <
+      outputChannel.length
     ) {
       if (!this.currentChunk) {
         this.currentChunk =
           this.queue.shift() ?? null;
+
         this.currentOffset = 0;
 
         if (!this.currentChunk) {
@@ -68,6 +129,13 @@ class TtsPcmPlayerProcessor extends AudioWorkletProcessor {
 
           this.port.postMessage({
             type: 'playback_started',
+            bufferedSamples:
+              this.queuedSamples,
+            bufferedMilliseconds:
+              (
+                this.queuedSamples /
+                sampleRate
+              ) * 1000,
           });
         }
       }
@@ -75,9 +143,11 @@ class TtsPcmPlayerProcessor extends AudioWorkletProcessor {
       const remainingOutput =
         outputChannel.length -
         outputOffset;
+
       const remainingChunk =
         this.currentChunk.length -
         this.currentOffset;
+
       const copyLength = Math.min(
         remainingOutput,
         remainingChunk,
@@ -93,7 +163,14 @@ class TtsPcmPlayerProcessor extends AudioWorkletProcessor {
       );
 
       outputOffset += copyLength;
-      this.currentOffset += copyLength;
+      this.currentOffset +=
+        copyLength;
+
+      this.queuedSamples = Math.max(
+        0,
+        this.queuedSamples -
+          copyLength,
+      );
 
       if (
         this.currentOffset >=
@@ -104,10 +181,30 @@ class TtsPcmPlayerProcessor extends AudioWorkletProcessor {
       }
     }
 
-    if (
-      this.streamComplete &&
+    const queueEmpty = (
       !this.currentChunk &&
       this.queue.length === 0
+    );
+
+    if (
+      this.playbackStarted &&
+      queueEmpty &&
+      !this.streamComplete &&
+      !this.underrunActive
+    ) {
+      this.underrunActive = true;
+      this.underrunCount += 1;
+
+      this.port.postMessage({
+        type: 'buffer_underrun',
+        underrunCount:
+          this.underrunCount,
+      });
+    }
+
+    if (
+      this.streamComplete &&
+      queueEmpty
     ) {
       this.streamComplete = false;
 
@@ -116,8 +213,13 @@ class TtsPcmPlayerProcessor extends AudioWorkletProcessor {
 
         this.port.postMessage({
           type: 'playback_complete',
+          underrunCount:
+            this.underrunCount,
         });
       }
+
+      this.underrunActive = false;
+      this.underrunCount = 0;
     }
 
     return true;

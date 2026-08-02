@@ -22,6 +22,7 @@ class TextToSpeechService(Protocol):
     default_voice_name: str
     default_language_code: str
     sample_rate: int
+    recommended_prebuffer_ms: int
 
     def warm_up(self) -> dict:
         ...

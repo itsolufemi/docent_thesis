@@ -1043,6 +1043,9 @@ export default function MainApplication() {
 
   const cancelProgressiveTtsResponse = (
     requestId,
+    {
+      cancelServerTurn = true,
+    } = {},
   ) => {
     if (!requestId) {
       return;
@@ -1051,6 +1054,12 @@ export default function MainApplication() {
     cancelledProgressiveResponsesRef.current.add(
       requestId,
     );
+
+    if (cancelServerTurn) {
+      turnStreamClientRef.current?.cancelTurn(
+        requestId,
+      );
+    }
 
     ttsStreamClientRef.current?.cancel(
       activeTtsStreamIdRef.current,
@@ -1095,6 +1104,22 @@ export default function MainApplication() {
     if (cancellingActiveResponse) {
       stopAssistantAudio();
     }
+  };
+
+  const stopCurrentAssistantResponse =
+  () => {
+    const activeResponse =
+      activeProgressiveResponseRef
+        .current;
+
+    if (!activeResponse?.requestId) {
+      stopAssistantAudio();
+      return;
+    }
+
+    cancelProgressiveTtsResponse(
+      activeResponse.requestId,
+    );
   };
 
   const rejectPendingTurnRequests = (
@@ -1573,8 +1598,12 @@ export default function MainApplication() {
         pendingTurnRequestsRef.current.delete(
           requestId,
         );
+
         cancelProgressiveTtsResponse(
           requestId,
+          {
+            cancelServerTurn: false,
+          },
         );
       },
 
@@ -1983,6 +2012,16 @@ export default function MainApplication() {
 
             break;
 
+          case 'buffer_underrun':
+            console.warn(
+              'TTS playback buffer underrun:',
+              {
+                underrunCount:
+                  event.data.underrunCount,
+              },
+            );
+            break;
+
           default:
             break;
         }
@@ -2083,6 +2122,22 @@ export default function MainApplication() {
 
                 activeTtsStreamIdRef.current =
                   metadata.synthesis_id;
+                
+                const playbackSampleRate =
+                  playerNode.context.sampleRate;
+
+                console.log(
+                  'TTS audio format:',
+                  {
+                    provider: metadata.provider,
+                    sourceSampleRate:
+                      metadata.sample_rate,
+                    playbackSampleRate,
+                    ratesMatch:
+                      metadata.sample_rate ===
+                      playbackSampleRate,
+                  },
+                );
 
                 setLatestTtsMetadata({
                   provider:
@@ -2098,7 +2153,17 @@ export default function MainApplication() {
                   generationSeconds: 0,
                   requestId,
                 });
+
+                playerNode.port.postMessage({
+                  type: 'configure',
+                  prebufferMs:
+                    metadata
+                      .recommended_prebuffer_ms
+                    ?? 120,
+                });
               },
+
+
 
               onFirstAudio: (ttsTiming) => {
                 if (!requestId) {
@@ -2209,13 +2274,30 @@ export default function MainApplication() {
                   (current) => ({
                     ...current,
                     generationSeconds:
-                      metadata
-                      .generation_seconds,
+                      metadata.generation_seconds,
+                    audioDurationSeconds:
+                      metadata.audio_duration_seconds,
+                    realtimeFactor:
+                      metadata.realtime_factor,
                     chunkCount:
                       metadata.chunk_count,
                     audioBytes:
                       metadata.audio_bytes,
                   }),
+                );
+
+                console.log(
+                  'TTS generation performance:',
+                  {
+                    provider:
+                      latestTtsMetadata?.provider,
+                    generationSeconds:
+                      metadata.generation_seconds,
+                    audioDurationSeconds:
+                      metadata.audio_duration_seconds,
+                    realtimeFactor:
+                      metadata.realtime_factor,
+                  },
                 );
 
                 playerNode.port.postMessage({
@@ -2809,7 +2891,7 @@ export default function MainApplication() {
             currentAudio.current = audio;
           }}
           stopAssistantAudio={
-            stopAssistantAudio
+            stopCurrentAssistantResponse
           }
           assistantAudioStatus={
             assistantAudioStatus

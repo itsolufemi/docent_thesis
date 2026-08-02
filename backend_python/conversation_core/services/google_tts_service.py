@@ -18,6 +18,7 @@ DEFAULT_SAMPLE_RATE = 24_000
 
 class GoogleTextToSpeechService:
     provider_name = "google"
+    recommended_prebuffer_ms = 0
     def __init__(
         self,
         *,
