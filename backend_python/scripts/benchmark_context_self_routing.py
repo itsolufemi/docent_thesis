@@ -36,38 +36,31 @@ CASES = [
             "Tell me about The Arab Tent."
         ),
         "route_type": "response_request",
-        "should_ignore": False,
+        "is_relevant": True,
         "retrieval_used": True,
-        "candidate_reference": (
+        "candidate_subject": [
             "painting:581"
-        ),
+        ],
         "expected_tool": None,
-        "current_subject": None,
     },
     {
         "case_id": "greeting",
         "text": "Hi, how are you?",
         "route_type": "response_request",
-        "should_ignore": False,
+        "is_relevant": True,
         "retrieval_used": False,
-        "candidate_reference": None,
+        "candidate_subject": None,
         "expected_tool": None,
-        "current_subject": None,
     },
     {
         "case_id": "current_subject",
         "text": "What painting is this?",
         "route_type": "response_request",
-        "should_ignore": False,
+        "is_relevant": True,
         "retrieval_used": True,
-        "candidate_reference": (
-            "painting:581"
-        ),
+        "candidate_subject": ["The Arab Tent"],
         "expected_tool": None,
-        "current_subject": {
-            "reference": "painting:581",
-            "label": "The Arab Tent",
-        },
+        "current_subject_reference": ["painting:581"],
     },
     {
         "case_id": "highlights_tour",
@@ -75,13 +68,12 @@ CASES = [
             "Start a highlights tour."
         ),
         "route_type": "call_to_action",
-        "should_ignore": False,
+        "is_relevant": True,
         "retrieval_used": True,
-        "candidate_reference": None,
+        "candidate_subject": None,
         "expected_tool": (
             "create_conversation_branch"
         ),
-        "current_subject": None,
     },
     {
         "case_id": "noise",
@@ -89,11 +81,10 @@ CASES = [
             "[unintelligible background noise]"
         ),
         "route_type": "noise",
-        "should_ignore": True,
+        "is_relevant": False,
         "retrieval_used": False,
-        "candidate_reference": None,
+        "candidate_subject": None,
         "expected_tool": None,
-        "current_subject": None,
     },
 ]
 
@@ -120,7 +111,7 @@ def run_sample(
         conversation.conversation_id
     )
     current_subject = case[
-        "current_subject"
+        "current_subject_reference"
     ]
 
     if current_subject is not None:

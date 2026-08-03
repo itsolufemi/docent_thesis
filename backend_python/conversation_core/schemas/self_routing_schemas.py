@@ -18,17 +18,20 @@ class SelfRoutingAssessment(BaseModel):
         "interruption",
         "noise",
     ]
+
     is_relevant: bool
-    should_ignore: bool
-    retrieval_available: bool
-    retrieval_used: bool
-    candidate_subject_reference: (
-        str | None
-    ) = None
+
+    candidate_subjects: list[str] = Field(
+        default_factory=list
+    )
+
     should_update_subject: bool = False
+
     proposed_action: str | None = None
+
     confidence: float = Field(
         ge=0.0,
         le=1.0,
     )
+
     reason: str

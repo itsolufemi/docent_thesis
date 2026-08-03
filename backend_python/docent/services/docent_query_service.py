@@ -54,11 +54,10 @@ def build_utterance_route_debug_payload(
 ) -> dict:
     return {
         "utterance_route_type": utterance_route.route_type,
+        "utterance_is_relevant": utterance_route.is_relevant,
         "utterance_floor_intent": utterance_route.floor_intent,
         "utterance_route_confidence": utterance_route.confidence,
         "utterance_route_reason": utterance_route.reason,
-        "utterance_is_relevant": utterance_route.is_relevant,
-        "utterance_should_ignore": utterance_route.should_ignore,
         "utterance_requires_retrieval": (
             utterance_route.requires_retrieval
         ),
@@ -727,13 +726,13 @@ def docent_resolve_self_routing_context(
     )
 
 
-SELF_ROUTING_OUTPUT_INSTRUCTIONS = """
+SELF_ROUTING_OUTPUT_INSTRUCTIONS = SELF_ROUTING_OUTPUT_INSTRUCTIONS = """
 SELF-ROUTING OUTPUT
 
 Before the spoken answer, output exactly one
 internal routing block:
 
-<route>{"route_type":"response_request","is_relevant":true,"should_ignore":false,"retrieval_available":true,"retrieval_used":true,"candidate_subject_reference":"painting:581","should_update_subject":false,"proposed_action":null,"confidence":0.98,"reason":"Artwork information was requested and matching evidence was supplied."}</route>
+<route>{"route_type":"response_request","is_relevant":true,"candidate_subject":"The Arab Tent","should_update_subject":true,"proposed_action":null,"confidence":0.98,"reason":"The user is asking about The Arab Tent."}</route>
 
 The route block must contain valid JSON with exactly
 the supplied fields and must appear before any
@@ -748,38 +747,36 @@ ROUTE RULES
 
 - noise: the original utterance contains no
   meaningful conversational language. Set
-  is_relevant=false and should_ignore=true.
+  is_relevant=false.
 - response_request: the original utterance expects a
   spoken answer, including greetings, questions,
   explanations, and ordinary follow-ups.
 - call_to_action: the original utterance explicitly
   asks the system to begin, end, or change a
-  structured activity such as a guided tour. Keep
-  this route and proposed_action even after its tool
-  has executed.
+  structured activity.
 - interruption: the original utterance stops,
   corrects, or redirects the assistant while it is
   speaking.
 
-retrieval_available means retrieved evidence was
-supplied in this prompt. retrieval_used means the
-answer or operational tool arguments actually rely
-on that evidence. Do not claim retrieval was used
-merely because evidence was available.
-If a retrieved candidate reference or label appears
-in operational tool arguments, retrieval_used must
-be true.
+candidate_subject must contain the readable subject
+identified from the user's utterance, such as
+"The Arab Tent", "The Swing", or "Fragonard".
 
-candidate_subject_reference must be null or one of
-the explicitly supplied current/candidate references.
-Set should_update_subject only when the user's focus
-should move to that candidate. This metadata is
-observational and does not itself mutate state.
+Do not place an internal reference such as
+"painting:581" in candidate_subject.
 
-For an explicit request to begin or end a tour, use
-call_to_action, populate proposed_action, and call an
-appropriate registered conversation-tree tool when
-state actually needs to change.
+Set candidate_subject to null when the utterance has
+no identifiable subject.
+
+Set should_update_subject only when the user's
+conversational focus should move to the identified
+candidate subject.
+
+proposed_action must describe an explicitly requested
+structural action, or be null.
+
+reason must briefly explain the routing decision and
+subject decision.
 
 Emit this route block only once for the user turn.
 If a tool returns a result, continue without
@@ -824,9 +821,9 @@ def docent_build_self_routing_prompt(
     )
     candidate_lines = [
         (
-            f"- {candidate['reference']} | "
-            f"{candidate['label']} | "
-            f"score {candidate['score']:.4f}"
+            f"- {candidate['label']} "
+            f"(retrieval score "
+            f"{candidate['score']:.4f})"
         )
         for candidate in candidate_subjects
     ]
@@ -855,7 +852,7 @@ CURRENT SUBJECT
 
 {current_subject_section}
 
-CANDIDATE SUBJECTS
+RETRIEVED SUBJECT OPTIONS
 
 {candidate_section}
 

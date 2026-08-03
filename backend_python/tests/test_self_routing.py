@@ -41,19 +41,13 @@ from docent.services.docent_query_service import (  # noqa: E402
 VALID_ROUTE = {
     "route_type": "response_request",
     "is_relevant": True,
-    "should_ignore": False,
-    "retrieval_available": True,
-    "retrieval_used": True,
-    "candidate_subject_reference": (
-        "painting:581"
-    ),
-    "should_update_subject": False,
+    "candidate_subject": ["The Arab Tent"],
+    "should_update_subject": True,
     "proposed_action": None,
     "confidence": 0.98,
-    "reason": (
-        "Matching artwork evidence was used."
-    ),
+    "reason": "...",
 }
+
 VALID_ROUTE_JSON = json.dumps(
     VALID_ROUTE,
     separators=(",", ":"),
