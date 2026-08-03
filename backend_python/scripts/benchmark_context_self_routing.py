@@ -38,7 +38,7 @@ CASES = [
         "route_type": "response_request",
         "is_relevant": True,
         "retrieval_used": True,
-        "candidate_subject": [
+        "candidate_subjects": [
             "painting:581"
         ],
         "expected_tool": None,
@@ -49,7 +49,7 @@ CASES = [
         "route_type": "response_request",
         "is_relevant": True,
         "retrieval_used": False,
-        "candidate_subject": None,
+        "candidate_subjects": None,
         "expected_tool": None,
     },
     {
@@ -58,7 +58,7 @@ CASES = [
         "route_type": "response_request",
         "is_relevant": True,
         "retrieval_used": True,
-        "candidate_subject": ["The Arab Tent"],
+        "candidate_subjects": ["The Arab Tent"],
         "expected_tool": None,
         "current_subject_reference": ["painting:581"],
     },
@@ -70,7 +70,7 @@ CASES = [
         "route_type": "call_to_action",
         "is_relevant": True,
         "retrieval_used": True,
-        "candidate_subject": None,
+        "candidate_subjects": None,
         "expected_tool": (
             "create_conversation_branch"
         ),
@@ -83,7 +83,7 @@ CASES = [
         "route_type": "noise",
         "is_relevant": False,
         "retrieval_used": False,
-        "candidate_subject": None,
+        "candidate_subjects": None,
         "expected_tool": None,
     },
 ]
@@ -241,12 +241,12 @@ def run_sample(
             and assessment["retrieval_used"]
             == case["retrieval_used"]
         )
-        candidate_subject_correct = (
+        candidate_subjects_correct = (
             assessment is not None
             and assessment.get(
-                "candidate_subject_reference"
+                "candidate_subjects"
             )
-            == case["candidate_reference"]
+            == case["candidate_subjects"]
         )
         proposed_action_correct = (
             assessment is not None
@@ -276,8 +276,8 @@ def run_sample(
             "retrieval_used_correct": (
                 retrieval_used_correct
             ),
-            "candidate_subject_correct": (
-                candidate_subject_correct
+            "candidate_subjects_correct": (
+                candidate_subjects_correct
             ),
             "proposed_action_correct": (
                 proposed_action_correct
@@ -373,8 +373,8 @@ def build_summary(
         "retrieval_used_accuracy": count(
             "retrieval_used_correct"
         ),
-        "candidate_subject_accuracy": count(
-            "candidate_subject_correct"
+        "candidate_subjects_accuracy": count(
+            "candidate_subjects_correct"
         ),
         "proposed_action_accuracy": count(
             "proposed_action_correct"
@@ -471,7 +471,7 @@ def write_markdown(
         ),
         (
             "| Candidate-subject accuracy | "
-            f"{summary['candidate_subject_accuracy']}/{count} |"
+            f"{summary['candidate_subjects_accuracy']}/{count} |"
         ),
         (
             "| Proposed-action accuracy | "
@@ -511,7 +511,7 @@ def write_markdown(
             f"{result.get('route_valid')} | "
             f"{result.get('route_correct')} | "
             f"{result.get('retrieval_used_correct')} | "
-            f"{result.get('candidate_subject_correct')} | "
+            f"{result.get('candidate_subjects_correct')} | "
             f"{result.get('tool_correct')} | "
             f"{result.get('time_to_self_routing_seconds')}s | "
             f"{result.get('time_to_first_spoken_seconds')}s | "
@@ -597,7 +597,7 @@ def main() -> None:
                         ),
                         "candidate": (
                             result.get(
-                                "candidate_subject_correct"
+                                "candidate_subjects_correct"
                             )
                         ),
                         "tool": result.get(

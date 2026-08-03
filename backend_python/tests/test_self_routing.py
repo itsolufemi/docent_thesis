@@ -41,7 +41,7 @@ from docent.services.docent_query_service import (  # noqa: E402
 VALID_ROUTE = {
     "route_type": "response_request",
     "is_relevant": True,
-    "candidate_subject": ["The Arab Tent"],
+    "candidate_subjects": ["The Arab Tent"],
     "should_update_subject": True,
     "proposed_action": None,
     "confidence": 0.98,

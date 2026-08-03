@@ -641,7 +641,7 @@ def docent_resolve_self_routing_context(
                 "retrieved_chunk_count": len(
                     retrieved_chunks
                 ),
-                "candidate_subject_count": len(
+                "candidate_subjects_count": len(
                     candidate_subjects
                 ),
                 "vector_retrieval_timings": (
@@ -693,7 +693,7 @@ def docent_resolve_self_routing_context(
                 "retrieved_document_count": len(
                     retrieved_documents
                 ),
-                "candidate_subject_count": len(
+                "candidate_subjects_count": len(
                     candidate_subjects
                 ),
                 "vector_retrieval_timings": (
@@ -717,7 +717,7 @@ def docent_resolve_self_routing_context(
             "self_routing_context_resolver": (
                 True
             ),
-            "candidate_subject_count": 0,
+            "candidate_subjects_count": 0,
             "vector_retrieval_timings": (
                 vector_retrieval_result
                 .timings.model_dump()
@@ -726,14 +726,12 @@ def docent_resolve_self_routing_context(
     )
 
 
-SELF_ROUTING_OUTPUT_INSTRUCTIONS = SELF_ROUTING_OUTPUT_INSTRUCTIONS = """
-SELF-ROUTING OUTPUT
+SELF_ROUTING_OUTPUT_INSTRUCTIONS = """SELF-ROUTING OUTPUT
 
 Before the spoken answer, output exactly one
 internal routing block:
 
-<route>{"route_type":"response_request","is_relevant":true,"candidate_subject":"The Arab Tent","should_update_subject":true,"proposed_action":null,"confidence":0.98,"reason":"The user is asking about The Arab Tent."}</route>
-
+<route>{"route_type":"response_request","is_relevant":true,"candidate_subjects":["The Arab Tent"],"should_update_subject":true,"proposed_action":null,"confidence":0.98,"reason":"The user is asking about The Arab Tent."}</route>
 The route block must contain valid JSON with exactly
 the supplied fields and must appear before any
 visitor-facing response. After </route>, respond
@@ -758,14 +756,15 @@ ROUTE RULES
   corrects, or redirects the assistant while it is
   speaking.
 
-candidate_subject must contain the readable subject
+candidate_subjects must contain the readable subject
 identified from the user's utterance, such as
-"The Arab Tent", "The Swing", or "Fragonard".
+["The Arab Tent"], ["The Swing", "The Arab Tent"],
+ or ["15th century italian geopolitics"].
 
 Do not place an internal reference such as
-"painting:581" in candidate_subject.
+"painting:581" in candidate_subjects.
 
-Set candidate_subject to null when the utterance has
+Set candidate_subjects to null when the utterance has
 no identifiable subject.
 
 Set should_update_subject only when the user's
