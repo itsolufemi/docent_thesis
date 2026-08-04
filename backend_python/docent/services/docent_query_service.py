@@ -9,6 +9,7 @@ from conversation_core.schemas.utterance_route_schemas import (
 )
 from conversation_core.services.query_service import (
     QueryEngine,
+    get_latest_subject_state,
     self_routing_response_generator,
 )
 from conversation_core.services.utterance_router_service import route_utterance
@@ -808,29 +809,25 @@ def docent_build_self_routing_prompt(
     active_branch: ConversationBranch | None,
 ) -> str:
     payload = resolved_context.prompt_payload
-    current_subject = (
-        active_branch.current_subjects[0]
-        if (
-            active_branch is not None
-            and active_branch.current_subjects
-        )
-        else None
+
+    (
+        current_subject_label,
+        current_subject_reference,
+    ) = get_latest_subject_state(
+        dialogue_history
     )
-    current_subject_section = (
-        "\n".join(
-            [
-                (
-                    "Reference: "
-                    f"{current_subject.reference or 'None'}"
-                ),
-                (
-                    "Label: "
-                    f"{current_subject.label}"
-                ),
-            ]
-        )
-        if current_subject is not None
-        else "Reference: None\nLabel: None"
+
+    current_subject_section = "\n".join(
+        [
+            (
+                "Reference: "
+                f"{current_subject_reference or 'None'}"
+            ),
+            (
+                "Label: "
+                f"{current_subject_label or 'None'}"
+            ),
+        ]
     )
     candidate_subjects = payload.get(
         "candidate_subjects",

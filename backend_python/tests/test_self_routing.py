@@ -26,6 +26,8 @@ from conversation_core.schemas.llm_stream_schemas import (  # noqa: E402
     LLMStreamEvent,
 )
 from conversation_core.schemas.conversation_schemas import (  # noqa: E402
+    ConversationBranch,
+    ConversationSubject,
     DialogueTurn,
 )
 from conversation_core.schemas.query_schemas import (  # noqa: E402
@@ -40,6 +42,7 @@ from conversation_core.services.self_routing_parser import (  # noqa: E402
 )
 from docent.services.docent_query_service import (  # noqa: E402
     build_candidate_subjects_from_chunks,
+    docent_build_self_routing_prompt,
     docent_resolve_self_routing_context,
 )
 
@@ -637,6 +640,110 @@ class CandidateSubjectTest(
         self.assertEqual(
             parser.route.candidate_subjects,
             [],
+        )
+
+
+class SelfRoutingPromptSubjectTest(
+    unittest.TestCase
+):
+    def test_self_routing_prompt_uses_dialogue_subject_not_branch(
+        self,
+    ) -> None:
+        dialogue_history = [
+            DialogueTurn(
+                role="assistant",
+                content="Previous answer.",
+                current_subject=(
+                    "The Laughing Cavalier"
+                ),
+                current_subject_reference=(
+                    "painting:84"
+                ),
+            )
+        ]
+
+        active_branch = ConversationBranch(
+            name="old-branch",
+            branch_type="open",
+            status="active",
+            current_subjects=[
+                ConversationSubject(
+                    label="The Arab Tent",
+                    reference="painting:581",
+                )
+            ],
+        )
+
+        resolved_context = ResolvedContext(
+            context_source="no_external_context",
+            prompt_payload={
+                "artwork": None,
+                "retrieved_chunks": [],
+                "retrieved_documents": [],
+                "candidate_subjects": [],
+            },
+        )
+
+        prompt = docent_build_self_routing_prompt(
+            user_input="What about the colours?",
+            dialogue_history=dialogue_history,
+            resolved_context=resolved_context,
+            active_branch=active_branch,
+        )
+
+        self.assertIn(
+            "Reference: painting:84",
+            prompt,
+        )
+        self.assertIn(
+            "Label: The Laughing Cavalier",
+            prompt,
+        )
+
+        current_subject_section = prompt.split(
+            "CURRENT SUBJECT",
+            1,
+        )[1].split(
+            "RETRIEVED SUBJECT OPTIONS",
+            1,
+        )[0]
+
+        self.assertNotIn(
+            "painting:581",
+            current_subject_section,
+        )
+        self.assertNotIn(
+            "The Arab Tent",
+            current_subject_section,
+        )
+
+    def test_self_routing_prompt_has_empty_subject_without_history(
+        self,
+    ) -> None:
+        resolved_context = ResolvedContext(
+            context_source="no_external_context",
+            prompt_payload={
+                "artwork": None,
+                "retrieved_chunks": [],
+                "retrieved_documents": [],
+                "candidate_subjects": [],
+            },
+        )
+
+        prompt = docent_build_self_routing_prompt(
+            user_input="Hello.",
+            dialogue_history=[],
+            resolved_context=resolved_context,
+            active_branch=None,
+        )
+
+        self.assertIn(
+            "Reference: None",
+            prompt,
+        )
+        self.assertIn(
+            "Label: None",
+            prompt,
         )
 
 
