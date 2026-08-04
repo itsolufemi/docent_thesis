@@ -188,11 +188,15 @@ def derive_retrieved_subject_state(
             )
         )
 
-        if not isinstance(
-            current_subject,
-            str,
+        if (
+            not isinstance(current_subject, str)
+            or not current_subject.strip()
         ):
-            current_subject = previous_subject
+            return (
+                previous_subject,
+                previous_subject,
+                previous_reference,
+            )
 
         if not isinstance(
             current_subject_reference,
