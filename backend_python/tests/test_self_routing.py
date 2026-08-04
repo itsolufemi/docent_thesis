@@ -18,6 +18,8 @@ from conversation_core.api.routes_turn_buffer_stream import (  # noqa: E402
     build_stream_websocket_message,
 )
 from conversation_core.memory.conversation_store import (  # noqa: E402
+    add_dialogue_turn,
+    create_conversation,
     get_recent_conversation_history,
 )
 from conversation_core.schemas.llm_stream_schemas import (  # noqa: E402
@@ -473,6 +475,120 @@ class CandidateSubjectTest(
 class SelfRoutingQueryEngineTest(
     unittest.TestCase
 ):
+    def test_follow_up_uses_stored_subject_reference(
+        self,
+    ) -> None:
+        state = create_conversation()
+        add_dialogue_turn(
+            conversation_id=state.conversation_id,
+            role="assistant",
+            content="Previous answer.",
+            current_subject="The Arab Tent",
+            current_subject_reference="painting:581",
+        )
+        seen_references = []
+
+        def tracking_resolver(
+            subject_reference,
+            user_input,
+            utterance_route=None,
+        ):
+            seen_references.append(
+                subject_reference
+            )
+            return ResolvedContext(
+                context_source="no_external_context",
+                subject_reference=subject_reference,
+                prompt_payload={
+                    "candidate_subjects": [],
+                },
+            )
+
+        engine = QueryEngine(
+            subject_resolver=tracking_resolver,
+            prompt_builder=build_prompt,
+            response_generator=(
+                lambda _prompt, _conversation_id: (
+                    "A follow-up answer."
+                )
+            ),
+        )
+
+        engine.generate_response(
+            text="What about the colours?",
+            conversation_id=state.conversation_id,
+        )
+
+        self.assertEqual(
+            seen_references[-1],
+            "painting:581",
+        )
+
+    @patch(
+        "conversation_core.services."
+        "query_service."
+        "stream_tool_aware_llm_response"
+    )
+    def test_streaming_follow_up_does_not_use_subject_label(
+        self,
+        stream_response,
+    ) -> None:
+        state = create_conversation()
+        add_dialogue_turn(
+            conversation_id=state.conversation_id,
+            role="assistant",
+            content="Previous answer.",
+            current_subject="Unknown external subject",
+            current_subject_reference=None,
+        )
+        seen_references = []
+
+        def tracking_resolver(
+            subject_reference,
+            user_input,
+            utterance_route=None,
+        ):
+            seen_references.append(
+                subject_reference
+            )
+            return ResolvedContext(
+                context_source="no_external_context",
+                subject_reference=subject_reference,
+                prompt_payload={
+                    "candidate_subjects": [],
+                },
+            )
+
+        stream_response.return_value = iter(
+            [
+                LLMStreamEvent(
+                    event_type="response_started",
+                ),
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text="A follow-up answer.",
+                ),
+                LLMStreamEvent(
+                    event_type="response_complete",
+                    text="A follow-up answer.",
+                    done=True,
+                ),
+            ]
+        )
+        engine = QueryEngine(
+            subject_resolver=tracking_resolver,
+            prompt_builder=build_prompt,
+        )
+
+        engine.generate_streaming_response(
+            text="What about this?",
+            conversation_id=state.conversation_id,
+        )
+
+        self.assertIsNone(
+            seen_references[-1]
+        )
+
     def test_non_streaming_stores_retrieved_subject_state(
         self,
     ) -> None:

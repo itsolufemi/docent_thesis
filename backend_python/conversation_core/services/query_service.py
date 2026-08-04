@@ -370,19 +370,17 @@ class QueryEngine:
                 conversation_id=conversation_id,
             )
 
-            # Preserve compatibility with the existing resolver,
-            # which currently accepts one subject reference.
+            latest_subject, latest_reference = (
+                get_latest_subject_state(
+                    dialogue_history
+                )
+            )
+
             if (
                 subject_reference is None
-                and active_branch is not None
-                and active_branch.current_subjects
+                and latest_reference is not None
             ):
-                current_subject = active_branch.current_subjects[0]
-
-                subject_reference = (
-                    current_subject.reference
-                    or current_subject.label
-                )
+                subject_reference = latest_reference
 
         # Context resolution must happen for every request,
         # including requests without a stored conversation.
@@ -624,18 +622,17 @@ class QueryEngine:
                 conversation_id=conversation_id,
             )
 
+            latest_subject, latest_reference = (
+                get_latest_subject_state(
+                    dialogue_history
+                )
+            )
+
             if (
                 subject_reference is None
-                and active_branch is not None
-                and active_branch.current_subjects
+                and latest_reference is not None
             ):
-                current_subject = (
-                    active_branch.current_subjects[0]
-                )
-                subject_reference = (
-                    current_subject.reference
-                    or current_subject.label
-                )
+                subject_reference = latest_reference
 
         conversation_preparation_seconds = (
             perf_counter()
