@@ -10,6 +10,10 @@ from ..schemas.conversation_schemas import (
     DialogueTurn,
 )
 
+from conversation_core.services.conversation_log_service import (
+    append_dialogue_turn_log,
+)
+
 conversations: dict[str, ConversationState] = {}
 
 INTRODUCTION_TEXT_METADATA_KEY = "introduction_text"
@@ -179,6 +183,11 @@ def add_dialogue_turn(
     )
 
     state.dialogue_history.append(turn)
+
+    append_dialogue_turn_log(
+        conversation_id=conversation_id,
+        turn=turn,
+    )
 
     conversations[conversation_id] = state
 

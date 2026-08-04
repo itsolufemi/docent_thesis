@@ -110,6 +110,29 @@ export class TurnStreamClient {
     );
   }
 
+  sendClientTelemetry(
+  requestId,
+  payload,
+  ) {
+    if (
+      !this.socket ||
+      this.socket.readyState !==
+        WebSocket.OPEN
+    ) {
+      return false;
+    }
+
+    this.socket.send(
+      JSON.stringify({
+        type: 'client_telemetry',
+        request_id: requestId,
+        payload,
+      }),
+    );
+
+    return true;
+  }
+
   handleMessage(rawMessage) {
     let message;
 

@@ -35,6 +35,10 @@ from conversation_core.services.turn_buffer_service import (
     process_turn_event,
 )
 
+from conversation_core.services.conversation_log_service import (
+    append_telemetry_log,
+)
+
 
 UtteranceClassifier = Callable[
     [str, bool],
@@ -358,7 +362,61 @@ async def process_streamed_turn_event(
                         "payload": {},
                     }
                 )
+
+                append_telemetry_log(
+                    conversation_id=conversation_id,
+                    request_id=request_id,
+                    event_type="backend_turn_cancelled",
+                    payload={
+                        "utterance": finalised_utterance,
+                        "turn_evaluation": (
+                            turn_result.model_dump(
+                                mode="json"
+                            )
+                        ),
+                        "utterance_route": (
+                            utterance_route.model_dump(
+                                mode="json"
+                            )
+                            if utterance_route is not None
+                            else None
+                        ),
+                        "stream_timings": (
+                            query_timing_events
+                        ),
+                    },
+                )
+
             return
+
+        append_telemetry_log(
+            conversation_id=conversation_id,
+            request_id=request_id,
+            event_type="backend_turn_complete",
+            payload={
+                "utterance": finalised_utterance,
+                "turn_evaluation": (
+                    turn_result.model_dump(
+                        mode="json"
+                    )
+                ),
+                "utterance_route": (
+                    utterance_route.model_dump(
+                        mode="json"
+                    )
+                    if utterance_route is not None
+                    else None
+                ),
+                "stream_timings": (
+                    query_timing_events
+                ),
+                "query_result": (
+                    query_result.model_dump(
+                        mode="json"
+                    )
+                ),
+            },
+        )
 
         await send_message(
             {
@@ -456,6 +514,59 @@ def create_turn_buffer_stream_router(
             while True:
                 message = await websocket.receive_json()
                 message_type = message.get("type")
+
+                if message_type == "client_telemetry":
+                    request_id_value = message.get(
+                        "request_id"
+                    )
+                    telemetry_payload = message.get(
+                        "payload"
+                    )
+
+                    if (
+                        not isinstance(
+                            request_id_value,
+                            str,
+                        )
+                        or not request_id_value
+                        or not isinstance(
+                            telemetry_payload,
+                            dict,
+                        )
+                    ):
+                        await send_message(
+                            {
+                                "type": "turn_error",
+                                "request_id": (
+                                    request_id_value
+                                ),
+                                "payload": {
+                                    "detail": (
+                                        "client_telemetry requires "
+                                        "a request_id and object payload."
+                                    ),
+                                },
+                            }
+                        )
+                        continue
+
+                    append_telemetry_log(
+                        conversation_id=conversation_id,
+                        request_id=request_id_value,
+                        event_type="client_voice_telemetry",
+                        payload=telemetry_payload,
+                    )
+
+                    await send_message(
+                        {
+                            "type": (
+                                "client_telemetry_recorded"
+                            ),
+                            "request_id": request_id_value,
+                            "payload": {},
+                        }
+                    )
+                    continue
 
                 if message_type == "cancel_turn":
                     request_id_value = message.get(

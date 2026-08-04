@@ -189,6 +189,16 @@ class Settings():
         docent_vector_store_directory / "docent_vector_embeddings.npy"
     )
 
+    conversation_logging_enabled: bool = _read_bool(
+        "CONVERSATION_LOGGING_ENABLED",
+        True
+    )
+
+    conversation_log_directory: str = os.getenv(
+        "CONVERSATION_LOG_DIRECTORY",
+        "runtime_logs/conversations"
+    )
+
     class Config:
         env_file = ".env"
 
