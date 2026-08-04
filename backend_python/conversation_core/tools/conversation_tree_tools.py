@@ -2,7 +2,6 @@ from conversation_core.memory.conversation_store import (
     close_active_branch,
     create_conversation_branch,
     get_active_branch,
-    update_branch_subjects,
 )
 
 from conversation_core.schemas.conversation_schemas import (
@@ -13,7 +12,6 @@ from conversation_core.schemas.conversation_tool_schemas import (
     CloseActiveBranchArguments,
     CreateConversationBranchArguments,
     ToolSubjectInput,
-    UpdateActiveBranchArguments,
 )
 
 from conversation_core.schemas.tool_schemas import (
@@ -87,68 +85,6 @@ def handle_create_conversation_branch(
         ),
         data={
             "active_branch": active_branch.model_dump(),
-        },
-    )
-
-def handle_update_active_branch(
-    context: ToolExecutionContext,
-    raw_arguments: dict,
-) -> ToolExecutionResult:
-    arguments = UpdateActiveBranchArguments.model_validate(
-        raw_arguments
-    )
-
-    active_branch = get_active_branch(
-        context.conversation_id
-    )
-
-    if active_branch is None:
-        return ToolExecutionResult(
-            tool_name="update_active_branch",
-            success=False,
-            message="No active conversation branch was found.",
-        )
-
-    state = update_branch_subjects(
-        conversation_id=context.conversation_id,
-        branch_id=active_branch.branch_id,
-        previous_subjects=convert_subject_inputs(
-            arguments.previous_subjects
-        ),
-        current_subjects=convert_subject_inputs(
-            arguments.current_subjects
-        ),
-        remaining_subjects=convert_subject_inputs(
-            arguments.remaining_subjects
-        ),
-    )
-
-    if state is None:
-        return ToolExecutionResult(
-            tool_name="update_active_branch",
-            success=False,
-            message="The active branch could not be updated.",
-        )
-
-    updated_branch = get_active_branch(
-        context.conversation_id
-    )
-
-    if updated_branch is None:
-        return ToolExecutionResult(
-            tool_name="update_active_branch",
-            success=False,
-            message="The updated branch could not be retrieved.",
-        )
-
-    return ToolExecutionResult(
-        tool_name="update_active_branch",
-        success=True,
-        message=(
-            f"Updated the '{updated_branch.name}' branch."
-        ),
-        data={
-            "active_branch": updated_branch.model_dump(),
         },
     )
 
@@ -275,59 +211,6 @@ CREATE_CONVERSATION_BRANCH_DEFINITION = ToolDefinition(
     },
 )
 
-UPDATE_ACTIVE_BRANCH_DEFINITION = ToolDefinition(
-    name="update_active_branch",
-    description=(
-        "Update the structured subjects of the currently active "
-        "conversation branch. Only include subject groups that "
-        "should be replaced."
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "previous_subjects": {
-                "type": ["array", "null"],
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "label": {"type": "string"},
-                        "reference": {
-                            "type": ["string", "null"],
-                        },
-                    },
-                    "required": ["label"],
-                },
-            },
-            "current_subjects": {
-                "type": ["array", "null"],
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "label": {"type": "string"},
-                        "reference": {
-                            "type": ["string", "null"],
-                        },
-                    },
-                    "required": ["label"],
-                },
-            },
-            "remaining_subjects": {
-                "type": ["array", "null"],
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "label": {"type": "string"},
-                        "reference": {
-                            "type": ["string", "null"],
-                        },
-                    },
-                    "required": ["label"],
-                },
-            },
-        },
-    },
-)
-
 CLOSE_ACTIVE_BRANCH_DEFINITION = ToolDefinition(
     name="close_active_branch",
     description=(
@@ -354,11 +237,6 @@ def register_conversation_tree_tools(
     registry.register(
         definition=CREATE_CONVERSATION_BRANCH_DEFINITION,
         handler=handle_create_conversation_branch,
-    )
-
-    registry.register(
-        definition=UPDATE_ACTIVE_BRANCH_DEFINITION,
-        handler=handle_update_active_branch,
     )
 
     registry.register(

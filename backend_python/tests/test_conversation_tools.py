@@ -46,36 +46,6 @@ create_result = core_tool_registry.execute(
 print("CREATE RESULT")
 print(create_result.model_dump_json(indent=2))
 
-update_result = core_tool_registry.execute(
-    tool_call=ToolCall(
-        name="update_active_branch",
-        arguments={
-            "previous_subjects": [
-                {
-                    "label": "The Swing",
-                    "reference": "painting:1",
-                }
-            ],
-            "current_subjects": [
-                {
-                    "label": "The Laughing Cavalier",
-                    "reference": "painting:2",
-                }
-            ],
-            "remaining_subjects": [
-                {
-                    "label": "The Arab Tent",
-                    "reference": "painting:581",
-                }
-            ],
-        },
-    ),
-    context=context,
-)
-
-print("\nUPDATE RESULT")
-print(update_result.model_dump_json(indent=2))
-
 close_result = core_tool_registry.execute(
     tool_call=ToolCall(
         name="close_active_branch",

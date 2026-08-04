@@ -646,6 +646,37 @@ class CandidateSubjectTest(
 class SelfRoutingPromptSubjectTest(
     unittest.TestCase
 ):
+    def test_prompt_prohibits_branch_subject_updates(
+        self,
+    ) -> None:
+        resolved_context = ResolvedContext(
+            context_source="no_external_context",
+            prompt_payload={
+                "artwork": None,
+                "retrieved_chunks": [],
+                "retrieved_documents": [],
+                "candidate_subjects": [],
+            },
+        )
+
+        prompt = docent_build_self_routing_prompt(
+            user_input=(
+                "Now tell me about "
+                "The Laughing Cavalier."
+            ),
+            dialogue_history=[],
+            resolved_context=resolved_context,
+            active_branch=None,
+        )
+
+        self.assertIn(
+            (
+                "Do not update branch subject fields "
+                "when the conversation changes artwork."
+            ),
+            " ".join(prompt.split()),
+        )
+
     def test_self_routing_prompt_uses_dialogue_subject_not_branch(
         self,
     ) -> None:

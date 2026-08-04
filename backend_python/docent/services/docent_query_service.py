@@ -379,15 +379,18 @@ def docent_build_prompt_from_context(
     Use a conversation-tree tool only when the user's request and the
     current conversation state justify it.
 
-    For create_bounded_branch:
+    For create_conversation_branch:
     - use retrieved artwork evidence to form an ordered remaining-subject list;
     - create the bounded branch with current_subjects empty;
     - do not mark the first subject current until the conversation actually
       begins discussing it.
 
-    For close_bounded_branch:
+    For close_active_branch:
     - close the active bounded branch only when the user clearly requests
       its termination or it has completed.
+
+    - Do not use conversation-tree tools to record the current artwork or
+      an ordinary change of subject.
     """.strip()
 
     if payload.get("route_handled_without_retrieval"):
@@ -874,10 +877,18 @@ ACTIVE CONVERSATION BRANCH
 
 {branch_context}
 
-The active branch is the current overarching
-conversational activity. A digression does not close
-a bounded branch. Use operational tools only when
-conversation-tree state genuinely needs to change.
+The active branch represents only the current
+overarching conversational activity.
+
+Use create_conversation_branch only when the user
+begins a distinct structured activity.
+
+Use close_active_branch only when a bounded activity
+has completed or the user clearly asks to stop it.
+
+Do not update branch subject fields when the
+conversation changes artwork. Artwork continuity is
+managed through dialogue history.
 
 USER UTTERANCE
 
