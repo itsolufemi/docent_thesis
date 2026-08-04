@@ -12,6 +12,9 @@ if str(BACKEND_PYTHON_ROOT) not in sys.path:
 from conversation_core.tools.core_tool_registry import (  # noqa: E402
     core_tool_registry,
 )
+from conversation_core.api.routes_conversation import (  # noqa: E402
+    router,
+)
 
 
 class ConversationTreeToolRegistryTest(unittest.TestCase):
@@ -45,6 +48,24 @@ class ConversationTreeToolRegistryTest(unittest.TestCase):
         self.assertIn(
             "close_active_branch",
             tool_names,
+        )
+
+
+class ConversationRouteTest(unittest.TestCase):
+    def test_active_branch_subject_route_is_removed(
+        self,
+    ) -> None:
+        route_paths = {
+            route.path
+            for route in router.routes
+        }
+
+        self.assertNotIn(
+            (
+                "/api/conversations/current/"
+                "active-branch/subject"
+            ),
+            route_paths,
         )
 
 

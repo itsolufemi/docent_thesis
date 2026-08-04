@@ -93,12 +93,3 @@ class ConversationState(BaseModel):
 class StartConversationResponse(BaseModel):
     conversation_id: str
     state: ConversationState
-
-
-class SetCurrentSubjectRequest(BaseModel):
-    subject_reference: str
-
-
-class SetCurrentSubjectResponse(BaseModel):
-    conversation_id: str
-    state: ConversationState

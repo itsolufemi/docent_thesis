@@ -18,8 +18,8 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from config import settings  # noqa: E402
 from conversation_core.memory.conversation_store import (  # noqa: E402
+    add_dialogue_turn,
     create_conversation,
-    set_active_branch_subject,
 )
 from conversation_core.schemas.llm_stream_schemas import (  # noqa: E402
     LLMStreamEvent,
@@ -60,7 +60,8 @@ CASES = [
         "retrieval_used": True,
         "candidate_subjects": ["The Arab Tent"],
         "expected_tool": None,
-        "current_subject_reference": ["painting:581"],
+        "current_subject_reference": "painting:581",
+        "current_subject_label": "The Arab Tent",
     },
     {
         "case_id": "highlights_tour",
@@ -110,18 +111,20 @@ def run_sample(
     conversation_id = (
         conversation.conversation_id
     )
-    current_subject = case[
+    current_subject_reference = case.get(
         "current_subject_reference"
-    ]
+    )
 
-    if current_subject is not None:
-        set_active_branch_subject(
+    if current_subject_reference is not None:
+        add_dialogue_turn(
             conversation_id=conversation_id,
-            subject_reference=(
-                current_subject["reference"]
+            role="assistant",
+            content="Previous subject context.",
+            current_subject=case.get(
+                "current_subject_label"
             ),
-            subject_label=(
-                current_subject["label"]
+            current_subject_reference=(
+                current_subject_reference
             ),
         )
 

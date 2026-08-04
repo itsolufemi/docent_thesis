@@ -110,68 +110,6 @@ def create_conversation_branch(
 
     return state
 
-def update_branch_subjects(
-    conversation_id: str,
-    branch_id: str,
-    previous_subjects: list[ConversationSubject] | None = None,
-    current_subjects: list[ConversationSubject] | None = None,
-    remaining_subjects: list[ConversationSubject] | None = None,
-) -> ConversationState | None:
-    state = get_conversation(conversation_id)
-
-    if state is None:
-        return None
-
-    branch = state.conversation_tree.branches.get(branch_id)
-
-    if branch is None:
-        return None
-
-    if previous_subjects is not None:
-        branch.previous_subjects = previous_subjects
-
-    if current_subjects is not None:
-        branch.current_subjects = current_subjects
-
-    if remaining_subjects is not None:
-        branch.remaining_subjects = remaining_subjects
-
-    conversations[conversation_id] = state
-
-    return state
-
-def set_active_branch_subject(
-    conversation_id: str,
-    subject_reference: str,
-    subject_label: str | None = None,
-) -> ConversationState | None:
-    state = get_conversation(conversation_id)
-
-    if state is None:
-        return None
-
-    active_branch = get_active_branch(
-        conversation_id
-    )
-
-    if active_branch is None:
-        return None
-
-    for current_subject in active_branch.current_subjects:
-        if current_subject not in active_branch.previous_subjects:
-            active_branch.previous_subjects.append(current_subject)
-
-    active_branch.current_subjects = [
-        ConversationSubject(
-            label=subject_label or subject_reference,
-            reference=subject_reference,
-        )
-    ]
-
-    conversations[conversation_id] = state
-
-    return state
-
 def close_active_branch(
     conversation_id: str,
 ) -> ConversationState | None:

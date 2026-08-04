@@ -23,11 +23,5 @@ class CreateConversationBranchArguments(BaseModel):
     )
 
 
-class UpdateActiveBranchArguments(BaseModel):
-    previous_subjects: list[ToolSubjectInput] | None = None
-    current_subjects: list[ToolSubjectInput] | None = None
-    remaining_subjects: list[ToolSubjectInput] | None = None
-
-
 class CloseActiveBranchArguments(BaseModel):
     reason: str | None = None
