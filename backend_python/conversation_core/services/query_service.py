@@ -375,11 +375,14 @@ class QueryEngine:
                 content=text,
             )
 
-            add_dialogue_turn(
-                conversation_id=conversation_state.conversation_id,
-                role="assistant",
-                content=response,
-            )
+            if response:
+                add_dialogue_turn(
+                    conversation_id=(
+                        conversation_state.conversation_id
+                    ),
+                    role="assistant",
+                    content=response,
+                )
         
         total_request_seconds = (
             perf_counter() - request_started_at
@@ -871,7 +874,10 @@ class QueryEngine:
             self_routing_consistent = False
 
         if conversation_state is not None:
-            if not response_cancelled:
+            if (
+                not response_cancelled
+                and response
+            ):
                 add_dialogue_turn(
                     conversation_id=(
                         conversation_state

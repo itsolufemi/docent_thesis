@@ -497,6 +497,45 @@ class SelfRoutingQueryEngineTest(
             ]
         )
 
+    def test_non_streaming_ignored_turn_stores_no_assistant(
+        self,
+    ) -> None:
+        route = {
+            "route_type": "noise",
+            "is_relevant": False,
+            "candidate_subjects": [],
+            "should_update_subject": False,
+            "proposed_action": None,
+            "confidence": 0.99,
+            "reason": "The input was noise.",
+        }
+        engine = QueryEngine(
+            subject_resolver=resolve_context,
+            prompt_builder=build_prompt,
+            response_generator=(
+                lambda _prompt, _conversation_id: (
+                    "<route>"
+                    + json.dumps(route)
+                    + "</route>"
+                )
+            ),
+            self_routing_enabled=True,
+        )
+
+        result = engine.generate_response(
+            text="[background noise]",
+            include_debug=True,
+        )
+
+        self.assertEqual(result.response, "")
+        history = get_recent_conversation_history(
+            result.conversation_id
+        )
+        self.assertEqual(
+            [turn.role for turn in history],
+            ["user"],
+        )
+
     def test_non_streaming_irrelevant_text_records_error(
         self,
     ) -> None:
@@ -836,6 +875,81 @@ class SelfRoutingQueryEngineTest(
         )
         self.assertEqual(len(history), 1)
         self.assertEqual(history[0].role, "user")
+
+    @patch(
+        "conversation_core.services."
+        "query_service."
+        "stream_tool_aware_llm_response"
+    )
+    def test_streaming_ignored_turn_stores_no_assistant(
+        self,
+        stream_response,
+    ) -> None:
+        route = {
+            "route_type": "noise",
+            "is_relevant": False,
+            "candidate_subjects": [],
+            "should_update_subject": False,
+            "proposed_action": None,
+            "confidence": 0.99,
+            "reason": "The input was noise.",
+        }
+        stream_response.return_value = iter(
+            [
+                LLMStreamEvent(
+                    event_type="response_started",
+                ),
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text=(
+                        "<route>"
+                        + json.dumps(route)
+                        + "</route>"
+                    ),
+                ),
+                LLMStreamEvent(
+                    event_type="response_complete",
+                    text="raw response",
+                    done=True,
+                ),
+            ]
+        )
+        events = []
+        engine = QueryEngine(
+            subject_resolver=resolve_context,
+            prompt_builder=build_prompt,
+            self_routing_enabled=True,
+        )
+
+        result = engine.generate_streaming_response(
+            text="[background noise]",
+            include_debug=True,
+            on_stream_event=events.append,
+        )
+
+        self.assertEqual(result.response, "")
+        self.assertTrue(
+            result.debug.debug_payload[
+                "self_routing_valid"
+            ]
+        )
+        self.assertTrue(
+            result.debug.debug_payload[
+                "self_routing_consistent"
+            ]
+        )
+        self.assertNotIn(
+            "content_delta",
+            [event.event_type for event in events],
+        )
+
+        history = get_recent_conversation_history(
+            result.conversation_id
+        )
+        self.assertEqual(
+            [turn.role for turn in history],
+            ["user"],
+        )
 
     @patch(
         "conversation_core.services."
