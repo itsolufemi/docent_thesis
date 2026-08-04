@@ -531,61 +531,6 @@ def docent_resolve_self_routing_context(
     user_input: str,
     utterance_route: UtteranceRoute | None = None,
 ) -> ResolvedContext:
-    if subject_reference is not None:
-        painting_index = (
-            docent_parse_subject_reference(
-                subject_reference
-            )
-        )
-
-        if painting_index is not None:
-            artwork = get_painting_by_index(
-                painting_index
-            )
-
-            if artwork is not None:
-                return ResolvedContext(
-                    context_source=(
-                        "subject_reference"
-                    ),
-                    subject_reference=(
-                        subject_reference
-                    ),
-                    sources=[
-                        build_source_from_artwork(
-                            artwork=artwork,
-                            source_type=(
-                                "artwork_context"
-                            ),
-                        )
-                    ],
-                    prompt_payload={
-                        "artwork": artwork,
-                        "retrieved_chunks": [],
-                        "retrieved_documents": [],
-                        "candidate_subjects": [
-                            {
-                                "reference": (
-                                    subject_reference
-                                ),
-                                "label": (
-                                    artwork.title
-                                ),
-                                "score": 1.0,
-                            }
-                        ],
-                    },
-                    debug_payload={
-                        "self_routing_context_resolver": (
-                            True
-                        ),
-                        "painting_index": (
-                            painting_index
-                        ),
-                        "artwork_found": True,
-                    },
-                )
-
     vector_retrieval_result = (
         retrieve_docent_chunks_by_vector_similarity(
             query=user_input,
@@ -702,6 +647,61 @@ def docent_resolve_self_routing_context(
                 ),
             },
         )
+
+    if subject_reference is not None:
+        painting_index = (
+            docent_parse_subject_reference(
+                subject_reference
+            )
+        )
+
+        if painting_index is not None:
+            artwork = get_painting_by_index(
+                painting_index
+            )
+
+            if artwork is not None:
+                return ResolvedContext(
+                    context_source=(
+                        "subject_reference"
+                    ),
+                    subject_reference=(
+                        subject_reference
+                    ),
+                    sources=[
+                        build_source_from_artwork(
+                            artwork=artwork,
+                            source_type=(
+                                "artwork_context"
+                            ),
+                        )
+                    ],
+                    prompt_payload={
+                        "artwork": artwork,
+                        "retrieved_chunks": [],
+                        "retrieved_documents": [],
+                        "candidate_subjects": [
+                            {
+                                "reference": (
+                                    subject_reference
+                                ),
+                                "label": (
+                                    artwork.title
+                                ),
+                                "score": 1.0,
+                            }
+                        ],
+                    },
+                    debug_payload={
+                        "self_routing_context_resolver": (
+                            True
+                        ),
+                        "painting_index": (
+                            painting_index
+                        ),
+                        "artwork_found": True,
+                    },
+                )
 
     return ResolvedContext(
         context_source="no_external_context",

@@ -370,7 +370,7 @@ class QueryEngine:
                 conversation_id=conversation_id,
             )
 
-            latest_subject, latest_reference = (
+            _, latest_reference = (
                 get_latest_subject_state(
                     dialogue_history
                 )
@@ -622,7 +622,7 @@ class QueryEngine:
                 conversation_id=conversation_id,
             )
 
-            latest_subject, latest_reference = (
+            _, latest_reference = (
                 get_latest_subject_state(
                     dialogue_history
                 )

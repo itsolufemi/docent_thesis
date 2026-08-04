@@ -399,6 +399,174 @@ class CandidateSubjectTest(
             ]
         )
 
+    def test_query_vector_result_wins_over_stored_reference(
+        self,
+    ) -> None:
+        vector_result = Mock()
+        vector_result.results = [
+            SimpleNamespace(
+                score=0.95,
+                chunk=SimpleNamespace(
+                    parent_document_id="painting:84",
+                    title="The Laughing Cavalier",
+                ),
+            ),
+        ]
+        vector_result.timings.model_dump.return_value = {}
+
+        with (
+            patch(
+                "docent.services.docent_query_service."
+                "retrieve_docent_chunks_by_vector_similarity",
+                return_value=vector_result,
+            ),
+            patch(
+                "docent.services.docent_query_service."
+                "build_sources_from_retrieved_chunks",
+                return_value=[],
+            ),
+            patch(
+                "docent.services.docent_query_service."
+                "get_painting_by_index"
+            ) as get_painting,
+        ):
+            resolved = (
+                docent_resolve_self_routing_context(
+                    "painting:581",
+                    "Tell me about The Laughing Cavalier.",
+                )
+            )
+
+        self.assertEqual(
+            resolved.context_source,
+            "vector_retrieved_chunks",
+        )
+        self.assertEqual(
+            resolved.prompt_payload[
+                "candidate_subjects"
+            ][0]["reference"],
+            "painting:84",
+        )
+        get_painting.assert_not_called()
+
+    def test_keyword_result_wins_over_stored_reference(
+        self,
+    ) -> None:
+        vector_result = Mock()
+        vector_result.results = []
+        vector_result.timings.model_dump.return_value = {}
+        keyword_result = SimpleNamespace(
+            score=0.88,
+            document=SimpleNamespace(
+                source_reference="painting:84",
+                document_id="document:84",
+                title="The Laughing Cavalier",
+            ),
+        )
+
+        with (
+            patch(
+                "docent.services.docent_query_service."
+                "retrieve_docent_chunks_by_vector_similarity",
+                return_value=vector_result,
+            ),
+            patch(
+                "docent.services.docent_query_service."
+                "get_docent_retrieval_documents",
+                return_value=[],
+            ),
+            patch(
+                "docent.services.docent_query_service."
+                "retrieve_documents_by_keyword",
+                return_value=[keyword_result],
+            ),
+            patch(
+                "docent.services.docent_query_service."
+                "build_sources_from_retrieved_documents",
+                return_value=[],
+            ),
+            patch(
+                "docent.services.docent_query_service."
+                "get_painting_by_index"
+            ) as get_painting,
+        ):
+            resolved = (
+                docent_resolve_self_routing_context(
+                    "painting:581",
+                    "The Laughing Cavalier",
+                )
+            )
+
+        self.assertEqual(
+            resolved.context_source,
+            "retrieved_documents",
+        )
+        self.assertEqual(
+            resolved.prompt_payload[
+                "candidate_subjects"
+            ][0]["reference"],
+            "painting:84",
+        )
+        get_painting.assert_not_called()
+
+    def test_stored_reference_is_fallback_after_query_misses(
+        self,
+    ) -> None:
+        vector_result = Mock()
+        vector_result.results = []
+        vector_result.timings.model_dump.return_value = {}
+        artwork = SimpleNamespace(
+            title="The Arab Tent",
+        )
+
+        with (
+            patch(
+                "docent.services.docent_query_service."
+                "retrieve_docent_chunks_by_vector_similarity",
+                return_value=vector_result,
+            ),
+            patch(
+                "docent.services.docent_query_service."
+                "get_docent_retrieval_documents",
+                return_value=[],
+            ),
+            patch(
+                "docent.services.docent_query_service."
+                "retrieve_documents_by_keyword",
+                return_value=[],
+            ),
+            patch(
+                "docent.services.docent_query_service."
+                "get_painting_by_index",
+                return_value=artwork,
+            ) as get_painting,
+            patch(
+                "docent.services.docent_query_service."
+                "build_source_from_artwork",
+                return_value={
+                    "source_type": "artwork_context",
+                    "title": "The Arab Tent",
+                    "reference": "painting:581",
+                },
+            ),
+        ):
+            resolved = (
+                docent_resolve_self_routing_context(
+                    "painting:581",
+                    "What about the colours?",
+                )
+            )
+
+        self.assertEqual(
+            resolved.context_source,
+            "subject_reference",
+        )
+        self.assertEqual(
+            resolved.subject_reference,
+            "painting:581",
+        )
+        get_painting.assert_called_once_with(581)
+
     def test_multiple_candidate_subjects_are_parsed(
         self,
     ) -> None:
