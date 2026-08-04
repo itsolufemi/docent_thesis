@@ -45,8 +45,8 @@ DOCENT_PROMPT_PROFILE = PromptProfile(
 
         # Reference resolution and grounding
         (
-            "Use the current subject, active conversation branch, dialogue "
-            "history, and supplied evidence to resolve references such as "
+            "Use the current subject, dialogue history, and supplied "
+            "evidence to resolve references such as "
             "'this', 'that', 'it', 'he', 'she', 'the other one', and 'there'."
         ),
         (
@@ -134,7 +134,7 @@ DOCENT_PROMPT_PROFILE = PromptProfile(
         ),
         (
             "A side question or temporary digression does not by itself end "
-            "the current bounded conversation branch."
+            "the visitor's current tour or conversational activity."
         ),
 
         # Tool use

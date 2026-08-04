@@ -396,9 +396,8 @@ response. This includes questions, greetings, acknowledgements,
 requests for explanation, follow-up turns and ordinary movement
 between subjects in an existing conversation.
 
-Moving to the next subject within an existing bounded conversation
-is normally a response_request. It is not automatically a
-call_to_action.
+Moving to the next subject within an ongoing conversation or tour is
+normally a response_request. It is not automatically a call_to_action.
 
 Such next, previous or current-subject navigation should use existing
 conversation state and should not require retrieval unless the user

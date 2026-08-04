@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 BACKEND_PYTHON_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_PYTHON_ROOT) not in sys.path:
@@ -13,11 +14,13 @@ from conversation_core.memory.conversation_store import (
 from conversation_core.services.llm_service import (
     generate_tool_aware_llm_response,
 )
+from conversation_core.tools.conversation_tree_tools import (
+    register_conversation_tree_tools,
+)
+from conversation_core.tools.tool_registry import ToolRegistry
 
 
-state = create_conversation()
-
-prompt = """
+PROMPT = """
 You are a conversational AI with access to operational tools.
 
 The user has requested a gallery tour containing three paintings.
@@ -35,19 +38,34 @@ After the tool succeeds, briefly tell the user that the tour has begun.
 """.strip()
 
 
-response = generate_tool_aware_llm_response(
-    prompt=prompt,
-    conversation_id=state.conversation_id,
-)
+def main() -> None:
+    state = create_conversation()
+    isolated_tree_registry = ToolRegistry()
+    register_conversation_tree_tools(
+        isolated_tree_registry
+    )
 
-print("LLM RESPONSE")
-print(response)
+    with patch(
+        "conversation_core.services.llm_service.core_tool_registry",
+        isolated_tree_registry,
+    ):
+        response = generate_tool_aware_llm_response(
+            prompt=PROMPT,
+            conversation_id=state.conversation_id,
+        )
 
-updated_state = get_conversation(
-    state.conversation_id
-)
+    print("LLM RESPONSE")
+    print(response)
 
-assert updated_state is not None
+    updated_state = get_conversation(
+        state.conversation_id
+    )
 
-print("\nUPDATED CONVERSATION")
-print(updated_state.model_dump_json(indent=2))
+    assert updated_state is not None
+
+    print("\nUPDATED CONVERSATION")
+    print(updated_state.model_dump_json(indent=2))
+
+
+if __name__ == "__main__":
+    main()

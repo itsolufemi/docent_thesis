@@ -161,7 +161,7 @@ class DocentRetrievalRoutingTest(unittest.TestCase):
         route = utterance_route(
             route_type="call_to_action",
             requires_retrieval=True,
-            proposed_action="create_bounded_branch",
+            proposed_action="start_highlights_tour",
             candidate_subjects=["highlights tour"],
         )
 
@@ -181,14 +181,14 @@ class DocentRetrievalRoutingTest(unittest.TestCase):
         )
         self.assertEqual(
             context.prompt_payload["proposed_action"],
-            "create_bounded_branch",
+            "start_highlights_tour",
         )
 
     def test_close_tour_skips_retrieval_and_preserves_action(self) -> None:
         route = utterance_route(
             route_type="call_to_action",
             requires_retrieval=False,
-            proposed_action="close_bounded_branch",
+            proposed_action="stop_tour",
         )
 
         context, vector_retrieval, keyword_retrieval = (
@@ -201,9 +201,9 @@ class DocentRetrievalRoutingTest(unittest.TestCase):
         )
         self.assertEqual(
             context.prompt_payload["proposed_action"],
-            "close_bounded_branch",
+            "stop_tour",
         )
-        self.assertTrue(
+        self.assertFalse(
             context.debug_payload["action_execution_available"]
         )
         vector_retrieval.assert_not_called()
@@ -224,7 +224,7 @@ class DocentPromptClassificationTest(unittest.TestCase):
             prompt_payload={
                 "route_type": "call_to_action",
                 "requires_retrieval": True,
-                "proposed_action": "create_bounded_branch",
+                "proposed_action": "start_highlights_tour",
                 "candidate_subjects": ["highlights tour"],
                 "artwork": None,
                 "retrieved_chunks": [],
@@ -236,15 +236,14 @@ class DocentPromptClassificationTest(unittest.TestCase):
             user_input="Give me a highlights tour.",
             dialogue_history=[],
             resolved_context=context,
-            active_branch=None,
         )
 
         self.assertEqual(result, "built prompt")
         wrapped_input = build_prompt.call_args.kwargs["user_input"]
         self.assertIn("call_to_action", wrapped_input)
-        self.assertIn("create_bounded_branch", wrapped_input)
+        self.assertIn("start_highlights_tour", wrapped_input)
         self.assertIn("highlights tour", wrapped_input)
-        self.assertIn("current_subjects empty", wrapped_input)
+        self.assertNotIn("conversation-tree", wrapped_input)
 
     def test_no_retrieval_prompt_preserves_close_action(self) -> None:
         context = ResolvedContext(
@@ -252,7 +251,7 @@ class DocentPromptClassificationTest(unittest.TestCase):
             prompt_payload={
                 "route_type": "call_to_action",
                 "requires_retrieval": False,
-                "proposed_action": "close_bounded_branch",
+                "proposed_action": "stop_tour",
                 "candidate_subjects": [],
                 "route_handled_without_retrieval": True,
                 "route_message": "No retrieval required.",
@@ -263,12 +262,12 @@ class DocentPromptClassificationTest(unittest.TestCase):
             user_input="Stop the tour.",
             dialogue_history=[],
             resolved_context=context,
-            active_branch=None,
         )
 
         self.assertIn("call_to_action", prompt)
-        self.assertIn("close_bounded_branch", prompt)
+        self.assertIn("stop_tour", prompt)
         self.assertIn("No retrieval required.", prompt)
+        self.assertNotIn("bounded branch", prompt)
 
 
 if __name__ == "__main__":

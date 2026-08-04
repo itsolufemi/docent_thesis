@@ -17,8 +17,8 @@ from conversation_core.api.routes_conversation import (  # noqa: E402
 )
 
 
-class ConversationTreeToolRegistryTest(unittest.TestCase):
-    def test_update_active_branch_is_not_registered(
+class ConversationTreeDisconnectionTest(unittest.TestCase):
+    def test_conversation_tree_tools_are_disconnected(
         self,
     ) -> None:
         tool_names = {
@@ -28,25 +28,15 @@ class ConversationTreeToolRegistryTest(unittest.TestCase):
         }
 
         self.assertNotIn(
-            "update_active_branch",
-            tool_names,
-        )
-
-    def test_activity_branch_tools_remain_registered(
-        self,
-    ) -> None:
-        tool_names = {
-            definition.name
-            for definition
-            in core_tool_registry.get_definitions()
-        }
-
-        self.assertIn(
             "create_conversation_branch",
             tool_names,
         )
-        self.assertIn(
+        self.assertNotIn(
             "close_active_branch",
+            tool_names,
+        )
+        self.assertNotIn(
+            "update_active_branch",
             tool_names,
         )
 

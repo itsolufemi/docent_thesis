@@ -26,8 +26,6 @@ from conversation_core.schemas.llm_stream_schemas import (  # noqa: E402
     LLMStreamEvent,
 )
 from conversation_core.schemas.conversation_schemas import (  # noqa: E402
-    ConversationBranch,
-    ConversationSubject,
     DialogueTurn,
 )
 from conversation_core.schemas.query_schemas import (  # noqa: E402
@@ -94,7 +92,6 @@ def build_prompt(
     user_input,
     dialogue_history,
     resolved_context,
-    active_branch,
 ):
     return "self-routing prompt"
 
@@ -646,7 +643,7 @@ class CandidateSubjectTest(
 class SelfRoutingPromptSubjectTest(
     unittest.TestCase
 ):
-    def test_prompt_prohibits_branch_subject_updates(
+    def test_self_routing_prompt_contains_no_tree_context(
         self,
     ) -> None:
         resolved_context = ResolvedContext(
@@ -660,24 +657,37 @@ class SelfRoutingPromptSubjectTest(
         )
 
         prompt = docent_build_self_routing_prompt(
-            user_input=(
-                "Now tell me about "
-                "The Laughing Cavalier."
-            ),
+            user_input="Hello.",
             dialogue_history=[],
             resolved_context=resolved_context,
-            active_branch=None,
         )
 
-        self.assertIn(
-            (
-                "Do not update branch subject fields "
-                "when the conversation changes artwork."
-            ),
-            " ".join(prompt.split()),
+        self.assertNotIn(
+            "ACTIVE CONVERSATION BRANCH",
+            prompt,
+        )
+        self.assertNotIn(
+            "CONVERSATION-TREE GUIDANCE",
+            prompt,
+        )
+        self.assertNotIn(
+            "create_conversation_branch",
+            prompt,
+        )
+        self.assertNotIn(
+            "close_active_branch",
+            prompt,
+        )
+        self.assertNotIn(
+            "conversation branch",
+            prompt.lower(),
+        )
+        self.assertNotIn(
+            "conversation-tree",
+            prompt.lower(),
         )
 
-    def test_self_routing_prompt_uses_dialogue_subject_not_branch(
+    def test_self_routing_prompt_uses_dialogue_subject(
         self,
     ) -> None:
         dialogue_history = [
@@ -693,18 +703,6 @@ class SelfRoutingPromptSubjectTest(
             )
         ]
 
-        active_branch = ConversationBranch(
-            name="old-branch",
-            branch_type="open",
-            status="active",
-            current_subjects=[
-                ConversationSubject(
-                    label="The Arab Tent",
-                    reference="painting:581",
-                )
-            ],
-        )
-
         resolved_context = ResolvedContext(
             context_source="no_external_context",
             prompt_payload={
@@ -719,7 +717,6 @@ class SelfRoutingPromptSubjectTest(
             user_input="What about the colours?",
             dialogue_history=dialogue_history,
             resolved_context=resolved_context,
-            active_branch=active_branch,
         )
 
         self.assertIn(
@@ -729,23 +726,6 @@ class SelfRoutingPromptSubjectTest(
         self.assertIn(
             "Label: The Laughing Cavalier",
             prompt,
-        )
-
-        current_subject_section = prompt.split(
-            "CURRENT SUBJECT",
-            1,
-        )[1].split(
-            "RETRIEVED SUBJECT OPTIONS",
-            1,
-        )[0]
-
-        self.assertNotIn(
-            "painting:581",
-            current_subject_section,
-        )
-        self.assertNotIn(
-            "The Arab Tent",
-            current_subject_section,
         )
 
     def test_self_routing_prompt_has_empty_subject_without_history(
@@ -765,7 +745,6 @@ class SelfRoutingPromptSubjectTest(
             user_input="Hello.",
             dialogue_history=[],
             resolved_context=resolved_context,
-            active_branch=None,
         )
 
         self.assertIn(
@@ -1592,18 +1571,14 @@ class SelfRoutingQueryEngineTest(
                     event_type="tool_call",
                     tool_calls=[
                         {
-                            "name": (
-                                "create_conversation_branch"
-                            ),
+                            "name": "application_action",
                             "arguments": {},
                         }
                     ],
                 ),
                 LLMStreamEvent(
                     event_type="tool_result",
-                    tool_name=(
-                        "create_conversation_branch"
-                    ),
+                    tool_name="application_action",
                     tool_result={
                         "success": True,
                     },

@@ -1,6 +1,5 @@
 from conversation_core.schemas.conversation_schemas import (
     DialogueTurn,
-    ConversationBranch,
 )
 from conversation_core.schemas.query_schemas import ResolvedContext
 from conversation_core.schemas.source_schemas import QuerySource
@@ -13,10 +12,6 @@ from conversation_core.services.query_service import (
     self_routing_response_generator,
 )
 from conversation_core.services.utterance_router_service import route_utterance
-from conversation_core.services.prompt_service import (
-    format_conversation_branch_for_prompt,
-)
-
 from docent.config.docent_classifier_profile import docent_classifier_profile
 from docent.services.artwork_service import get_painting_by_index
 from docent.services.docent_prompt_service import docent_build_prompt
@@ -133,9 +128,9 @@ def build_route_handled_context(
 
         if utterance_route.route_type == "call_to_action":
             route_message = (
-                "The utterance requests a supported structural action. "
-                "No domain retrieval is required. Use the proposed action "
-                "and available conversation tools when appropriate."
+                "The utterance requests an application action. No domain "
+                "retrieval is required. The proposed action is advisory; "
+                "do not claim that it was executed."
             )
 
         return ResolvedContext(
@@ -155,9 +150,7 @@ def build_route_handled_context(
                     utterance_route=utterance_route,
                     retrieval_skipped_by_utterance_route=True,
                 ),
-                "action_execution_available": (
-                    utterance_route.route_type == "call_to_action"
-                ),
+                "action_execution_available": False,
             },
         )
 
@@ -345,12 +338,7 @@ def docent_build_prompt_from_context(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     resolved_context: ResolvedContext,
-    active_branch: ConversationBranch | None,
 ) -> str:
-    branch_context = format_conversation_branch_for_prompt(
-        active_branch
-    )
-
     payload = resolved_context.prompt_payload
     route_type = payload.get("route_type", "response_request")
     floor_intent = payload.get("floor_intent", "none")
@@ -376,72 +364,40 @@ def docent_build_prompt_from_context(
     action_guidance = """
     The proposed action is advisory classifier output.
 
-    Use a conversation-tree tool only when the user's request and the
-    current conversation state justify it.
+    call_to_action indicates that the user explicitly requested an
+    application action rather than only a spoken response.
 
-    For create_conversation_branch:
-    - use retrieved artwork evidence to form an ordered remaining-subject list;
-    - create the bounded branch with current_subjects empty;
-    - do not mark the first subject current until the conversation actually
-      begins discussing it.
-
-    For close_active_branch:
-    - close the active bounded branch only when the user clearly requests
-      its termination or it has completed.
-
-    - Do not use conversation-tree tools to record the current artwork or
-      an ordinary change of subject.
+    proposed_action should describe the requested action, or be null when
+    no supported action is requested.
     """.strip()
 
     if payload.get("route_handled_without_retrieval"):
-        return f"""
-    You are Docent, a voice-led conversational guide.
+        routed_user_input = f"""
+        {classification_context}
 
-    The user's utterance has already been classified by the conversation router.
+        Routing note:
+        {payload.get("route_message")}
 
+        {action_guidance}
+
+        USER UTTERANCE
+
+        {user_input}
+
+        Respond briefly and naturally. Do not invent artwork information.
+        Do not use external context because none was retrieved.
+        """.strip()
+
+        return docent_build_prompt(
+            user_input=routed_user_input,
+            dialogue_history=dialogue_history,
+            artwork=None,
+            retrieved_documents=[],
+            retrieved_chunks=[],
+        )
+
+    routed_user_input = f"""
     {classification_context}
-
-    ACTIVE CONVERSATION BRANCH
-
-    {branch_context}
-
-    Routing note:
-    {payload.get("route_message")}
-
-    User utterance:
-    {user_input}
-
-    Respond briefly and naturally.
-
-    The active branch represents the current overarching conversational activity.
-    A digression does not automatically close a bounded branch.
-
-    Use conversation-tree tools only when the branch state genuinely needs to change.
-
-    {action_guidance}
-
-    Do not invent artwork information.
-    Do not use external context because none was retrieved.
-    """.strip()
-
-    user_input_with_branch_context = f"""
-    {classification_context}
-
-    ACTIVE CONVERSATION BRANCH
-
-    {branch_context}
-
-    CONVERSATION-TREE GUIDANCE
-
-    The active branch represents the current overarching conversational activity.
-
-    Do not close a bounded branch merely because the user asks a digressive or unrelated question.
-
-    Keep a bounded branch active until:
-    - its defined activity is complete; or
-    - the user clearly asks to stop it.
-
-    Use operational tools only when the conversation-tree state genuinely needs to change.
 
     {action_guidance}
 
@@ -451,7 +407,7 @@ def docent_build_prompt_from_context(
     """.strip()
 
     return docent_build_prompt(
-        user_input=user_input_with_branch_context,
+        user_input=routed_user_input,
         dialogue_history=dialogue_history,
         artwork=payload.get("artwork"),
         retrieved_documents=payload.get("retrieved_documents", []),
@@ -767,9 +723,9 @@ ROUTE RULES
 - response_request: the original utterance expects a
   spoken answer, including greetings, questions,
   explanations, comparisons, and ordinary follow-ups.
-- call_to_action: the original utterance explicitly
-  asks the system to begin, end, or change a
-  structured activity.
+- call_to_action: the user explicitly requested an
+  application action rather than only a spoken
+  response.
 - interruption: the original utterance stops,
   corrects, or redirects the assistant while it is
   speaking.
@@ -793,8 +749,8 @@ Set should_update_subject only when the user's
 primary conversational focus should change to one
 of the identified candidate subjects.
 
-proposed_action must describe an explicitly requested
-structural action, or be null.
+proposed_action should describe the requested action,
+or be null when no supported action is requested.
 
 reason must briefly explain the routing decision and
 subject decision.
@@ -809,7 +765,6 @@ def docent_build_self_routing_prompt(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     resolved_context: ResolvedContext,
-    active_branch: ConversationBranch | None,
 ) -> str:
     payload = resolved_context.prompt_payload
 
@@ -853,11 +808,6 @@ def docent_build_self_routing_prompt(
         or payload.get("retrieved_chunks")
         or payload.get("retrieved_documents")
     )
-    branch_context = (
-        format_conversation_branch_for_prompt(
-            active_branch
-        )
-    )
     routed_user_input = f"""
 {SELF_ROUTING_OUTPUT_INSTRUCTIONS}
 
@@ -872,23 +822,6 @@ CURRENT SUBJECT
 RETRIEVED SUBJECT OPTIONS
 
 {candidate_section}
-
-ACTIVE CONVERSATION BRANCH
-
-{branch_context}
-
-The active branch represents only the current
-overarching conversational activity.
-
-Use create_conversation_branch only when the user
-begins a distinct structured activity.
-
-Use close_active_branch only when a bounded activity
-has completed or the user clearly asks to stop it.
-
-Do not update branch subject fields when the
-conversation changes artwork. Artwork continuity is
-managed through dialogue history.
 
 USER UTTERANCE
 

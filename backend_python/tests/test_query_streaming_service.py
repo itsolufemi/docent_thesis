@@ -41,7 +41,6 @@ def build_prompt(
     user_input,
     dialogue_history,
     resolved_context,
-    active_branch,
 ):
     return "streaming prompt"
 

@@ -5,7 +5,6 @@ from time import perf_counter
 from conversation_core.memory.conversation_store import (
     add_dialogue_turn,
     create_conversation,
-    get_active_branch,
     get_conversation,
     get_conversation_introduction,
     get_recent_conversation_history,
@@ -14,7 +13,6 @@ from conversation_core.memory.conversation_store import (
 from conversation_core.schemas.context_schemas import QueryDebugInfo
 from conversation_core.schemas.conversation_schemas import (
     DialogueTurn,
-    ConversationBranch,
 )
 from conversation_core.schemas.llm_stream_schemas import (
     LLMStreamEvent,
@@ -24,7 +22,6 @@ from conversation_core.schemas.self_routing_schemas import (
 )
 from conversation_core.schemas.prompt_schemas import (
     PromptProfile,
-    PromptSection,
 )
 
 from conversation_core.schemas.query_schemas import (
@@ -44,7 +41,6 @@ from conversation_core.services.cancellation import (
 )
 from conversation_core.services.prompt_service import (
     build_prompt,
-    format_conversation_branch_for_prompt,
 )
 from conversation_core.services.self_routing_parser import (
     SelfRoutingStreamParser,
@@ -76,7 +72,6 @@ PromptBuilder = Callable[
         str,
         list[DialogueTurn],
         ResolvedContext,
-        ConversationBranch | None,
     ],
     str,
 ]
@@ -347,7 +342,6 @@ class QueryEngine:
 
         conversation_created = False
         dialogue_history: list[DialogueTurn] = []
-        active_branch: ConversationBranch | None = None
 
         conversation_state = None
 
@@ -363,10 +357,6 @@ class QueryEngine:
 
         if conversation_state is not None:
             dialogue_history = get_recent_conversation_history(
-                conversation_id=conversation_id,
-            )
-
-            active_branch = get_active_branch(
                 conversation_id=conversation_id,
             )
 
@@ -410,7 +400,6 @@ class QueryEngine:
             text,
             dialogue_history,
             resolved_context,
-            active_branch,
         )
 
         response_generation_started_at = perf_counter()
@@ -601,7 +590,6 @@ class QueryEngine:
         conversation_preparation_started_at = perf_counter()
         conversation_created = False
         dialogue_history: list[DialogueTurn] = []
-        active_branch: ConversationBranch | None = None
         conversation_state = None
 
         if conversation_id is not None:
@@ -618,10 +606,6 @@ class QueryEngine:
             dialogue_history = get_recent_conversation_history(
                 conversation_id=conversation_id,
             )
-            active_branch = get_active_branch(
-                conversation_id=conversation_id,
-            )
-
             _, latest_reference = (
                 get_latest_subject_state(
                     dialogue_history
@@ -677,7 +661,6 @@ class QueryEngine:
             text,
             dialogue_history,
             resolved_context,
-            active_branch,
         )
 
         prompt_build_seconds = (
@@ -1159,29 +1142,12 @@ def default_build_prompt(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     resolved_context: ResolvedContext,
-    active_branch: ConversationBranch | None,
 ) -> str:
-    branch_context = format_conversation_branch_for_prompt(
-        active_branch
-    )
-
     return build_prompt(
         user_input=user_input,
         dialogue_history=dialogue_history,
         profile=DEFAULT_CONVERSATION_PROFILE,
-        context_sections=[
-            PromptSection(
-                title="Active conversation branch",
-                content=f"""
-                    {branch_context}
-
-                    Operational rules:
-                    - A digression does not close an active bounded branch.
-                    - Keep a bounded branch active until its activity is complete or the user clearly asks to stop.
-                    - Use operational tools only when conversation-tree state actually needs to change.
-                """.strip(),
-            )
-        ],
+        context_sections=[],
     )
 
 default_query_engine = QueryEngine(

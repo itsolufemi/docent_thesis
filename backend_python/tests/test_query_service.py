@@ -22,7 +22,7 @@ class FakeResolver:
 
 
 class FakePromptBuilder:
-    def __call__(self, user_input, dialogue_history, resolved_context, active_branch):
+    def __call__(self, user_input, dialogue_history, resolved_context):
         return "prompt"
 
 

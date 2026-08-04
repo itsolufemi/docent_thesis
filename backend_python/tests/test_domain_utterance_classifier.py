@@ -52,13 +52,13 @@ CLASSIFIER_CASES = [
         "text": "Give me a highlights tour.",
         "route_type": "call_to_action",
         "requires_retrieval": True,
-        "proposed_action": "create_bounded_branch",
+        "proposed_action": "start_highlights_tour",
     },
     {
         "text": "Stop the tour.",
         "route_type": "call_to_action",
         "requires_retrieval": False,
-        "proposed_action": "close_bounded_branch",
+        "proposed_action": "stop_tour",
     },
     {
         "text": "Wait, that's not what I meant.",
