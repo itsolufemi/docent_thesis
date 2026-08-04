@@ -726,29 +726,43 @@ def docent_resolve_self_routing_context(
     )
 
 
-SELF_ROUTING_OUTPUT_INSTRUCTIONS = """SELF-ROUTING OUTPUT
+SELF_ROUTING_OUTPUT_INSTRUCTIONS = """
+SELF-ROUTING DECISION AND OUTPUT
 
-Before the spoken answer, output exactly one
-internal routing block:
+Before composing the visitor-facing response, decide
+the route internally using the fields described below.
+
+If is_relevant is true:
+- respond naturally to the visitor immediately;
+- after the complete visitor-facing response, append
+  exactly one internal routing footer.
+
+If is_relevant is false:
+- do not produce any visitor-facing response;
+- output only the internal routing footer.
+
+The routing footer must use exactly this format:
 
 <route>{"route_type":"response_request","is_relevant":true,"candidate_subjects":["The Arab Tent"],"should_update_subject":true,"proposed_action":null,"confidence":0.98,"reason":"The user is asking about The Arab Tent."}</route>
-The route block must contain valid JSON with exactly
-the supplied fields and must appear before any
-visitor-facing response. After </route>, respond
-naturally to the visitor.
 
-Always classify the original USER UTTERANCE. If an
-operational tool has already returned a result, do
-not reclassify the current post-tool stage.
+The route block must contain valid JSON with exactly
+the supplied fields.
+
+The routing footer is internal metadata:
+- never mention it in the visitor-facing response;
+- never explain that routing occurred;
+- never place visitor-facing text after </route>;
+- emit the footer exactly once.
 
 ROUTE RULES
 
 - noise: the original utterance contains no
   meaningful conversational language. Set
-  is_relevant=false.
+  is_relevant=false and produce no visitor-facing
+  response.
 - response_request: the original utterance expects a
   spoken answer, including greetings, questions,
-  explanations, and ordinary follow-ups.
+  explanations, comparisons, and ordinary follow-ups.
 - call_to_action: the original utterance explicitly
   asks the system to begin, end, or change a
   structured activity.
@@ -756,20 +770,24 @@ ROUTE RULES
   corrects, or redirects the assistant while it is
   speaking.
 
-candidate_subjects must contain the readable subject
-identified from the user's utterance, such as
-["The Arab Tent"], ["The Swing", "The Arab Tent"],
- or ["15th century italian geopolitics"].
+candidate_subjects must contain readable subject
+names identified in the user's utterance, such as:
 
-Do not place an internal reference such as
+["The Arab Tent"]
+
+or:
+
+["The Swing", "The Arab Tent"]
+
+Do not place internal references such as
 "painting:581" in candidate_subjects.
 
-Set candidate_subjects to null when the utterance has
-no identifiable subject.
+Set candidate_subjects to an empty list when the
+utterance has no identifiable subject.
 
 Set should_update_subject only when the user's
-conversational focus should move to the identified
-candidate subject.
+primary conversational focus should change to one
+of the identified candidate subjects.
 
 proposed_action must describe an explicitly requested
 structural action, or be null.
@@ -777,9 +795,9 @@ structural action, or be null.
 reason must briefly explain the routing decision and
 subject decision.
 
-Emit this route block only once for the user turn.
-If a tool returns a result, continue without
-repeating the route block.
+Always classify the original USER UTTERANCE. If an
+operational tool has returned a result, do not
+reclassify the post-tool stage.
 """.strip()
 
 

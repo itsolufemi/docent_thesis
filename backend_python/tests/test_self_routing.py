@@ -84,30 +84,39 @@ def build_prompt(
 class SelfRoutingParserTest(
     unittest.TestCase
 ):
-    def test_split_route_is_hidden(
+    def test_split_footer_is_hidden(
         self,
     ) -> None:
         parser = SelfRoutingStreamParser()
 
         self.assertEqual(
-            parser.consume("<rou"),
-            "",
+            parser.consume(
+                "The Arab Tent is richly "
+            ),
+            "The Arab Tent is richly ",
+        )
+        self.assertEqual(
+            parser.consume(
+                "decorated.\n<rou"
+            ),
+            "decorated.\n",
         )
         spoken = parser.consume(
             "te>"
             + VALID_ROUTE_JSON
-            + "</route>The Arab Tent."
+            + "</route>"
         )
 
         self.assertEqual(
             spoken,
-            "The Arab Tent.",
+            "",
+        )
+        self.assertIsNotNone(
+            parser.route
         )
         self.assertEqual(
-            parser.route,
-            parser.route.model_validate(
-                VALID_ROUTE
-            ),
+            parser.route.candidate_subjects,
+            ["The Arab Tent"],
         )
         self.assertTrue(
             parser.route_complete
@@ -118,8 +127,8 @@ class SelfRoutingParserTest(
     ) -> None:
         parser = SelfRoutingStreamParser()
         spoken = parser.consume(
-            "<route>{invalid}</route>"
             "A usable answer."
+            "<route>{invalid}</route>"
         )
 
         self.assertEqual(
@@ -140,7 +149,145 @@ class SelfRoutingParserTest(
             parser.consume("Hello there."),
             "Hello there.",
         )
+        self.assertEqual(parser.finish(), "")
         self.assertIsNone(parser.route)
+        self.assertEqual(
+            parser.validation_error,
+            (
+                "The response ended without a "
+                "self-routing footer."
+            ),
+        )
+
+    def test_ignored_turn_contains_only_footer(
+        self,
+    ) -> None:
+        route = {
+            "route_type": "noise",
+            "is_relevant": False,
+            "candidate_subjects": [],
+            "should_update_subject": False,
+            "proposed_action": None,
+            "confidence": 0.99,
+            "reason": "The input was noise.",
+        }
+
+        parser = SelfRoutingStreamParser()
+
+        spoken = parser.consume(
+            "<route>"
+            + json.dumps(route)
+            + "</route>"
+        )
+
+        self.assertEqual(spoken, "")
+        self.assertIsNotNone(parser.route)
+        self.assertFalse(parser.route.is_relevant)
+
+    def test_text_after_footer_is_not_released(
+        self,
+    ) -> None:
+        parser = SelfRoutingStreamParser()
+
+        spoken = parser.consume(
+            "Answer."
+            "<route>"
+            + VALID_ROUTE_JSON
+            + "</route>"
+            "This must not be spoken."
+        )
+
+        self.assertEqual(spoken, "Answer.")
+        self.assertIsNotNone(
+            parser.validation_error
+        )
+
+    def test_whitespace_after_footer_is_ignored(
+        self,
+    ) -> None:
+        parser = SelfRoutingStreamParser()
+
+        parser.consume(
+            "Answer.<route>"
+            + VALID_ROUTE_JSON
+            + "</route>"
+        )
+
+        self.assertEqual(parser.consume("\n"), "")
+        self.assertIsNone(parser.validation_error)
+
+    def test_partial_footer_at_stream_end_is_not_released(
+        self,
+    ) -> None:
+        parser = SelfRoutingStreamParser()
+
+        self.assertEqual(
+            parser.consume("Answer.<rou"),
+            "Answer.",
+        )
+        self.assertEqual(parser.finish(), "")
+        self.assertEqual(
+            parser.validation_error,
+            (
+                "The self-routing footer was not "
+                "closed."
+            ),
+        )
+
+    def test_cancel_discards_partial_footer_without_error(
+        self,
+    ) -> None:
+        parser = SelfRoutingStreamParser()
+
+        self.assertEqual(
+            parser.consume("Partial answer.<rou"),
+            "Partial answer.",
+        )
+
+        parser.cancel()
+
+        self.assertIsNone(parser.route)
+        self.assertIsNone(parser.validation_error)
+        self.assertFalse(parser.route_just_completed)
+
+    def test_old_redundant_fields_are_rejected(
+        self,
+    ) -> None:
+        route = {
+            "route_type": "response_request",
+            "is_relevant": True,
+            "should_ignore": False,
+            "retrieval_available": True,
+            "retrieval_used": True,
+            "candidate_subject_reference": (
+                "painting:581"
+            ),
+            "candidate_subjects": [
+                "The Arab Tent",
+            ],
+            "should_update_subject": True,
+            "proposed_action": None,
+            "confidence": 0.98,
+            "reason": "Old schema.",
+        }
+
+        parser = SelfRoutingStreamParser()
+
+        spoken = parser.consume(
+            "A usable answer."
+            "<route>"
+            + json.dumps(route)
+            + "</route>"
+        )
+
+        self.assertEqual(
+            spoken,
+            "A usable answer.",
+        )
+        self.assertIsNone(parser.route)
+        self.assertIsNotNone(
+            parser.validation_error
+        )
 
 
 class CandidateSubjectTest(
@@ -211,6 +358,7 @@ class CandidateSubjectTest(
         "docent.services.docent_query_service."
         "route_utterance"
     )
+
     def test_resolver_never_calls_classifier(
         self,
         route_utterance,
@@ -236,16 +384,169 @@ class CandidateSubjectTest(
             ]
         )
 
+    def test_multiple_candidate_subjects_are_parsed(
+        self,
+    ) -> None:
+        route = {
+            "route_type": "response_request",
+            "is_relevant": True,
+            "candidate_subjects": [
+                "The Swing",
+                "The Arab Tent",
+            ],
+            "should_update_subject": False,
+            "proposed_action": None,
+            "confidence": 0.97,
+            "reason": (
+                "The user requested a comparison "
+                "between two paintings."
+            ),
+        }
+
+        parser = SelfRoutingStreamParser()
+
+        spoken = parser.consume(
+            "The two paintings differ considerably."
+            "<route>"
+            + json.dumps(route)
+            + "</route>"
+        )
+
+        self.assertEqual(
+            spoken,
+            "The two paintings differ considerably.",
+        )
+        self.assertIsNotNone(parser.route)
+        self.assertEqual(
+            parser.route.candidate_subjects,
+            [
+                "The Swing",
+                "The Arab Tent",
+            ],
+        )
+
+    def test_empty_candidate_subjects_are_valid(
+        self,
+    ) -> None:
+        route = {
+            "route_type": "response_request",
+            "is_relevant": True,
+            "candidate_subjects": [],
+            "should_update_subject": False,
+            "proposed_action": None,
+            "confidence": 0.94,
+            "reason": (
+                "The utterance is a greeting "
+                "with no specific subject."
+            ),
+        }
+
+        parser = SelfRoutingStreamParser()
+
+        parser.consume(
+            "Hello."
+            "<route>"
+            + json.dumps(route)
+            + "</route>"
+        )
+
+        self.assertIsNotNone(parser.route)
+        self.assertEqual(
+            parser.route.candidate_subjects,
+            [],
+        )
+
 
 class SelfRoutingQueryEngineTest(
     unittest.TestCase
 ):
+    def test_non_streaming_footer_is_removed(
+        self,
+    ) -> None:
+        engine = QueryEngine(
+            subject_resolver=resolve_context,
+            prompt_builder=build_prompt,
+            response_generator=(
+                lambda _prompt, _conversation_id: (
+                    "A usable answer."
+                    "<route>"
+                    + VALID_ROUTE_JSON
+                    + "</route>"
+                )
+            ),
+            self_routing_enabled=True,
+        )
+
+        result = engine.generate_response(
+            text="Question",
+            include_debug=True,
+        )
+
+        self.assertEqual(
+            result.response,
+            "A usable answer.",
+        )
+        self.assertTrue(
+            result.debug.debug_payload[
+                "self_routing_valid"
+            ]
+        )
+        self.assertTrue(
+            result.debug.debug_payload[
+                "self_routing_consistent"
+            ]
+        )
+
+    def test_non_streaming_irrelevant_text_records_error(
+        self,
+    ) -> None:
+        route = {
+            "route_type": "noise",
+            "is_relevant": False,
+            "candidate_subjects": [],
+            "should_update_subject": False,
+            "proposed_action": None,
+            "confidence": 0.99,
+            "reason": "The input was noise.",
+        }
+        engine = QueryEngine(
+            subject_resolver=resolve_context,
+            prompt_builder=build_prompt,
+            response_generator=(
+                lambda _prompt, _conversation_id: (
+                    "Sorry?"
+                    "<route>"
+                    + json.dumps(route)
+                    + "</route>"
+                )
+            ),
+            self_routing_enabled=True,
+        )
+
+        result = engine.generate_response(
+            text="[background noise]",
+            include_debug=True,
+        )
+
+        self.assertEqual(result.response, "Sorry?")
+        self.assertFalse(
+            result.debug.debug_payload[
+                "self_routing_consistent"
+            ]
+        )
+        self.assertIn(
+            "declaring is_relevant=false",
+            result.debug.debug_payload[
+                "self_routing_validation_error"
+            ],
+        )
+
     @patch(
         "conversation_core.services."
         "query_service."
         "stream_tool_aware_llm_response"
     )
-    def test_metadata_precedes_spoken_text(
+    def test_spoken_text_precedes_footer_metadata(
         self,
         stream_response,
     ) -> None:
@@ -256,22 +557,21 @@ class SelfRoutingQueryEngineTest(
                 ),
                 LLMStreamEvent(
                     event_type="content_delta",
+                    text="The Arab Tent ",
+                ),
+                LLMStreamEvent(
+                    event_type="content_delta",
                     text=(
-                        "<route>"
-                        + VALID_ROUTE_JSON[:80]
+                        "is richly decorated.\n<rou"
                     ),
                 ),
                 LLMStreamEvent(
                     event_type="content_delta",
                     text=(
-                        VALID_ROUTE_JSON[80:]
+                        "te>"
+                        + VALID_ROUTE_JSON
                         + "</route>"
-                        + "The Arab Tent "
                     ),
-                ),
-                LLMStreamEvent(
-                    event_type="content_delta",
-                    text="is richly decorated.",
                 ),
                 LLMStreamEvent(
                     event_type="response_complete",
@@ -306,9 +606,9 @@ class SelfRoutingQueryEngineTest(
             ],
             [
                 "response_started",
+                "content_delta",
+                "content_delta",
                 "self_routing",
-                "content_delta",
-                "content_delta",
                 "response_complete",
             ],
         )
@@ -327,7 +627,7 @@ class SelfRoutingQueryEngineTest(
         self.assertIsNotNone(
             result.debug.debug_payload[
                 "timings"
-            ]["self_routing_seconds"]
+            ]["self_routing_footer_seconds"]
         )
 
         history = (
@@ -387,13 +687,162 @@ class SelfRoutingQueryEngineTest(
                 "self_routing_valid"
             ]
         )
+        self.assertEqual(
+            result.debug.debug_payload[
+                "self_routing_validation_error"
+            ],
+            (
+                "The response ended without a "
+                "self-routing footer."
+            ),
+        )
 
     @patch(
         "conversation_core.services."
         "query_service."
         "stream_tool_aware_llm_response"
     )
-    def test_tool_events_follow_metadata(
+    def test_irrelevant_route_with_spoken_text_is_inconsistent(
+        self,
+        stream_response,
+    ) -> None:
+        irrelevant_route = {
+            "route_type": "noise",
+            "is_relevant": False,
+            "candidate_subjects": [],
+            "should_update_subject": False,
+            "proposed_action": None,
+            "confidence": 0.99,
+            "reason": "The input was noise.",
+        }
+        stream_response.return_value = iter(
+            [
+                LLMStreamEvent(
+                    event_type="response_started",
+                ),
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text=(
+                        "Sorry?"
+                        "<route>"
+                        + json.dumps(
+                            irrelevant_route
+                        )
+                        + "</route>"
+                    ),
+                ),
+                LLMStreamEvent(
+                    event_type="response_complete",
+                    text="raw response",
+                    done=True,
+                ),
+            ]
+        )
+        engine = QueryEngine(
+            subject_resolver=resolve_context,
+            prompt_builder=build_prompt,
+            self_routing_enabled=True,
+        )
+
+        result = engine.generate_streaming_response(
+            text="[background noise]",
+            include_debug=True,
+        )
+
+        self.assertEqual(result.response, "Sorry?")
+        self.assertFalse(
+            result.debug.debug_payload[
+                "self_routing_consistent"
+            ]
+        )
+
+    @patch(
+        "conversation_core.services."
+        "query_service."
+        "stream_tool_aware_llm_response"
+    )
+    def test_cancelled_stream_does_not_require_footer(
+        self,
+        stream_response,
+    ) -> None:
+        stream_response.return_value = iter(
+            [
+                LLMStreamEvent(
+                    event_type="response_started",
+                ),
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text="Partial answer.<rou",
+                ),
+                LLMStreamEvent(
+                    event_type="response_cancelled",
+                    done=True,
+                ),
+                # A defensive regression case: nothing after
+                # cancellation should trigger normal finalisation.
+                LLMStreamEvent(
+                    event_type="response_complete",
+                    text="raw response",
+                    done=True,
+                ),
+            ]
+        )
+        events = []
+        engine = QueryEngine(
+            subject_resolver=resolve_context,
+            prompt_builder=build_prompt,
+            self_routing_enabled=True,
+        )
+
+        result = engine.generate_streaming_response(
+            text="Interrupted question",
+            include_debug=True,
+            on_stream_event=events.append,
+        )
+
+        self.assertEqual(
+            result.response,
+            "Partial answer.",
+        )
+        self.assertIsNone(
+            result.debug.debug_payload[
+                "self_routing_validation_error"
+            ]
+        )
+        self.assertFalse(
+            result.debug.debug_payload[
+                "self_routing_valid"
+            ]
+        )
+        self.assertNotIn(
+            "self_routing",
+            [event.event_type for event in events],
+        )
+        self.assertEqual(
+            [
+                event.event_type
+                for event in events
+                if event.event_type != "timing"
+            ],
+            [
+                "response_started",
+                "content_delta",
+                "response_cancelled",
+            ],
+        )
+
+        history = get_recent_conversation_history(
+            result.conversation_id
+        )
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0].role, "user")
+
+    @patch(
+        "conversation_core.services."
+        "query_service."
+        "stream_tool_aware_llm_response"
+    )
+    def test_tool_events_are_not_deferred(
         self,
         stream_response,
     ) -> None:
@@ -425,9 +874,10 @@ class SelfRoutingQueryEngineTest(
                 LLMStreamEvent(
                     event_type="content_delta",
                     text=(
+                        "Tour started."
                         "<route>"
                         + VALID_ROUTE_JSON
-                        + "</route>Tour started."
+                        + "</route>"
                     ),
                 ),
                 LLMStreamEvent(
@@ -457,10 +907,10 @@ class SelfRoutingQueryEngineTest(
             ],
             [
                 "response_started",
-                "self_routing",
                 "tool_call",
                 "tool_result",
                 "content_delta",
+                "self_routing",
                 "response_complete",
             ],
         )
