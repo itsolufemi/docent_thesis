@@ -144,40 +144,6 @@ def close_bounded_branch(
 
     return state
 
-def add_subject_to_branch(
-    conversation_id: str,
-    branch_id: str,
-    subject: ConversationSubject,
-    subject_group: str,
-) -> ConversationState | None:
-    state = get_conversation(conversation_id)
-
-    if state is None:
-        return None
-
-    branch = state.conversation_tree.branches.get(branch_id)
-
-    if branch is None:
-        return None
-
-    subject_lists = {
-        "previous": branch.previous_subjects,
-        "current": branch.current_subjects,
-        "remaining": branch.remaining_subjects,
-    }
-
-    target_list = subject_lists.get(subject_group)
-
-    if target_list is None:
-        return None
-
-    if subject not in target_list:
-        target_list.append(subject)
-
-    conversations[conversation_id] = state
-
-    return state
-
 def get_branch(
     conversation_id: str,
     branch_id: str,
