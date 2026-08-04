@@ -23,11 +23,15 @@ from conversation_core.memory.conversation_store import (  # noqa: E402
 from conversation_core.schemas.llm_stream_schemas import (  # noqa: E402
     LLMStreamEvent,
 )
+from conversation_core.schemas.conversation_schemas import (  # noqa: E402
+    DialogueTurn,
+)
 from conversation_core.schemas.query_schemas import (  # noqa: E402
     ResolvedContext,
 )
 from conversation_core.services.query_service import (  # noqa: E402
     QueryEngine,
+    derive_retrieved_subject_state,
 )
 from conversation_core.services.self_routing_parser import (  # noqa: E402
     SelfRoutingStreamParser,
@@ -64,6 +68,15 @@ def resolve_context(
             "vector_retrieved_chunks"
         ),
         subject_reference=subject_reference,
+        prompt_payload={
+            "candidate_subjects": [
+                {
+                    "reference": "painting:581",
+                    "label": "The Arab Tent",
+                    "score": 0.92,
+                }
+            ],
+        },
         debug_payload={
             "self_routing_context_resolver": (
                 True
@@ -460,6 +473,182 @@ class CandidateSubjectTest(
 class SelfRoutingQueryEngineTest(
     unittest.TestCase
 ):
+    def test_non_streaming_stores_retrieved_subject_state(
+        self,
+    ) -> None:
+        engine = QueryEngine(
+            subject_resolver=resolve_context,
+            prompt_builder=build_prompt,
+            response_generator=(
+                lambda _prompt, _conversation_id: (
+                    "The Arab Tent is an "
+                    "orientalist painting."
+                    "<route>"
+                    + VALID_ROUTE_JSON
+                    + "</route>"
+                )
+            ),
+            self_routing_enabled=True,
+        )
+
+        result = engine.generate_response(
+            text="Tell me about The Arab Tent.",
+        )
+
+        history = get_recent_conversation_history(
+            result.conversation_id
+        )
+
+        self.assertEqual(len(history), 2)
+
+        for turn in history:
+            self.assertIsNone(
+                turn.previous_subject
+            )
+            self.assertEqual(
+                turn.current_subject,
+                "The Arab Tent",
+            )
+            self.assertEqual(
+                turn.current_subject_reference,
+                "painting:581",
+            )
+
+    def test_retrieved_subject_records_previous_subject(
+        self,
+    ) -> None:
+        first_engine = QueryEngine(
+            subject_resolver=resolve_context,
+            prompt_builder=build_prompt,
+            response_generator=(
+                lambda _prompt, _conversation_id: (
+                    "First answer."
+                    "<route>"
+                    + VALID_ROUTE_JSON
+                    + "</route>"
+                )
+            ),
+            self_routing_enabled=True,
+        )
+
+        first_result = first_engine.generate_response(
+            text="Tell me about The Arab Tent.",
+        )
+
+        second_route = {
+            **VALID_ROUTE,
+            "candidate_subjects": [
+                "The Laughing Cavalier"
+            ],
+        }
+
+        def second_resolver(
+            subject_reference,
+            user_input,
+            utterance_route=None,
+        ):
+            return ResolvedContext(
+                context_source=(
+                    "vector_retrieved_chunks"
+                ),
+                prompt_payload={
+                    "candidate_subjects": [
+                        {
+                            "reference": (
+                                "painting:84"
+                            ),
+                            "label": (
+                                "The Laughing Cavalier"
+                            ),
+                            "score": 0.95,
+                        }
+                    ],
+                },
+            )
+
+        second_engine = QueryEngine(
+            subject_resolver=second_resolver,
+            prompt_builder=build_prompt,
+            response_generator=(
+                lambda _prompt, _conversation_id: (
+                    "Second answer."
+                    "<route>"
+                    + json.dumps(second_route)
+                    + "</route>"
+                )
+            ),
+            self_routing_enabled=True,
+        )
+
+        second_engine.generate_response(
+            text=(
+                "Now tell me about "
+                "The Laughing Cavalier."
+            ),
+            conversation_id=(
+                first_result.conversation_id
+            ),
+        )
+
+        history = get_recent_conversation_history(
+            first_result.conversation_id
+        )
+
+        user_turn = history[-2]
+        assistant_turn = history[-1]
+
+        for turn in (
+            user_turn,
+            assistant_turn,
+        ):
+            self.assertEqual(
+                turn.previous_subject,
+                "The Arab Tent",
+            )
+            self.assertEqual(
+                turn.current_subject,
+                "The Laughing Cavalier",
+            )
+            self.assertEqual(
+                turn.current_subject_reference,
+                "painting:84",
+            )
+
+    def test_no_retrieved_subject_retains_existing_state(
+        self,
+    ) -> None:
+        dialogue_history = [
+            DialogueTurn(
+                role="assistant",
+                content="Previous answer.",
+                current_subject="The Arab Tent",
+                current_subject_reference=(
+                    "painting:581"
+                ),
+            )
+        ]
+
+        resolved_context = ResolvedContext(
+            context_source="no_external_context",
+            prompt_payload={
+                "candidate_subjects": [],
+            },
+        )
+
+        state = derive_retrieved_subject_state(
+            dialogue_history,
+            resolved_context,
+        )
+
+        self.assertEqual(
+            state,
+            (
+                "The Arab Tent",
+                "The Arab Tent",
+                "painting:581",
+            ),
+        )
+
     def test_non_streaming_footer_is_removed(
         self,
     ) -> None:
@@ -678,6 +867,18 @@ class SelfRoutingQueryEngineTest(
             "<route>",
             history[-1].content,
         )
+        for turn in history:
+            self.assertIsNone(
+                turn.previous_subject
+            )
+            self.assertEqual(
+                turn.current_subject,
+                "The Arab Tent",
+            )
+            self.assertEqual(
+                turn.current_subject_reference,
+                "painting:581",
+            )
 
     @patch(
         "conversation_core.services."

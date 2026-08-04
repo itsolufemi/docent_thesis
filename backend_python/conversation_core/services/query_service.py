@@ -129,6 +129,90 @@ def self_routing_response_generator(
     return "".join(response_parts).strip()
 
 
+def get_latest_subject_state(
+    dialogue_history: list[DialogueTurn],
+) -> tuple[
+    str | None,
+    str | None,
+]:
+    """
+    Return the latest stored current subject and its reference.
+    """
+    for turn in reversed(dialogue_history):
+        if turn.current_subject is not None:
+            return (
+                turn.current_subject,
+                turn.current_subject_reference,
+            )
+
+    return None, None
+
+
+def derive_retrieved_subject_state(
+    dialogue_history: list[DialogueTurn],
+    resolved_context: ResolvedContext,
+) -> tuple[
+    str | None,
+    str | None,
+    str | None,
+]:
+    """
+    Create the subject snapshot for the current exchange.
+
+    Retrieval has already happened. This function merely stores the
+    highest-ranked retrieved subject. When retrieval identifies no
+    subject, the existing subject state is retained.
+    """
+    previous_subject, previous_reference = (
+        get_latest_subject_state(
+            dialogue_history
+        )
+    )
+
+    candidate_subjects = (
+        resolved_context.prompt_payload.get(
+            "candidate_subjects",
+            [],
+        )
+    )
+
+    if candidate_subjects:
+        primary_candidate = candidate_subjects[0]
+
+        current_subject = primary_candidate.get(
+            "label"
+        )
+        current_subject_reference = (
+            primary_candidate.get(
+                "reference"
+            )
+        )
+
+        if not isinstance(
+            current_subject,
+            str,
+        ):
+            current_subject = previous_subject
+
+        if not isinstance(
+            current_subject_reference,
+            str,
+        ):
+            current_subject_reference = None
+
+        return (
+            previous_subject,
+            current_subject,
+            current_subject_reference,
+        )
+
+    return (
+        previous_subject,
+        previous_subject,
+        previous_reference,
+    )
+
+
 class QueryEngine:
     def __init__(
         self,
@@ -311,6 +395,15 @@ class QueryEngine:
             perf_counter() - context_resolution_started_at
         )
 
+        (
+            previous_subject,
+            current_subject,
+            current_subject_reference,
+        ) = derive_retrieved_subject_state(
+            dialogue_history=dialogue_history,
+            resolved_context=resolved_context,
+        )
+
         prompt = self.prompt_builder(
             text,
             dialogue_history,
@@ -373,6 +466,11 @@ class QueryEngine:
                 conversation_id=conversation_state.conversation_id,
                 role="user",
                 content=text,
+                previous_subject=previous_subject,
+                current_subject=current_subject,
+                current_subject_reference=(
+                    current_subject_reference
+                ),
             )
 
             if response:
@@ -382,6 +480,11 @@ class QueryEngine:
                     ),
                     role="assistant",
                     content=response,
+                    previous_subject=previous_subject,
+                    current_subject=current_subject,
+                    current_subject_reference=(
+                        current_subject_reference
+                    ),
                 )
         
         total_request_seconds = (
@@ -552,6 +655,15 @@ class QueryEngine:
             - context_resolution_started_at
         )
 
+        (
+            previous_subject,
+            current_subject,
+            current_subject_reference,
+        ) = derive_retrieved_subject_state(
+            dialogue_history=dialogue_history,
+            resolved_context=resolved_context,
+        )
+
         emit_timing(
             "context_resolution_seconds",
             context_resolution_seconds,
@@ -584,6 +696,11 @@ class QueryEngine:
                 ),
                 role="user",
                 content=text,
+                previous_subject=previous_subject,
+                current_subject=current_subject,
+                current_subject_reference=(
+                    current_subject_reference
+                ),
             )
 
         response_generation_started_at = perf_counter()
@@ -885,6 +1002,11 @@ class QueryEngine:
                     ),
                     role="assistant",
                     content=response,
+                    previous_subject=previous_subject,
+                    current_subject=current_subject,
+                    current_subject_reference=(
+                        current_subject_reference
+                    ),
                 )
 
         total_request_seconds = (
