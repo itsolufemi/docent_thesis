@@ -243,10 +243,14 @@ async def process_streamed_turn_event(
         def handle_stream_event(
             event: LLMStreamEvent,
         ) -> None:
-            event_loop.call_soon_threadsafe(
-                stream_queue.put_nowait,
-                event,
+            queued_event = (
+                asyncio.run_coroutine_threadsafe(
+                    stream_queue.put(event),
+                    event_loop,
+                )
             )
+
+            queued_event.result()
 
         async def run_query():
             try:
@@ -363,29 +367,29 @@ async def process_streamed_turn_event(
                     }
                 )
 
-                append_telemetry_log(
-                    conversation_id=conversation_id,
-                    request_id=request_id,
-                    event_type="backend_turn_cancelled",
-                    payload={
-                        "utterance": finalised_utterance,
-                        "turn_evaluation": (
-                            turn_result.model_dump(
-                                mode="json"
-                            )
-                        ),
-                        "utterance_route": (
-                            utterance_route.model_dump(
-                                mode="json"
-                            )
-                            if utterance_route is not None
-                            else None
-                        ),
-                        "stream_timings": (
-                            query_timing_events
-                        ),
-                    },
-                )
+            append_telemetry_log(
+                conversation_id=conversation_id,
+                request_id=request_id,
+                event_type="backend_turn_cancelled",
+                payload={
+                    "utterance": finalised_utterance,
+                    "turn_evaluation": (
+                        turn_result.model_dump(
+                            mode="json"
+                        )
+                    ),
+                    "utterance_route": (
+                        utterance_route.model_dump(
+                            mode="json"
+                        )
+                        if utterance_route is not None
+                        else None
+                    ),
+                    "stream_timings": (
+                        query_timing_events
+                    ),
+                },
+            )
 
             return
 

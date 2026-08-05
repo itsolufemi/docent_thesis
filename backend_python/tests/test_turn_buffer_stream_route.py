@@ -388,6 +388,503 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
             "turn_error",
         )
 
+    @patch(
+        "conversation_core.api."
+        "routes_turn_buffer_stream."
+        "append_telemetry_log"
+    )
+    @patch(
+        "conversation_core.api."
+        "routes_turn_buffer_stream."
+        "process_turn_event"
+    )
+    def test_completed_turn_writes_backend_telemetry(
+        self,
+        process_turn_event,
+        append_telemetry_log,
+    ) -> None:
+        process_turn_event.return_value = (
+            TurnBufferResult(
+                state=TurnBufferState(
+                    conversation_id=(
+                        "conversation-complete"
+                    ),
+                    transcript=(
+                        "Tell me about The Swing."
+                    ),
+                    is_finalised=True,
+                ),
+                decision="finalise_turn",
+                should_finalise_turn=True,
+                finalised_utterance=(
+                    "Tell me about The Swing."
+                ),
+                reason="Turn complete.",
+            )
+        )
+
+        route = UtteranceRoute(
+            route_type="response_request",
+            floor_intent="take_floor",
+            requires_retrieval=True,
+            is_relevant=True,
+            should_ignore=False,
+            confidence=0.95,
+            reason="Complete request.",
+        )
+
+        query_engine = Mock()
+
+        def generate_streaming_response(
+            *,
+            on_stream_event,
+            **_,
+        ):
+            on_stream_event(
+                LLMStreamEvent(
+                    event_type="timing",
+                    timing_name=(
+                        "context_resolution_seconds"
+                    ),
+                    timing_seconds=0.15,
+                    timing_payload={
+                        "context_source": (
+                            "vector_retrieved_chunks"
+                        ),
+                        "source_count": 2,
+                    },
+                )
+            )
+
+            on_stream_event(
+                LLMStreamEvent(
+                    event_type="response_started",
+                )
+            )
+
+            on_stream_event(
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text="The Swing is ",
+                )
+            )
+
+            on_stream_event(
+                LLMStreamEvent(
+                    event_type=(
+                        "response_complete"
+                    ),
+                    text=(
+                        "The Swing is by "
+                        "Jean-Honoré Fragonard."
+                    ),
+                    done=True,
+                )
+            )
+
+            return QueryResult(
+                request=(
+                    "Tell me about The Swing."
+                ),
+                response=(
+                    "The Swing is by "
+                    "Jean-Honoré Fragonard."
+                ),
+                conversation_id=(
+                    "conversation-complete"
+                ),
+            )
+
+        query_engine.generate_streaming_response.side_effect = (
+            generate_streaming_response
+        )
+
+        app = FastAPI()
+        app.include_router(
+            create_turn_buffer_stream_router(
+                query_engine=query_engine,
+                utterance_classifier=Mock(
+                    return_value=route,
+                ),
+            )
+        )
+
+        with TestClient(app) as client:
+            with client.websocket_connect(
+                (
+                    "/api/conversation/"
+                    "turn-buffer/stream"
+                )
+            ) as websocket:
+                ready = (
+                    websocket.receive_json()
+                )
+
+                conversation_id = (
+                    ready["payload"][
+                        "conversation_id"
+                    ]
+                )
+
+                websocket.send_json(
+                    {
+                        "type": "turn_event",
+                        "request_id": (
+                            "request-complete"
+                        ),
+                        "payload": {
+                            "partial_utterance": (
+                                "Tell me about "
+                                "The Swing."
+                            ),
+                            "is_speech_active": (
+                                False
+                            ),
+                            "silence_duration_ms": (
+                                600
+                            ),
+                            "debug": True,
+                        },
+                    }
+                )
+
+                message_type = None
+
+                while (
+                    message_type
+                    != "query_complete"
+                ):
+                    message = (
+                        websocket.receive_json()
+                    )
+                    message_type = (
+                        message["type"]
+                    )
+
+        append_telemetry_log.assert_called_once()
+
+        call = (
+            append_telemetry_log.call_args
+        )
+
+        self.assertEqual(
+            call.kwargs["conversation_id"],
+            conversation_id,
+        )
+        self.assertEqual(
+            call.kwargs["request_id"],
+            "request-complete",
+        )
+        self.assertEqual(
+            call.kwargs["event_type"],
+            "backend_turn_complete",
+        )
+
+        payload = call.kwargs["payload"]
+
+        self.assertEqual(
+            payload["utterance"],
+            "Tell me about The Swing.",
+        )
+        self.assertEqual(
+            payload["utterance_route"][
+                "route_type"
+            ],
+            "response_request",
+        )
+        self.assertEqual(
+            len(payload["stream_timings"]),
+            1,
+        )
+        self.assertEqual(
+            payload["stream_timings"][0][
+                "name"
+            ],
+            "context_resolution_seconds",
+        )
+        self.assertEqual(
+            payload["query_result"][
+                "response"
+            ],
+            (
+                "The Swing is by "
+                "Jean-Honoré Fragonard."
+            ),
+        )
+
+    @patch(
+        "conversation_core.api."
+        "routes_turn_buffer_stream."
+        "append_telemetry_log"
+    )
+    @patch(
+        "conversation_core.api."
+        "routes_turn_buffer_stream."
+        "process_turn_event"
+    )
+    def test_cancelled_turn_writes_cancellation_telemetry(
+        self,
+        process_turn_event,
+        append_telemetry_log,
+    ) -> None:
+        process_turn_event.return_value = (
+            TurnBufferResult(
+                state=TurnBufferState(
+                    conversation_id=(
+                        "conversation-cancelled"
+                    ),
+                    transcript="Tell me more.",
+                    is_finalised=True,
+                ),
+                decision="finalise_turn",
+                should_finalise_turn=True,
+                finalised_utterance=(
+                    "Tell me more."
+                ),
+                reason="Turn complete.",
+            )
+        )
+
+        route = UtteranceRoute(
+            route_type="response_request",
+            floor_intent="take_floor",
+            requires_retrieval=False,
+            is_relevant=True,
+            should_ignore=False,
+            confidence=0.9,
+            reason="Complete request.",
+        )
+
+        query_engine = Mock()
+
+        def generate_until_cancelled(
+            *,
+            on_stream_event,
+            cancellation_token,
+            **_,
+        ):
+            on_stream_event(
+                LLMStreamEvent(
+                    event_type="response_started",
+                )
+            )
+
+            on_stream_event(
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text="Partial response.",
+                )
+            )
+
+            while (
+                not cancellation_token
+                .is_cancelled
+            ):
+                time.sleep(0.005)
+
+            on_stream_event(
+                LLMStreamEvent(
+                    event_type=(
+                        "response_cancelled"
+                    ),
+                    done=True,
+                )
+            )
+
+            return QueryResult(
+                request="Tell me more.",
+                response="Partial response.",
+                conversation_id=(
+                    "conversation-cancelled"
+                ),
+            )
+
+        query_engine.generate_streaming_response.side_effect = (
+            generate_until_cancelled
+        )
+
+        app = FastAPI()
+        app.include_router(
+            create_turn_buffer_stream_router(
+                query_engine=query_engine,
+                utterance_classifier=Mock(
+                    return_value=route,
+                ),
+            )
+        )
+
+        with TestClient(app) as client:
+            with client.websocket_connect(
+                (
+                    "/api/conversation/"
+                    "turn-buffer/stream"
+                )
+            ) as websocket:
+                ready = (
+                    websocket.receive_json()
+                )
+
+                conversation_id = (
+                    ready["payload"][
+                        "conversation_id"
+                    ]
+                )
+
+                websocket.send_json(
+                    {
+                        "type": "turn_event",
+                        "request_id": (
+                            "request-cancelled"
+                        ),
+                        "payload": {
+                            "partial_utterance": (
+                                "Tell me more."
+                            ),
+                            "is_speech_active": (
+                                False
+                            ),
+                            "silence_duration_ms": (
+                                600
+                            ),
+                        },
+                    }
+                )
+
+                while True:
+                    message = (
+                        websocket.receive_json()
+                    )
+
+                    if (
+                        message["type"]
+                        == "response_delta"
+                    ):
+                        break
+
+                websocket.send_json(
+                    {
+                        "type": "cancel_turn",
+                        "request_id": (
+                            "request-cancelled"
+                        ),
+                    }
+                )
+
+                cancelled_message = (
+                    websocket.receive_json()
+                )
+
+        self.assertEqual(
+            cancelled_message["type"],
+            "turn_cancelled",
+        )
+
+        append_telemetry_log.assert_called_once()
+
+        call = (
+            append_telemetry_log.call_args
+        )
+
+        self.assertEqual(
+            call.kwargs["conversation_id"],
+            conversation_id,
+        )
+        self.assertEqual(
+            call.kwargs["request_id"],
+            "request-cancelled",
+        )
+        self.assertEqual(
+            call.kwargs["event_type"],
+            "backend_turn_cancelled",
+        )
+        self.assertEqual(
+            call.kwargs["payload"][
+                "utterance"
+            ],
+            "Tell me more.",
+        )
+
+    @patch(
+        "conversation_core.api."
+        "routes_turn_buffer_stream."
+        "append_telemetry_log"
+    )
+    def test_client_telemetry_message_is_written(
+        self,
+        append_telemetry_log,
+    ) -> None:
+        app = FastAPI()
+        app.include_router(
+            create_turn_buffer_stream_router()
+        )
+
+        telemetry_payload = {
+            "voicePipelineFirstAudio": {
+                "queryToFirstAudioSeconds": (
+                    1.3268
+                ),
+            },
+            "voicePipelinePlayback": {
+                "queryToPlaybackSeconds": (
+                    1.3364
+                ),
+            },
+            "bufferUnderrunCount": 0,
+        }
+
+        with TestClient(app) as client:
+            with client.websocket_connect(
+                (
+                    "/api/conversation/"
+                    "turn-buffer/stream"
+                )
+            ) as websocket:
+                ready = (
+                    websocket.receive_json()
+                )
+
+                conversation_id = (
+                    ready["payload"][
+                        "conversation_id"
+                    ]
+                )
+
+                websocket.send_json(
+                    {
+                        "type": (
+                            "client_telemetry"
+                        ),
+                        "request_id": (
+                            "request-client"
+                        ),
+                        "payload": (
+                            telemetry_payload
+                        ),
+                    }
+                )
+
+                response = (
+                    websocket.receive_json()
+                )
+
+        self.assertEqual(
+            response["type"],
+            "client_telemetry_recorded",
+        )
+        self.assertEqual(
+            response["request_id"],
+            "request-client",
+        )
+
+        append_telemetry_log.assert_called_once_with(
+            conversation_id=conversation_id,
+            request_id="request-client",
+            event_type=(
+                "client_voice_telemetry"
+            ),
+            payload=telemetry_payload,
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

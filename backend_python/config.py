@@ -194,10 +194,13 @@ class Settings():
         True
     )
 
-    conversation_log_directory: str = os.getenv(
-        "CONVERSATION_LOG_DIRECTORY",
-        "runtime_logs/conversations"
-    )
+    conversation_log_directory: Path = (
+        backend_root
+        / os.getenv(
+            "CONVERSATION_LOG_DIRECTORY",
+            "runtime_logs/conversations",
+        )
+    ).resolve()
 
     class Config:
         env_file = ".env"

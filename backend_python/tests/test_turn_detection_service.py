@@ -10,6 +10,7 @@ if str(BACKEND_PYTHON_ROOT) not in sys.path:
 
 from conversation_core.schemas.trp_schemas import TRPPrediction
 from conversation_core.services.turn_detection_service import (
+    FORCED_FINALISATION_SILENCE_MS,
     detect_turn_completion,
 )
 
@@ -106,7 +107,9 @@ class TurnDetectionServiceTest(unittest.TestCase):
         result = detect_turn_completion(
             partial_utterance="I think that the painting is",
             is_speech_active=False,
-            silence_duration_ms=2000,
+            silence_duration_ms=(
+                FORCED_FINALISATION_SILENCE_MS
+            ),
         )
 
         self.assertEqual(result.decision, "finalise_turn")

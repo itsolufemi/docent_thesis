@@ -13,6 +13,9 @@ import { calculateRemainingSilenceMs } from '../audio/vadMath';
 import {
   extractSpeakableSentences,
 } from '../audio/sentenceBuffer';
+import {
+  sendCompletedVoiceTelemetry,
+} from '../audio/voiceTelemetry';
 
 const FORCED_FINALISATION_SILENCE_MS = 3000;
 const INITIAL_VAD_SILENCE_MS = 500;
@@ -1864,6 +1867,18 @@ export default function MainApplication() {
       activeProgressiveResponseRef.current =
         null;
 
+      const timing =
+        responseTimingsRef.current.get(
+          completedRequestId,
+        );
+
+      sendCompletedVoiceTelemetry({
+        client:
+          turnStreamClientRef.current,
+        requestId: completedRequestId,
+        timing,
+      });
+
       responseTimingsRef.current.delete(
         completedRequestId,
       );
@@ -3019,43 +3034,6 @@ export default function MainApplication() {
       },
     );
   };
-
-  const sendCompletedVoiceTelemetry = (
-      requestId,
-    ) => {
-      const timing =
-        responseTimingsRef.current.get(
-          requestId,
-        );
-
-      if (!timing) {
-        return;
-      }
-
-      turnStreamClientRef.current
-        ?.sendClientTelemetry(
-          requestId,
-          {
-            llmFirstDelta:
-              timing.firstDeltaPayload,
-
-            voicePipelineFirstAudio:
-              timing.firstAudioPayload,
-
-            voicePipelinePlayback:
-              timing.playbackPayload,
-
-            ttsGenerations:
-              timing.ttsGenerations,
-
-            bufferUnderrunCount:
-              timing.bufferUnderrunCount,
-
-            queryComplete:
-              timing.queryCompletePayload,
-          },
-        );
-    };
 
   return (
     <div className="application">

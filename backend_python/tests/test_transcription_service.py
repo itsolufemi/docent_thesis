@@ -158,6 +158,8 @@ class TranscriptionServiceTest(unittest.TestCase):
             beam_size=1,
             condition_on_previous_text=False,
             vad_filter=False,
+            no_speech_threshold=0.8,
+            log_prob_threshold=-0.6,
         )
 
     def test_missing_audio_file_is_rejected_before_model_load(self) -> None:

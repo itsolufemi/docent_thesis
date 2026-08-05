@@ -14,6 +14,9 @@ from conversation_core.schemas.turn_buffer_schemas import TurnBufferEvent
 from conversation_core.schemas.turn_detection_schemas import (
     TurnDetectionResult,
 )
+from conversation_core.services.turn_detection_service import (
+    FORCED_FINALISATION_SILENCE_MS,
+)
 from conversation_core.services.turn_buffer_service import process_turn_event
 
 
@@ -197,7 +200,9 @@ class TurnBufferServiceTest(unittest.TestCase):
                 conversation_id=conversation_id,
                 partial_utterance="I think that the painting is",
                 is_speech_active=False,
-                silence_duration_ms=2000,
+                silence_duration_ms=(
+                    FORCED_FINALISATION_SILENCE_MS
+                ),
             )
         )
 

@@ -54,32 +54,40 @@ def _conversation_directory(
         settings.conversation_log_directory
     )
 
-    directory = root / safe_id
-    directory.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    return directory
+    return root / safe_id
 
 
 def _append_text(
     path: Path,
     content: str,
-) -> None:
+) -> bool:
     if not (
         settings.conversation_logging_enabled
     ):
-        return
+        return False
 
-    with _file_lock:
-        with path.open(
-            "a",
-            encoding="utf-8",
-            newline="\n",
-        ) as file:
-            file.write(content)
-            file.flush()
+    try:
+        with _file_lock:
+            path.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            with path.open(
+                "a",
+                encoding="utf-8",
+                newline="\n",
+            ) as file:
+                file.write(content)
+                file.flush()
+
+        return True
+    except OSError as error:
+        print(
+            f"Conversation logging failed for "
+            f"{path}: {error}"
+        )
+        return False
 
 
 def append_dialogue_turn_log(
@@ -90,6 +98,11 @@ def append_dialogue_turn_log(
     """
     Append one human-readable dialogue turn.
     """
+    if not (
+        settings.conversation_logging_enabled
+    ):
+        return
+
     directory = _conversation_directory(
         conversation_id
     )
@@ -152,6 +165,11 @@ def append_telemetry_log(
     The file remains a .txt file, but each event is formatted JSON so
     that it is both readable and machine-parseable.
     """
+    if not (
+        settings.conversation_logging_enabled
+    ):
+        return
+
     directory = _conversation_directory(
         conversation_id
     )

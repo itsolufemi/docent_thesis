@@ -22,6 +22,7 @@ class FakeStreamingTtsService:
     default_voice_name = "museum-guide"
     default_language_code = "en-GB"
     sample_rate = 24_000
+    recommended_prebuffer_ms = 120
 
     def __init__(self) -> None:
         self.requests = []
@@ -42,6 +43,8 @@ class FakeStreamingTtsService:
 
 
 class BlockingTtsService(FakeStreamingTtsService):
+    recommended_prebuffer_ms = 120
+
     def __init__(self) -> None:
         super().__init__()
         self.release = threading.Event()
