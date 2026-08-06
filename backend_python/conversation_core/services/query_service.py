@@ -4,6 +4,7 @@ from time import perf_counter
 
 from conversation_core.memory.conversation_store import (
     add_dialogue_turn,
+    complete_dialogue_turn,
     create_conversation,
     get_conversation,
     get_conversation_introduction,
@@ -59,8 +60,8 @@ def get_latest_subjects(
     dialogue_history: list[DialogueTurn],
 ) -> list[str]:
     for turn in reversed(dialogue_history):
-        if turn.subjects:
-            return list(turn.subjects)
+        if turn.subject:
+            return list(turn.subject)
 
     return []
 
@@ -93,6 +94,30 @@ def get_resolved_subjects(
         subjects.append(value)
 
     return subjects
+
+
+def get_resolved_references(
+    resolved_context: ResolvedContext,
+) -> list[str]:
+    references: list[str] = []
+    seen: set[str] = set()
+
+    for source in resolved_context.sources:
+        reference = source.reference
+
+        if not isinstance(reference, str):
+            continue
+
+        value = reference.strip()
+        normalised = value.casefold()
+
+        if not value or normalised in seen:
+            continue
+
+        seen.add(normalised)
+        references.append(value)
+
+    return references
 
 
 class QueryEngine:
@@ -165,8 +190,7 @@ class QueryEngine:
             if definition.store_as_dialogue_turn:
                 add_dialogue_turn(
                     conversation_id=conversation_id,
-                    role="assistant",
-                    content=response,
+                    assistant=response,
                 )
 
             set_conversation_introduction(
@@ -213,6 +237,35 @@ class QueryEngine:
             dialogue_history,
         )
 
+    def _create_exchange(
+        self,
+        *,
+        conversation_id: str,
+        dialogue_history: list[DialogueTurn],
+        text: str,
+        resolved_context: ResolvedContext,
+    ) -> DialogueTurn:
+        exchange = add_dialogue_turn(
+            conversation_id=conversation_id,
+            user=text,
+            previous_subject=get_latest_subjects(
+                dialogue_history
+            ),
+            subject=get_resolved_subjects(
+                resolved_context
+            ),
+            reference=get_resolved_references(
+                resolved_context
+            ),
+        )
+
+        if exchange is None:
+            raise RuntimeError(
+                "Could not create dialogue exchange."
+            )
+
+        return exchange
+
     def generate_response(
         self,
         text: str,
@@ -223,7 +276,7 @@ class QueryEngine:
     ) -> QueryResult:
         request_started_at = perf_counter()
         (
-            conversation_state,
+            _conversation_state,
             conversation_id,
             conversation_created,
             dialogue_history,
@@ -240,17 +293,17 @@ class QueryEngine:
         )
 
         subjects = get_resolved_subjects(resolved_context)
+        references = get_resolved_references(resolved_context)
         prompt = self.prompt_builder(
             text,
             dialogue_history,
             resolved_context,
         )
-
-        add_dialogue_turn(
+        exchange = self._create_exchange(
             conversation_id=conversation_id,
-            role="user",
-            content=text,
-            subjects=subjects,
+            dialogue_history=dialogue_history,
+            text=text,
+            resolved_context=resolved_context,
         )
 
         response_generation_started_at = perf_counter()
@@ -263,11 +316,10 @@ class QueryEngine:
         )
 
         if response:
-            add_dialogue_turn(
-                conversation_id=conversation_id,
-                role="assistant",
-                content=response,
-                subjects=subjects,
+            complete_dialogue_turn(
+                conversation_id,
+                exchange,
+                assistant=response,
             )
 
         total_request_seconds = (
@@ -276,7 +328,9 @@ class QueryEngine:
         debug_payload = {
             **resolved_context.debug_payload,
             "conversation_created": conversation_created,
+            "previous_subject": exchange.previous_subject,
             "subjects": subjects,
+            "references": references,
             "timings": {
                 "total_request_seconds": round(
                     total_request_seconds,
@@ -354,7 +408,7 @@ class QueryEngine:
 
         preparation_started_at = perf_counter()
         (
-            conversation_state,
+            _conversation_state,
             conversation_id,
             conversation_created,
             dialogue_history,
@@ -374,6 +428,7 @@ class QueryEngine:
             perf_counter() - context_resolution_started_at
         )
         subjects = get_resolved_subjects(resolved_context)
+        references = get_resolved_references(resolved_context)
 
         emit_timing(
             "context_resolution_seconds",
@@ -381,6 +436,7 @@ class QueryEngine:
             context_source=resolved_context.context_source,
             source_count=len(resolved_context.sources),
             subjects=subjects,
+            references=references,
         )
 
         context_resolution = (
@@ -412,11 +468,11 @@ class QueryEngine:
             dialogue_turns=len(dialogue_history),
         )
 
-        add_dialogue_turn(
+        exchange = self._create_exchange(
             conversation_id=conversation_id,
-            role="user",
-            content=text,
-            subjects=subjects,
+            dialogue_history=dialogue_history,
+            text=text,
+            resolved_context=resolved_context,
         )
 
         response_generation_started_at = perf_counter()
@@ -479,11 +535,10 @@ class QueryEngine:
         )
 
         if not response_cancelled and response:
-            add_dialogue_turn(
-                conversation_id=conversation_id,
-                role="assistant",
-                content=response,
-                subjects=subjects,
+            complete_dialogue_turn(
+                conversation_id,
+                exchange,
+                assistant=response,
             )
 
         total_request_seconds = (
@@ -492,7 +547,9 @@ class QueryEngine:
         debug_payload = {
             **resolved_context.debug_payload,
             "conversation_created": conversation_created,
+            "previous_subject": exchange.previous_subject,
             "subjects": subjects,
+            "references": references,
             "timings": {
                 "total_request_seconds": round(
                     total_request_seconds,
