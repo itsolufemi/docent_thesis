@@ -18,9 +18,9 @@ from conversation_core.schemas.query_schemas import QueryResult, ResolvedContext
 from conversation_core.schemas.utterance_route_schemas import UtteranceRoute
 from conversation_core.services.cancellation import CancellationToken
 from conversation_core.services.introduction_service import IntroductionProvider
-from conversation_core.services.llm_service import (
-    generate_llm_response,
-    stream_tool_aware_llm_response,
+from conversation_core.services.llm_service import generate_llm_response
+from conversation_core.services.plain_llm_stream_service import (
+    stream_llm_response,
 )
 from conversation_core.services.prompt_service import build_prompt
 
@@ -43,8 +43,16 @@ PromptBuilder = Callable[
     [str, list[DialogueTurn], ResolvedContext],
     str,
 ]
+ResponseGenerator = Callable[[str, str | None], str]
 LLMStreamCallback = Callable[[LLMStreamEvent], None]
 IntroductionResponseGenerator = Callable[[str], str]
+
+
+def default_response_generator(
+    prompt: str,
+    conversation_id: str | None,
+) -> str:
+    return generate_llm_response(prompt)
 
 
 def get_latest_subjects(
@@ -92,6 +100,7 @@ class QueryEngine:
         self,
         subject_resolver: SubjectResolver,
         prompt_builder: PromptBuilder,
+        response_generator: ResponseGenerator | None = None,
         self_routing_enabled: bool = False,
         introduction_provider: IntroductionProvider | None = None,
         introduction_response_generator: (
@@ -100,6 +109,9 @@ class QueryEngine:
     ):
         self.subject_resolver = subject_resolver
         self.prompt_builder = prompt_builder
+        self.response_generator = (
+            response_generator or default_response_generator
+        )
         self.self_routing_enabled = self_routing_enabled
         self.introduction_provider = introduction_provider
         self.introduction_response_generator = (
@@ -242,7 +254,10 @@ class QueryEngine:
         )
 
         response_generation_started_at = perf_counter()
-        response = generate_llm_response(prompt)
+        response = self.response_generator(
+            prompt,
+            conversation_id,
+        )
         response_generation_seconds = (
             perf_counter() - response_generation_started_at
         )
@@ -426,10 +441,8 @@ class QueryEngine:
                     )
                 )
         else:
-            for stream_event in stream_tool_aware_llm_response(
+            for stream_event in stream_llm_response(
                 prompt=prompt,
-                conversation_id=conversation_id,
-                buffer_for_tool_decision=False,
                 cancellation_token=cancellation_token,
             ):
                 if stream_event.event_type == "content_delta":
