@@ -2,7 +2,6 @@ from uuid import uuid4
 
 from conversation_core.schemas.conversation_schemas import (
     ConversationState,
-    DialogueRole,
     DialogueTurn,
 )
 from conversation_core.services.conversation_log_service import (
@@ -35,39 +34,60 @@ def get_conversation(
 
 def add_dialogue_turn(
     conversation_id: str,
-    role: DialogueRole,
-    content: str,
-    subjects: list[str] | None = None,
-    previous_subject: str | None = None,
-    current_subject: str | None = None,
-    current_subject_reference: str | None = None,
-) -> ConversationState | None:
+    *,
+    user: str | None = None,
+    assistant: str | None = None,
+    previous_subject: list[str] | None = None,
+    subject: list[str] | None = None,
+    reference: list[str] | None = None,
+) -> DialogueTurn | None:
+    """Append one complete or pending user-assistant exchange."""
     state = get_conversation(conversation_id)
 
     if state is None:
         return None
 
     turn = DialogueTurn(
-        role=role,
-        content=content,
-        subjects=subjects or [],
-        previous_subject=previous_subject,
-        current_subject=current_subject,
-        current_subject_reference=(
-            current_subject_reference
-        ),
+        previous_subject=previous_subject or [],
+        subject=subject or [],
+        reference=reference or [],
+        user=user,
+        assistant=assistant,
     )
 
     state.dialogue_history.append(turn)
+    conversations[conversation_id] = state
+
+    if assistant is not None or user is None:
+        append_dialogue_turn_log(
+            conversation_id=conversation_id,
+            turn=turn,
+        )
+
+    return turn
+
+
+def complete_dialogue_turn(
+    conversation_id: str,
+    turn: DialogueTurn,
+    *,
+    assistant: str,
+) -> DialogueTurn | None:
+    """Complete an exchange that was added before response generation."""
+    state = get_conversation(conversation_id)
+
+    if state is None or turn not in state.dialogue_history:
+        return None
+
+    turn.assistant = assistant
+    conversations[conversation_id] = state
 
     append_dialogue_turn_log(
         conversation_id=conversation_id,
         turn=turn,
     )
 
-    conversations[conversation_id] = state
-
-    return state
+    return turn
 
 
 def get_recent_conversation_history(
