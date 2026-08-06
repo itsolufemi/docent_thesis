@@ -15,6 +15,9 @@ from conversation_core.memory.conversation_store import (  # noqa: E402
 from conversation_core.schemas.query_schemas import (  # noqa: E402
     ResolvedContext,
 )
+from conversation_core.schemas.source_schemas import (  # noqa: E402
+    QuerySource,
+)
 from conversation_core.services.query_service import (  # noqa: E402
     QueryEngine,
 )
@@ -25,9 +28,11 @@ class FakeResolver:
         self,
         *,
         subjects: list[str] | None = None,
+        references: list[str] | None = None,
         context_source: str = "no_external_context",
     ) -> None:
         self.subjects = subjects or []
+        self.references = references or []
         self.context_source = context_source
         self.calls: list[tuple[list, str, object]] = []
 
@@ -46,27 +51,25 @@ class FakeResolver:
         )
         return ResolvedContext(
             context_source=self.context_source,
+            sources=[
+                QuerySource(
+                    source_type="retrieved_chunk",
+                    reference=reference,
+                )
+                for reference in self.references
+            ],
             prompt_payload={
                 "subjects": list(self.subjects),
                 "context_resolution": {
                     "is_relevant": True,
                     "route_type": "response_request",
                     "requires_retrieval": bool(
-                        self.subjects
+                        self.references
                     ),
                     "subjects": list(self.subjects),
                 },
             },
-            debug_payload={
-                "context_resolution": {
-                    "is_relevant": True,
-                    "route_type": "response_request",
-                    "requires_retrieval": bool(
-                        self.subjects
-                    ),
-                    "subjects": list(self.subjects),
-                }
-            },
+            debug_payload={},
         )
 
 
@@ -108,22 +111,24 @@ def setup_function() -> None:
     conversations.clear()
 
 
-def test_generate_response_uses_context_resolver_and_stores_subject_list():
+def test_generate_response_stores_one_complete_exchange():
     resolver = FakeResolver(
         subjects=[
             "The Arab Tent",
             "The Rising of the Sun",
         ],
+        references=[
+            "painting:581",
+            "painting:119",
+        ],
         context_source="subject_vector_retrieval",
-    )
-    prompt_builder = FakePromptBuilder()
-    response_generator = FakeResponseGenerator(
-        "They differ in subject and treatment."
     )
     engine = QueryEngine(
         subject_resolver=resolver,
-        prompt_builder=prompt_builder,
-        response_generator=response_generator,
+        prompt_builder=FakePromptBuilder(),
+        response_generator=FakeResponseGenerator(
+            "They differ in subject and treatment."
+        ),
     )
 
     result = engine.generate_response(
@@ -134,43 +139,42 @@ def test_generate_response_uses_context_resolver_and_stores_subject_list():
         include_debug=True,
     )
 
-    assert result.response == (
-        "They differ in subject and treatment."
-    )
-    assert result.subject_reference is None
-    assert len(resolver.calls) == 1
-    assert resolver.calls[0][0] == []
-    assert resolver.calls[0][1] == (
-        "Compare The Arab Tent and "
-        "The Rising of the Sun."
-    )
-
     history = get_recent_conversation_history(
         conversation_id=result.conversation_id,
     )
-    assert [turn.role for turn in history] == [
-        "user",
-        "assistant",
-    ]
-    assert history[0].subjects == [
+    assert len(history) == 1
+
+    exchange = history[0]
+    assert exchange.previous_subject == []
+    assert exchange.subject == [
         "The Arab Tent",
         "The Rising of the Sun",
     ]
-    assert history[1].subjects == [
-        "The Arab Tent",
-        "The Rising of the Sun",
+    assert exchange.reference == [
+        "painting:581",
+        "painting:119",
     ]
+    assert exchange.user == (
+        "Compare The Arab Tent and "
+        "The Rising of the Sun."
+    )
+    assert exchange.assistant == (
+        "They differ in subject and treatment."
+    )
 
     assert result.debug is not None
-    assert result.debug.retrieval_used is True
-    assert result.debug.debug_payload["subjects"] == [
-        "The Arab Tent",
-        "The Rising of the Sun",
+    assert result.debug.debug_payload["references"] == [
+        "painting:581",
+        "painting:119",
     ]
 
 
-def test_follow_up_passes_existing_dialogue_to_context_resolver():
-    resolver = FakeResolver(subjects=["The Arab Tent"])
+def test_follow_up_uses_prior_subject_as_previous_subject():
+    resolver = FakeResolver(
+        subjects=["The Arab Tent"],
+        references=["painting:581"],
+        context_source="subject_vector_retrieval",
+    )
     engine = QueryEngine(
         subject_resolver=resolver,
         prompt_builder=FakePromptBuilder(),
@@ -185,22 +189,28 @@ def test_follow_up_passes_existing_dialogue_to_context_resolver():
         conversation_id=first.conversation_id,
     )
 
-    assert len(resolver.calls) == 2
-    second_history = resolver.calls[1][0]
-    assert [turn.content for turn in second_history] == [
-        "Tell me about The Arab Tent.",
-        "response",
-    ]
-    assert all(
-        turn.subjects == ["The Arab Tent"]
-        for turn in second_history
+    history = get_recent_conversation_history(
+        conversation_id=first.conversation_id,
     )
+    assert len(history) == 2
+    assert history[0].previous_subject == []
+    assert history[0].subject == ["The Arab Tent"]
+    assert history[1].previous_subject == [
+        "The Arab Tent"
+    ]
+    assert history[1].subject == ["The Arab Tent"]
+
+    second_resolver_history = resolver.calls[1][0]
+    assert len(second_resolver_history) == 1
+    assert second_resolver_history[0].user == (
+        "Tell me about The Arab Tent."
+    )
+    assert second_resolver_history[0].assistant == "response"
 
 
-def test_empty_subject_list_is_stored_without_singular_subject_state():
-    resolver = FakeResolver(subjects=[])
+def test_empty_subjects_and_references_are_valid():
     engine = QueryEngine(
-        subject_resolver=resolver,
+        subject_resolver=FakeResolver(),
         prompt_builder=FakePromptBuilder(),
         response_generator=FakeResponseGenerator("Hello."),
     )
@@ -213,11 +223,12 @@ def test_empty_subject_list_is_stored_without_singular_subject_state():
     history = get_recent_conversation_history(
         conversation_id=result.conversation_id,
     )
-    assert len(history) == 2
-    assert history[0].subjects == []
-    assert history[1].subjects == []
-    assert history[0].current_subject is None
-    assert history[0].current_subject_reference is None
+    assert len(history) == 1
+    assert history[0].previous_subject == []
+    assert history[0].subject == []
+    assert history[0].reference == []
+    assert history[0].user == "Hello"
+    assert history[0].assistant == "Hello."
 
     assert result.debug is not None
     assert result.debug.retrieval_used is False
