@@ -173,7 +173,7 @@ class ContextResolutionParsingTest(unittest.TestCase):
 
         prompt = generate_response.call_args.kwargs["prompt"]
         self.assertIn(
-            "Subject state: subjects=['The Arab Tent']",
+            "Subjects: ['The Arab Tent']",
             prompt,
         )
         self.assertIn(
