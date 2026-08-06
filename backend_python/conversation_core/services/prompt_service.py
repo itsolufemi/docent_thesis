@@ -4,6 +4,7 @@ from conversation_core.schemas.conversation_schemas import (
 
 from conversation_core.schemas.prompt_schemas import PromptProfile, PromptSection
 
+
 def format_dialogue_history_for_prompt(
     dialogue_history: list[DialogueTurn],
     user_label: str = "User",
@@ -26,13 +27,17 @@ def format_dialogue_history_for_prompt(
             f"{speaker}: {turn.content}",
         ]
 
-        if (
+        if turn.subjects:
+            turn_lines.append(
+                f"Subjects: {turn.subjects!r}"
+            )
+        elif (
             turn.previous_subject is not None
             or turn.current_subject is not None
             or turn.current_subject_reference is not None
         ):
             turn_lines.append(
-                "Subject state: "
+                "Legacy subject state: "
                 f"previous={turn.previous_subject!r}; "
                 f"current={turn.current_subject!r}; "
                 "current_reference="
@@ -44,6 +49,7 @@ def format_dialogue_history_for_prompt(
         )
 
     return "\n".join(formatted_turns)
+
 
 def format_prompt_sections(
     sections: list[PromptSection],
@@ -63,6 +69,7 @@ def format_prompt_sections(
         )
 
     return "\n\n".join(blocks)
+
 
 def build_prompt(
     user_input: str,
