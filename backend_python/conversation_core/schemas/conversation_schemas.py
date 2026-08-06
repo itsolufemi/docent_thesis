@@ -1,29 +1,21 @@
-from typing import Literal
-
 from pydantic import BaseModel, Field
 
 
-DialogueRole = Literal[
-    "user",
-    "assistant",
-    "system",
-]
-
-
 class DialogueTurn(BaseModel):
-    role: DialogueRole
-    content: str
+    """One complete user-assistant exchange in conversation history."""
 
-    subjects: list[str] = Field(
+    previous_subject: list[str] = Field(
+        default_factory=list
+    )
+    subject: list[str] = Field(
+        default_factory=list
+    )
+    reference: list[str] = Field(
         default_factory=list
     )
 
-    # Legacy singular fields remain temporarily for compatibility with
-    # inactive query paths. The active context-resolution pipeline writes
-    # only `subjects`.
-    previous_subject: str | None = None
-    current_subject: str | None = None
-    current_subject_reference: str | None = None
+    user: str | None = None
+    assistant: str | None = None
 
 
 class ConversationState(BaseModel):
