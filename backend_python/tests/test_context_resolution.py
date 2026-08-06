@@ -141,15 +141,14 @@ class ContextResolutionParsingTest(unittest.TestCase):
         )
         history = [
             DialogueTurn(
-                role="user",
-                content="Tell me about The Arab Tent.",
-                subjects=["The Arab Tent"],
-            ),
-            DialogueTurn(
-                role="assistant",
-                content="It is a nineteenth-century painting.",
-                subjects=["The Arab Tent"],
-            ),
+                previous_subject=[],
+                subject=["The Arab Tent"],
+                reference=["painting:581"],
+                user="Tell me about The Arab Tent.",
+                assistant=(
+                    "It is a nineteenth-century painting."
+                ),
+            )
         ]
 
         assessment, debug = resolve_context_assessment(
@@ -174,6 +173,14 @@ class ContextResolutionParsingTest(unittest.TestCase):
         prompt = generate_response.call_args.kwargs["prompt"]
         self.assertIn(
             "Subjects: ['The Arab Tent']",
+            prompt,
+        )
+        self.assertIn(
+            "Visitor: Tell me about The Arab Tent.",
+            prompt,
+        )
+        self.assertIn(
+            "Docent: It is a nineteenth-century painting.",
             prompt,
         )
         self.assertIn(
