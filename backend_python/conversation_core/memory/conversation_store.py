@@ -1,163 +1,37 @@
 from uuid import uuid4
 
-from ..schemas.conversation_schemas import (
-    ConversationBranch,
-    ConversationBranchType,
+from conversation_core.schemas.conversation_schemas import (
     ConversationState,
-    ConversationTree,
-    ConversationSubject,
     DialogueRole,
     DialogueTurn,
 )
-
 from conversation_core.services.conversation_log_service import (
     append_dialogue_turn_log,
 )
+
 
 conversations: dict[str, ConversationState] = {}
 
 INTRODUCTION_TEXT_METADATA_KEY = "introduction_text"
 
 
-def generate_branch_name(tree: ConversationTree) -> str:
-    return f"branch-{len(tree.branches) + 1}"
-
-
-def _add_active_branch(
-    tree: ConversationTree,
-    *,
-    branch_type: ConversationBranchType,
-    name: str | None = None,
-    current_subjects: list[ConversationSubject] | None = None,
-    remaining_subjects: list[ConversationSubject] | None = None,
-) -> ConversationBranch:
-    branch = ConversationBranch(
-        name=name or generate_branch_name(tree),
-        branch_type=branch_type,
-        status="active",
-        current_subjects=current_subjects or [],
-        remaining_subjects=remaining_subjects or [],
-    )
-
-    tree.branches[branch.branch_id] = branch
-    tree.active_branch_id = branch.branch_id
-
-    return branch
-
 def create_conversation() -> ConversationState:
     conversation_id = str(uuid4())
 
-    initial_branch = ConversationBranch(
-        name="branch-1",
-        branch_type="open",
-        status="active",
-    )
-
-    conversation_tree = ConversationTree(
-        active_branch_id=initial_branch.branch_id,
-        branches={
-            initial_branch.branch_id: initial_branch,
-        },
-    )
-
     state = ConversationState(
         conversation_id=conversation_id,
-        conversation_tree=conversation_tree,
     )
 
     conversations[conversation_id] = state
 
     return state
 
-def get_conversation(conversation_id:str) -> ConversationState | None:
+
+def get_conversation(
+    conversation_id: str,
+) -> ConversationState | None:
     return conversations.get(conversation_id)
 
-def get_active_branch(
-    conversation_id: str,
-) -> ConversationBranch | None:
-    state = get_conversation(conversation_id)
-
-    if state is None:
-        return None
-
-    tree = state.conversation_tree
-
-    return tree.branches.get(tree.active_branch_id)
-
-def create_conversation_branch(
-    conversation_id: str,
-    branch_type: ConversationBranchType,
-    name: str | None = None,
-    current_subjects: list[ConversationSubject] | None = None,
-    remaining_subjects: list[ConversationSubject] | None = None,
-) -> ConversationState | None:
-    state = get_conversation(conversation_id)
-
-    if state is None:
-        return None
-
-    tree = state.conversation_tree
-    active_branch = tree.branches.get(tree.active_branch_id)
-
-    if active_branch is not None:
-        active_branch.status = "closed"
-
-    _add_active_branch(
-        tree,
-        name=name,
-        branch_type=branch_type,
-        current_subjects=current_subjects or [],
-        remaining_subjects=remaining_subjects or [],
-    )
-
-    conversations[conversation_id] = state
-
-    return state
-
-def close_active_branch(
-    conversation_id: str,
-) -> ConversationState | None:
-    return close_bounded_branch(conversation_id)
-
-
-def close_bounded_branch(
-    conversation_id: str,
-) -> ConversationState | None:
-    state = get_conversation(conversation_id)
-
-    if state is None:
-        return None
-
-    tree = state.conversation_tree
-    active_branch = tree.branches.get(tree.active_branch_id)
-
-    if active_branch is None:
-        return None
-
-    if active_branch.branch_type != "bounded":
-        raise ValueError("The active branch is not bounded.")
-
-    active_branch.status = "closed"
-
-    _add_active_branch(
-        tree,
-        branch_type="open",
-    )
-
-    conversations[conversation_id] = state
-
-    return state
-
-def get_branch(
-    conversation_id: str,
-    branch_id: str,
-) -> ConversationBranch | None:
-    state = get_conversation(conversation_id)
-
-    if state is None:
-        return None
-
-    return state.conversation_tree.branches.get(branch_id)
 
 def add_dialogue_turn(
     conversation_id: str,
@@ -193,6 +67,7 @@ def add_dialogue_turn(
 
     return state
 
+
 def get_recent_conversation_history(
     conversation_id: str,
     limit: int = 6,
@@ -201,7 +76,7 @@ def get_recent_conversation_history(
 
     if state is None:
         return []
-    
+
     return state.dialogue_history[-limit:]
 
 
@@ -236,8 +111,7 @@ def set_conversation_introduction(
     state.metadata[
         INTRODUCTION_TEXT_METADATA_KEY
     ] = text
+
     conversations[conversation_id] = state
 
     return state
-
-

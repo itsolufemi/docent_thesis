@@ -12,12 +12,25 @@ if str(BACKEND_PYTHON_ROOT) not in sys.path:
 from conversation_core.tools.core_tool_registry import (  # noqa: E402
     core_tool_registry,
 )
+from conversation_core.memory.conversation_store import (  # noqa: E402
+    create_conversation,
+)
 from conversation_core.api.routes_conversation import (  # noqa: E402
     router,
 )
 
 
-class ConversationTreeDisconnectionTest(unittest.TestCase):
+class ConversationTreeRemovalTest(unittest.TestCase):
+    def test_conversation_state_contains_no_tree(
+        self,
+    ) -> None:
+        state = create_conversation()
+
+        self.assertNotIn(
+            "conversation_tree",
+            state.model_dump(mode="json"),
+        )
+
     def test_conversation_tree_tools_are_disconnected(
         self,
     ) -> None:

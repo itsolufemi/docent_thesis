@@ -1,0 +1,235 @@
+{
+  "suite_name": "digression_and_resumption_v1",
+  "description": "Tests whether Docent can answer temporary side questions, preserve the prior thread, and resume it without restarting or losing context.",
+  "conversation_mode": "one_fresh_conversation_per_case",
+  "cases": [
+    {
+      "id": "digression_01_simple_return",
+      "description": "Tests a simple side question followed by an explicit return.",
+      "turns": [
+        {
+          "query": "Tell me about The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Was Queen Victoria fond of Landseer?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Anyway, go back to what you were saying about the animals.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_02_resume_specific_point",
+      "description": "Tests whether the model resumes a specific interrupted point rather than restarting the whole artwork description.",
+      "turns": [
+        {
+          "query": "Explain the hierarchy of animals in The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "What other kinds of paintings did Landseer make?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Right, continue from the monkeys.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_03_return_by_reference",
+      "description": "Tests resumption through an indirect reference to the earlier topic.",
+      "turns": [
+        {
+          "query": "Why does The Arab Tent matter?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Where is it displayed in the Wallace Collection?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "What was the connection with status again?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_04_no_full_restart",
+      "description": "Tests whether the model avoids repeating the original introduction after a brief side question.",
+      "turns": [
+        {
+          "query": "Tell me about The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "When was Landseer born?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Go on.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_05_longer_side_exchange",
+      "description": "Tests whether the earlier thread survives several turns of digression.",
+      "turns": [
+        {
+          "query": "Tell me why the animals are arranged that way in The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Was Landseer mainly known for painting animals?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Did Queen Victoria commission him often?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "So was he a fashionable painter?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Anyway, return to the arrangement in this painting.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_06_compare_then_return",
+      "description": "Tests whether a temporary comparison can be followed by a return to the original artwork.",
+      "turns": [
+        {
+          "query": "What is unusual about The Arab Tent?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "How is that different from The Rising of the Sun?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Leave the Boucher aside. What is unusual about The Arab Tent again?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_07_user_abandons_digression",
+      "description": "Tests whether the model follows an explicit instruction to abandon the side question and return.",
+      "turns": [
+        {
+          "query": "Explain the painting's connection with Victorian ideas about the East.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Who was the Prince of Wales at the time?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Actually, never mind that. Continue with the painting.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_08_resume_after_challenge",
+      "description": "Tests whether the model can handle a challenge during a digression and still return coherently.",
+      "turns": [
+        {
+          "query": "Tell me about the social meaning of The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Was Sir Richard Wallace really trying to improve his social position?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "That sounds speculative.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "All right, go back to the painting itself.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_09_resume_without_explicit_keyword",
+      "description": "Tests whether the model recognises a return from content rather than relying only on phrases like go back.",
+      "turns": [
+        {
+          "query": "Explain the strange arrangement of animals in The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Did Landseer paint dogs often?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "And the monkeys being at the top means what?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_10_do_not_resume_when_not_requested",
+      "description": "Tests whether the model avoids forcing the earlier topic back into the conversation when the visitor continues the digression.",
+      "turns": [
+        {
+          "query": "Tell me about The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Was Queen Victoria fond of Landseer?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "What did she like about his work?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_11_resume_concisely",
+      "description": "Tests whether resumption begins from the interrupted point without a long recap.",
+      "turns": [
+        {
+          "query": "Start explaining how the visible details create the painting's meaning.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "How much did Wallace pay for it?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Continue.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "digression_12_explicit_topic_change",
+      "description": "Tests whether the model distinguishes a temporary digression from a genuine permanent topic change.",
+      "turns": [
+        {
+          "query": "Tell me about The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Let us stop talking about this and move on to The Rising of the Sun.",
+          "subject_reference": "painting:118"
+        },
+        {
+          "query": "What is happening in this painting?",
+          "subject_reference": "painting:118"
+        }
+      ]
+    }
+  ]
+}

@@ -8,7 +8,7 @@ from conversation_core.schemas.conversation_schemas import (
     ConversationSubject,
 )
 
-from conversation_core.schemas.conversation_tool_schemas import (
+from conversation_core.schemas.dep_conversation_tool_schemas import (
     CloseActiveBranchArguments,
     CreateConversationBranchArguments,
     ToolSubjectInput,

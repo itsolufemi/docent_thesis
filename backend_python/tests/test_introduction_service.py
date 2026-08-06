@@ -19,7 +19,6 @@ from conversation_core.api.routes_conversation import (
 from conversation_core.memory.conversation_store import (
     conversations,
     create_conversation,
-    get_active_branch,
 )
 from conversation_core.schemas.introduction_schemas import (
     IntroductionDefinition,
@@ -178,21 +177,27 @@ class IntroductionServiceTest(unittest.TestCase):
         )
         generator.assert_called_once()
 
-    def test_introduction_does_not_change_subjects_or_add_route(
+    def test_introduction_has_no_subject_state_or_route(
         self,
     ) -> None:
         state = create_conversation()
         engine = self.build_engine()
-        branch = get_active_branch(
-            state.conversation_id
-        )
 
         result = engine.generate_introduction(
             conversation_id=state.conversation_id
         )
 
-        self.assertIsNotNone(branch)
-        self.assertEqual(branch.current_subjects, [])
+        introduction_turn = state.dialogue_history[0]
+
+        self.assertIsNone(
+            introduction_turn.previous_subject
+        )
+        self.assertIsNone(
+            introduction_turn.current_subject
+        )
+        self.assertIsNone(
+            introduction_turn.current_subject_reference
+        )
         self.assertNotIn("<route>", result)
 
     def test_docent_definition_identifies_docent_without_route(

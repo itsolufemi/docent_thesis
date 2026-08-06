@@ -1,0 +1,151 @@
+{
+  "suite_name": "repair_and_explanatory_adaptation_v1",
+  "description": "Tests whether Docent recognises failures of understanding, corrections, and dissatisfaction, then changes its explanatory strategy rather than repeating the original response.",
+  "conversation_mode": "one_fresh_conversation_per_case",
+  "cases": [
+    {
+      "id": "repair_01_unknown_term",
+      "description": "Tests repair after the user identifies an unfamiliar term.",
+      "turns": [
+        {
+          "query": "Explain why The Arab Tent matters.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "I do not understand what you mean by Orientalism.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "repair_02_relevance_correction",
+      "description": "Tests whether the model responds to a correction about what needs explaining.",
+      "turns": [
+        {
+          "query": "Explain why The Arab Tent matters.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "No, I understand what Orientalism means. I mean why is it relevant to this particular painting?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "repair_03_repeated_non_understanding",
+      "description": "Tests whether a second signal of confusion produces a genuinely different explanation.",
+      "turns": [
+        {
+          "query": "What is the point of The Arab Tent?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "I do not really understand.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "I still do not get it.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "repair_04_explicit_language_constraint",
+      "description": "Tests whether the model incorporates a user-specified repair constraint.",
+      "turns": [
+        {
+          "query": "Explain the historical importance of The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Explain that again without using the words Orientalism, exoticism, or colonialism.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "repair_05_wrong_focus",
+      "description": "Tests whether the model changes focus after the user says the answer addressed the wrong issue.",
+      "turns": [
+        {
+          "query": "Why does The Arab Tent matter?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "You are telling me why it is historically interesting. I mean why should I care about it as a painting?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "repair_06_factual_correction",
+      "description": "Tests acknowledgement and incorporation of a user correction.",
+      "turns": [
+        {
+          "query": "Tell me what is happening in The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "You said the owner is shown, but the owner is not actually in the painting.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "repair_07_requested_simplification",
+      "description": "Tests adaptation to an explicit request for a simpler level of explanation.",
+      "turns": [
+        {
+          "query": "Explain the visual hierarchy in The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "That sounds too academic. Explain it as though I know nothing about art.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "repair_08_requested_concreteness",
+      "description": "Tests whether the model moves from an abstract explanation to visible evidence.",
+      "turns": [
+        {
+          "query": "What is the main idea behind The Arab Tent?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "That is too abstract. Show me what you mean using something I can actually see in the painting.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "repair_09_challenge_to_interpretation",
+      "description": "Tests whether the model treats disagreement as a request to justify or qualify its interpretation.",
+      "turns": [
+        {
+          "query": "What is Landseer saying through The Arab Tent?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "I am not convinced that the painting is really about status.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "repair_10_reference_repair",
+      "description": "Tests concise repair when the user asks what a prior reference meant.",
+      "turns": [
+        {
+          "query": "Tell me about the people connected with The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Wait, who do you mean by he?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    }
+  ]
+}

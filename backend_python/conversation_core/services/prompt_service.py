@@ -1,6 +1,5 @@
 from conversation_core.schemas.conversation_schemas import (
     DialogueTurn,
-    ConversationBranch,
 )
 
 from conversation_core.schemas.prompt_schemas import PromptProfile, PromptSection
@@ -102,35 +101,3 @@ Recent dialogue:
 
 Respond as {profile.assistant_name}:
 """.strip()
-
-def format_conversation_branch_for_prompt(
-    branch: ConversationBranch | None,
-) -> str:
-    if branch is None:
-        return "No active conversation branch is available."
-
-    previous_labels = [
-        subject.label
-        for subject in branch.previous_subjects
-    ]
-
-    current_labels = [
-        subject.label
-        for subject in branch.current_subjects
-    ]
-
-    remaining_labels = [
-        subject.label
-        for subject in branch.remaining_subjects
-    ]
-
-    return "\n".join(
-        [
-            f"Branch name: {branch.name}",
-            f"Branch type: {branch.branch_type}",
-            f"Branch status: {branch.status}",
-            f"Previous subjects: {previous_labels}",
-            f"Current subjects: {current_labels}",
-            f"Remaining subjects: {remaining_labels}",
-        ]
-    )

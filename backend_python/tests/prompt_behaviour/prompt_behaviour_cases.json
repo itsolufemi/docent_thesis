@@ -1,0 +1,31 @@
+{
+  "suite_name": "implicature_v1",
+  "description": "Tests whether Docent responds to implied conversational meaning.",
+  "cases": [
+    {
+      "id": "implicature_01",
+      "query": "That is a pretty strange collection of animals.",
+      "subject_reference": "painting:581"
+    },
+    {
+      "id": "implicature_02",
+      "query": "One of the monkeys is wearing an earring.",
+      "subject_reference": "painting:581"
+    },
+    {
+      "id": "implicature_03",
+      "query": "That all seems rather excessive.",
+      "subject_reference": "painting:581"
+    },
+    {
+      "id": "implicature_04",
+      "query": "I still do not understand why it matters.",
+      "subject_reference": "painting:581"
+    },
+    {
+      "id": "implicature_05",
+      "query": "Six thousand three hundred pounds is quite a lot for this.",
+      "subject_reference": "painting:581"
+    }
+  ]
+}
