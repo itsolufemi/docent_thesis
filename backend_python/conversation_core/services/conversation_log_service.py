@@ -25,9 +25,6 @@ def _utc_timestamp() -> str:
 def _safe_conversation_id(
     conversation_id: str,
 ) -> str:
-    """
-    Prevent conversation identifiers from becoming arbitrary paths.
-    """
     return "".join(
         character
         for character in conversation_id
@@ -61,9 +58,7 @@ def _append_text(
     path: Path,
     content: str,
 ) -> bool:
-    if not (
-        settings.conversation_logging_enabled
-    ):
+    if not settings.conversation_logging_enabled:
         return False
 
     try:
@@ -95,53 +90,27 @@ def append_dialogue_turn_log(
     conversation_id: str,
     turn: DialogueTurn,
 ) -> None:
-    """
-    Append one human-readable dialogue turn.
-    """
-    if not (
-        settings.conversation_logging_enabled
-    ):
+    """Append one complete user-assistant exchange."""
+    if not settings.conversation_logging_enabled:
         return
 
     directory = _conversation_directory(
         conversation_id
     )
 
-    role = (
-        turn.role.value
-        if hasattr(turn.role, "value")
-        else str(turn.role)
-    )
-
-    subject_lines = [
-        (
-            "Previous subject: "
-            f"{turn.previous_subject or 'None'}"
-        ),
-        (
-            "Current subject: "
-            f"{turn.current_subject or 'None'}"
-        ),
-        (
-            "Subject reference: "
-            f"{turn.current_subject_reference or 'None'}"
-        ),
-    ]
-
     entry = "\n".join(
         [
             "",
-            (
-                "========================================"
-            ),
+            "========================================",
             f"Timestamp: {_utc_timestamp()}",
-            f"Role: {role}",
-            *subject_lines,
-            "Text:",
-            turn.content,
-            (
-                "========================================"
-            ),
+            f"Previous subjects: {turn.previous_subject}",
+            f"Subjects: {turn.subject}",
+            f"References: {turn.reference}",
+            "User:",
+            turn.user or "None",
+            "Assistant:",
+            turn.assistant or "None",
+            "========================================",
             "",
         ]
     )
@@ -159,15 +128,7 @@ def append_telemetry_log(
     event_type: str,
     payload: dict[str, Any],
 ) -> None:
-    """
-    Append one structured telemetry event.
-
-    The file remains a .txt file, but each event is formatted JSON so
-    that it is both readable and machine-parseable.
-    """
-    if not (
-        settings.conversation_logging_enabled
-    ):
+    if not settings.conversation_logging_enabled:
         return
 
     directory = _conversation_directory(
