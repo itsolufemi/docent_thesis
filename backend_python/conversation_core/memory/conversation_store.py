@@ -37,6 +37,7 @@ def add_dialogue_turn(
     conversation_id: str,
     role: DialogueRole,
     content: str,
+    subjects: list[str] | None = None,
     previous_subject: str | None = None,
     current_subject: str | None = None,
     current_subject_reference: str | None = None,
@@ -49,6 +50,7 @@ def add_dialogue_turn(
     turn = DialogueTurn(
         role=role,
         content=content,
+        subjects=subjects or [],
         previous_subject=previous_subject,
         current_subject=current_subject,
         current_subject_reference=(
