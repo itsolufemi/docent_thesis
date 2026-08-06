@@ -126,18 +126,6 @@ def create_conversation_router(
             conversation_id=conversation_id,
         )
 
-    @router.post(
-        "/api/conversations/{conversation_id}/introduction",
-        response_model=IntroductionResponse,
-    )
-    def introduce_conversation(
-        conversation_id: str,
-    ):
-        return _generate_introduction_response(
-            query_engine=active_query_engine,
-            conversation_id=conversation_id,
-        )
-
     return router
 
 
