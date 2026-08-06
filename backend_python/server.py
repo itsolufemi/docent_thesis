@@ -64,7 +64,7 @@ from docent.api.routes_artworks import router as artworks_router
 from docent.api.routes_docent_index import router as docent_index_router
 from docent.api.routes_docent_retrieval import router as docent_retrieval_router
 from docent.services.docent_query_service import (
-    self_routing_docent_query_engine,
+    context_resolved_docent_query_engine,
 )
 from docent.services.docent_vector_retrieval_service import (
     warm_up_docent_retrieval,
@@ -117,14 +117,6 @@ async def run_warm_up(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Warm latency-sensitive application services before FastAPI begins
-    accepting requests.
-
-    Code before `yield` is application startup.
-    Code after `yield` is application shutdown.
-    """
-
     startup_started_at = perf_counter()
     warm_up_operations: list[
         tuple[str, Callable[[], Any]]
@@ -238,25 +230,17 @@ app.add_middleware(
 )
 
 query_router = create_query_router(
-    query_engine=(
-        self_routing_docent_query_engine
-    ),
+    query_engine=context_resolved_docent_query_engine,
 )
 conversation_router = create_conversation_router(
-    query_engine=(
-        self_routing_docent_query_engine
-    ),
+    query_engine=context_resolved_docent_query_engine,
 )
 turn_buffer_router = create_turn_buffer_router(
-    query_engine=(
-        self_routing_docent_query_engine
-    ),
+    query_engine=context_resolved_docent_query_engine,
     utterance_classifier=None,
 )
 turn_buffer_stream_router = create_turn_buffer_stream_router(
-    query_engine=(
-        self_routing_docent_query_engine
-    ),
+    query_engine=context_resolved_docent_query_engine,
     utterance_classifier=None,
 )
 transcription_router = create_transcription_router()
@@ -273,14 +257,11 @@ smart_turn_service = (
 )
 
 audio_stream_router = create_audio_stream_router(
-    transcription_service=(
-        default_transcription_service
-    ),
+    transcription_service=default_transcription_service,
     smart_turn_service=smart_turn_service,
     moonshine_transcription_service=(
         default_moonshine_transcription_service
-        if settings.transcription_backend
-        == "moonshine"
+        if settings.transcription_backend == "moonshine"
         else None
     ),
 )
