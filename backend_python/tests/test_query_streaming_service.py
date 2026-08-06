@@ -117,6 +117,7 @@ class QueryStreamingServiceTest(unittest.TestCase):
                 if event.event_type != "timing"
             ],
             [
+                "self_routing",
                 "response_started",
                 "content_delta",
                 "content_delta",
@@ -192,20 +193,28 @@ class QueryStreamingServiceTest(unittest.TestCase):
             on_stream_event=observed_events.append,
         )
 
-        event_types = [
-            event.event_type
+        non_timing_events = [
+            event
             for event in observed_events
             if event.event_type != "timing"
         ]
-        self.assertEqual(event_types[0], "self_routing")
+
         self.assertEqual(
-            observed_events[0].route_assessment,
+            non_timing_events[0].event_type,
+            "self_routing",
+        )
+        self.assertEqual(
+            non_timing_events[0].route_assessment,
             {
                 "is_relevant": True,
                 "route_type": "response_request",
                 "requires_retrieval": True,
                 "subjects": ["The Arab Tent"],
             },
+        )
+        self.assertEqual(
+            non_timing_events[1].event_type,
+            "response_started",
         )
 
     def test_cancelled_response_stores_only_user_turn_with_subjects(
