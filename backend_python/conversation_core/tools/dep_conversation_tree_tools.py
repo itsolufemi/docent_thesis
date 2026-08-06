@@ -1,3 +1,15 @@
+"""
+DEPRECATED REFERENCE IMPLEMENTATION.
+
+This module belongs to the retired conversation-tree architecture.
+It is intentionally disconnected from the active application and may
+not import successfully because its former state models and store
+operations have been removed.
+
+Restore the associated schemas and conversation-store functions before
+attempting to reactivate this implementation.
+"""
+
 from conversation_core.memory.conversation_store import (
     close_active_branch,
     create_conversation_branch,
