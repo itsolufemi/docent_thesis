@@ -13,42 +13,30 @@ def format_dialogue_history_for_prompt(
     if not dialogue_history:
         return "No previous dialogue."
 
-    formatted_turns = []
+    formatted_turns: list[str] = []
 
     for turn in dialogue_history:
-        if turn.role == "user":
-            speaker = user_label
-        elif turn.role == "assistant":
-            speaker = assistant_label
-        else:
-            speaker = "System"
-
         turn_lines = [
-            f"{speaker}: {turn.content}",
+            f"Previous subjects: {turn.previous_subject!r}",
+            f"Subjects: {turn.subject!r}",
+            f"References: {turn.reference!r}",
         ]
 
-        if turn.subjects:
+        if turn.user is not None:
             turn_lines.append(
-                f"Subjects: {turn.subjects!r}"
+                f"{user_label}: {turn.user}"
             )
-        elif (
-            turn.previous_subject is not None
-            or turn.current_subject is not None
-            or turn.current_subject_reference is not None
-        ):
+
+        if turn.assistant is not None:
             turn_lines.append(
-                "Legacy subject state: "
-                f"previous={turn.previous_subject!r}; "
-                f"current={turn.current_subject!r}; "
-                "current_reference="
-                f"{turn.current_subject_reference!r}"
+                f"{assistant_label}: {turn.assistant}"
             )
 
         formatted_turns.append(
             "\n".join(turn_lines)
         )
 
-    return "\n".join(formatted_turns)
+    return "\n\n".join(formatted_turns)
 
 
 def format_prompt_sections(
