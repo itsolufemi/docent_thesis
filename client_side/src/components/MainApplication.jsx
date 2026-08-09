@@ -1957,71 +1957,58 @@ export default function MainApplication() {
           case 'playback_started': {
             isPlaying.current = true;
 
-            const playbackPayload = {
-              firstAudioToPlaybackSeconds:
-                elapsedSeconds(
-                  responseTiming.firstTtsAudioAt,
-                  responseTiming.firstPlaybackAt,
-                ),
-
-              queryToPlaybackSeconds:
-                elapsedSeconds(
-                  responseTiming.queryStartedAt,
-                  responseTiming.firstPlaybackAt,
-                ),
-
-              bufferedSamples:
-                event.data?.bufferedSamples ??
-                null,
-
-              bufferedMilliseconds:
-                event.data
-                  ?.bufferedMilliseconds ??
-                null,
-            };
-
-            responseTiming.playbackPayload =
-              playbackPayload;
-
             const activeRequestId =
               activeProgressiveResponseRef.current
                 ?.requestId;
 
-            if (activeRequestId) {
-              const responseTiming =
-                responseTimingsRef.current.get(
-                  activeRequestId,
-                );
+            const responseTiming =
+              activeRequestId
+                ? responseTimingsRef.current.get(
+                    activeRequestId,
+                  )
+                : null;
 
-              if (
-                responseTiming &&
-                responseTiming.firstPlaybackAt
-                  === null
-              ) {
-                responseTiming.firstPlaybackAt =
-                  performance.now();
+            if (
+              responseTiming &&
+              responseTiming.firstPlaybackAt ===
+                null
+            ) {
+              responseTiming.firstPlaybackAt =
+                performance.now();
 
-                console.log(
-                  'Voice pipeline playback timing:',
-                  {
-                    requestId: activeRequestId,
-                    firstAudioToPlaybackSeconds:
-                      elapsedSeconds(
-                        responseTiming
-                          .firstTtsAudioAt,
-                        responseTiming
-                          .firstPlaybackAt,
-                      ),
-                    queryToPlaybackSeconds:
-                      elapsedSeconds(
-                        responseTiming
-                          .queryStartedAt,
-                        responseTiming
-                          .firstPlaybackAt,
-                      ),
-                  },
-                );
-              }
+              const playbackPayload = {
+                firstAudioToPlaybackSeconds:
+                  elapsedSeconds(
+                    responseTiming.firstTtsAudioAt,
+                    responseTiming.firstPlaybackAt,
+                  ),
+
+                queryToPlaybackSeconds:
+                  elapsedSeconds(
+                    responseTiming.queryStartedAt,
+                    responseTiming.firstPlaybackAt,
+                  ),
+
+                bufferedSamples:
+                  event.data?.bufferedSamples ??
+                  null,
+
+                bufferedMilliseconds:
+                  event.data
+                    ?.bufferedMilliseconds ??
+                  null,
+              };
+
+              responseTiming.playbackPayload =
+                playbackPayload;
+
+              console.log(
+                'Voice pipeline playback timing:',
+                {
+                  requestId: activeRequestId,
+                  ...playbackPayload,
+                },
+              );
             }
 
             if (
@@ -2258,6 +2245,25 @@ export default function MainApplication() {
                   return;
                 }
 
+                const responseTiming =
+                  responseTimingsRef.current.get(
+                    requestId,
+                  );
+
+                if (
+                  !responseTiming ||
+                  responseTiming.firstTtsAudioAt
+                    !== null
+                ) {
+                  return;
+                }
+
+                responseTiming.firstTtsAudioAt =
+                  performance.now();
+
+                responseTiming.ttsTiming =
+                  ttsTiming;
+
                 const firstAudioPayload = {
                   serverQueryToFirstDeltaSeconds:
                     responseTiming
@@ -2315,68 +2321,6 @@ export default function MainApplication() {
                     ...firstAudioPayload,
                   },
                 );
-
-                const responseTiming =
-                  responseTimingsRef.current.get(
-                    requestId,
-                  );
-
-                if (
-                  !responseTiming ||
-                  responseTiming.firstTtsAudioAt
-                    !== null
-                ) {
-                  return;
-                }
-
-                responseTiming.firstTtsAudioAt =
-                  performance.now();
-
-                responseTiming.ttsTiming =
-                  ttsTiming;
-
-                console.log(
-                  'Voice pipeline first-audio timing:',
-                  {
-                    requestId,
-                    serverQueryToFirstDeltaSeconds:
-                      responseTiming
-                        .serverFirstDeltaSeconds,
-                    queryToFirstDeltaSeconds:
-                      elapsedSeconds(
-                        responseTiming.queryStartedAt,
-                        responseTiming.firstDeltaAt,
-                      ),
-                    firstDeltaToSentenceSeconds:
-                      elapsedSeconds(
-                        responseTiming.firstDeltaAt,
-                        responseTiming
-                          .firstSentenceQueuedAt,
-                      ),
-                    sentenceToTtsRequestSeconds:
-                      elapsedSeconds(
-                        responseTiming
-                          .firstSentenceQueuedAt,
-                        responseTiming
-                          .firstTtsRequestAt,
-                      ),
-                    ttsSocketConnectSeconds:
-                      ttsTiming.connectSeconds,
-                    ttsConnectionReused:
-                      ttsTiming.connectionReused,
-                    ttsRequestToFirstAudioSeconds:
-                      ttsTiming
-                        .requestToFirstAudioSeconds,
-                    serverTtsFirstChunkSeconds:
-                      ttsTiming
-                        .serverRequestToFirstChunkSeconds,
-                    queryToFirstAudioSeconds:
-                      elapsedSeconds(
-                        responseTiming.queryStartedAt,
-                        responseTiming.firstTtsAudioAt,
-                      ),
-                  },
-                );
               },
 
               onAudioChunk: ({
@@ -2415,6 +2359,35 @@ export default function MainApplication() {
                   requestId,
                   ttsClient,
                 );
+
+                if (requestId) {
+                  const timing =
+                    responseTimingsRef.current.get(
+                      requestId,
+                    );
+
+                  if (timing) {
+                    timing.ttsGenerations.push({
+                      synthesisId:
+                        metadata.synthesis_id,
+                      generationSeconds:
+                        metadata
+                          .generation_seconds,
+                      audioDurationSeconds:
+                        metadata
+                          .audio_duration_seconds,
+                      realtimeFactor:
+                        metadata.realtime_factor,
+                      chunkCount:
+                        metadata.chunk_count,
+                      audioBytes:
+                        metadata.audio_bytes,
+                      firstChunkSeconds:
+                        metadata
+                          .first_chunk_seconds,
+                    });
+                  }
+                }
 
                 setLatestTtsMetadata(
                   (current) => ({
@@ -2525,32 +2498,6 @@ export default function MainApplication() {
             ) {
               responseTiming.firstTtsRequestAt =
                 performance.now();
-            }
-          }
-
-          if (requestId) {
-            const timing =
-              responseTimingsRef.current.get(
-                requestId,
-              );
-
-            if (timing) {
-              timing.ttsGenerations.push({
-                synthesisId:
-                  metadata.synthesis_id,
-                generationSeconds:
-                  metadata.generation_seconds,
-                audioDurationSeconds:
-                  metadata.audio_duration_seconds,
-                realtimeFactor:
-                  metadata.realtime_factor,
-                chunkCount:
-                  metadata.chunk_count,
-                audioBytes:
-                  metadata.audio_bytes,
-                firstChunkSeconds:
-                  metadata.first_chunk_seconds,
-              });
             }
           }
 
