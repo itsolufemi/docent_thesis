@@ -120,6 +120,26 @@ def get_resolved_references(
     return references
 
 
+def should_suppress_response(
+    resolved_context: ResolvedContext,
+) -> bool:
+    assessment = resolved_context.prompt_payload.get(
+        "context_resolution",
+        {},
+    )
+
+    if not isinstance(assessment, dict):
+        return False
+
+    if assessment.get("is_relevant") is False:
+        return True
+
+    return assessment.get("route_type") in {
+        "backchannel",
+        "noise",
+    }
+
+
 class QueryEngine:
     def __init__(
         self,
@@ -266,6 +286,70 @@ class QueryEngine:
 
         return exchange
 
+    def _build_suppressed_result(
+        self,
+        *,
+        text: str,
+        conversation_id: str,
+        conversation_created: bool,
+        dialogue_history: list[DialogueTurn],
+        resolved_context: ResolvedContext,
+        subjects: list[str],
+        references: list[str],
+        request_started_at: float,
+        context_resolution_seconds: float,
+        include_debug: bool,
+    ) -> QueryResult:
+        total_request_seconds = (
+            perf_counter() - request_started_at
+        )
+        debug_payload = {
+            **resolved_context.debug_payload,
+            "conversation_created": conversation_created,
+            "previous_subject": get_latest_subjects(
+                dialogue_history
+            ),
+            "subjects": subjects,
+            "references": references,
+            "response_suppressed": True,
+            "timings": {
+                "total_request_seconds": round(
+                    total_request_seconds,
+                    4,
+                ),
+                "context_resolution_seconds": round(
+                    context_resolution_seconds,
+                    4,
+                ),
+                "response_generation_seconds": 0.0,
+                "first_spoken_token_seconds": None,
+            },
+        }
+
+        debug = None
+        if include_debug:
+            debug = QueryDebugInfo(
+                conversation_found=True,
+                subject_reference=None,
+                context_source=resolved_context.context_source,
+                context_used=True,
+                dialogue_turns_used=len(dialogue_history),
+                prompt="",
+                retrieval_used=False,
+                sources_count=0,
+                sources=[],
+                debug_payload=debug_payload,
+            )
+
+        return QueryResult(
+            request=text,
+            response="",
+            conversation_id=conversation_id,
+            subject_reference=None,
+            sources=[],
+            debug=debug,
+        )
+
     def generate_response(
         self,
         text: str,
@@ -294,6 +378,23 @@ class QueryEngine:
 
         subjects = get_resolved_subjects(resolved_context)
         references = get_resolved_references(resolved_context)
+
+        if should_suppress_response(resolved_context):
+            return self._build_suppressed_result(
+                text=text,
+                conversation_id=conversation_id,
+                conversation_created=conversation_created,
+                dialogue_history=dialogue_history,
+                resolved_context=resolved_context,
+                subjects=subjects,
+                references=references,
+                request_started_at=request_started_at,
+                context_resolution_seconds=(
+                    context_resolution_seconds
+                ),
+                include_debug=include_debug,
+            )
+
         prompt = self.prompt_builder(
             text,
             dialogue_history,
@@ -453,6 +554,22 @@ class QueryEngine:
                     event_type="self_routing",
                     route_assessment=context_resolution,
                 )
+            )
+
+        if should_suppress_response(resolved_context):
+            return self._build_suppressed_result(
+                text=text,
+                conversation_id=conversation_id,
+                conversation_created=conversation_created,
+                dialogue_history=dialogue_history,
+                resolved_context=resolved_context,
+                subjects=subjects,
+                references=references,
+                request_started_at=request_started_at,
+                context_resolution_seconds=(
+                    context_resolution_seconds
+                ),
+                include_debug=include_debug,
             )
 
         prompt_started_at = perf_counter()

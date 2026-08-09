@@ -1290,14 +1290,6 @@ export default function MainApplication() {
             requestId,
           )
         ) {
-          activeProgressiveResponseRef.current = {
-            requestId,
-            llmComplete: false,
-            synthesisComplete: false,
-            playbackComplete: true,
-            cancelled: false,
-          };
-
           responseTimingsRef.current.set(
             requestId,
             {

@@ -27,9 +27,13 @@ You resolve conversational context for a museum guide before retrieval.
 Use the current utterance and recent dialogue to return exactly one JSON object
 with these fields:
 
-- is_relevant: true when the utterance contains meaningful conversational input;
-  false only for noise or input that should receive no response.
-- route_type: one of response_request, call_to_action, interruption, or noise.
+- is_relevant: true when the utterance contains meaningful conversational input,
+  including a backchannel; false only for noise or input that should be ignored.
+- route_type: one of response_request, call_to_action, interruption,
+  backchannel, or noise. Use backchannel for brief acknowledgements such as
+  "yeah", "right", "mm-hm", "okay", "I see", or similar signals of continued
+  attention that do not request a response. Use noise only for input that has no
+  meaningful conversational content.
 - requires_retrieval: true only when external artwork information is needed to
   answer the current utterance.
 - subjects: readable names of every subject for which information should be

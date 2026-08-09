@@ -11,6 +11,7 @@ class ContextResolutionAssessment(BaseModel):
         "response_request",
         "call_to_action",
         "interruption",
+        "backchannel",
         "noise",
     ]
     requires_retrieval: bool

@@ -81,6 +81,14 @@ DOCENT_PROMPT_PROFILE = PromptProfile(
                 "attention rather than request a new explanation. Do not respond with "
                 "another full answer unless the visitor has clearly asked for more."
             ),
+            (
+                "When the visitor's utterance appears incomplete, truncated, or only "
+                "partially formed, use the shortest natural repair response possible. "
+                "Prefer brief prompts such as 'Yes?', 'Go ahead', 'Mm-hm?', or "
+                "'What about it?' when appropriate. Do not expand the repair into a "
+                "long clarification question or speculate about what the visitor may "
+                "have intended."
+            ),
         ],
     )
 
