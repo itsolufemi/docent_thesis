@@ -7,7 +7,7 @@ from conversation_core.services.trp_service import (
 
 
 MIN_SEMANTIC_CHECK_SILENCE_MS = 300
-FORCED_FINALISATION_SILENCE_MS = 3000
+FORCED_FINALISATION_SILENCE_MS = 1800
 
 
 def detect_turn_completion(
