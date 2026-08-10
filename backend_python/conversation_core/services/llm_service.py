@@ -87,6 +87,7 @@ def generate_llm_response(
     model: str | None = None,
     timeout: float = 120.0,
     options: dict[str, Any] | None = None,
+    think: bool | None = None,
 ) -> str:
     payload = {
         "model": model or settings.ollama_model,
@@ -94,6 +95,9 @@ def generate_llm_response(
         "stream": False,
         "options": options or {},
     }
+
+    if think is not None:
+        payload["think"] = think
 
     try:
         response = ollama_http_client.post(

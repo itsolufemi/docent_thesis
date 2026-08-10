@@ -120,6 +120,7 @@ JSON:
         options={
             "temperature": 0,
         },
+        think=False,
     )
 
     validation_error: str | None = None
