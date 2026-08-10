@@ -20,9 +20,10 @@ import {
 const FORCED_FINALISATION_SILENCE_MS = 3000;
 const INITIAL_VAD_SILENCE_MS = 500;
 const BARGE_IN_CONFIRMATION_MS = 120;
+const BARGE_IN_PAUSE_MS = 500;
 const ASSISTANT_DUCK_GAIN = 0.08;
 const ASSISTANT_NORMAL_GAIN = 1.0;
-const DUCK_RAMP_SECONDS = 0.05;
+const DUCK_RAMP_SECONDS = 0.06;
 const RESTORE_RAMP_SECONDS = 0.03;
 const INTER_SENTENCE_PAUSE_MS = 400;
 const MIN_PROGRESSIVE_TTS_CHARACTERS = 24;
@@ -150,6 +151,7 @@ export default function MainApplication() {
   const activeTtsStreamIdRef = useRef(null);
   const assistantGainNodeRef = useRef(null);
   const duckingTimerRef = useRef(null);
+  const bargeInPauseTimerRef = useRef(null);
   const assistantIsDuckedRef = useRef(false);
   const assistantPlaybackPausedRef =
     useRef(false);
@@ -335,6 +337,17 @@ export default function MainApplication() {
     duckingTimerRef.current = null;
   };
 
+  const clearBargeInPauseTimer = () => {
+    if (!bargeInPauseTimerRef.current) {
+      return;
+    }
+
+    window.clearTimeout(
+      bargeInPauseTimerRef.current,
+    );
+    bargeInPauseTimerRef.current = null;
+  };
+
   const clearSilenceReevaluationTimer = () => {
     if (silenceReevaluationTimerRef.current) {
       window.clearTimeout(
@@ -364,6 +377,7 @@ export default function MainApplication() {
     clearSilenceReevaluationTimer();
     clearSmartTurnForcedTimer();
     clearDuckingTimer();
+    clearBargeInPauseTimer();
 
     const assistantIsActive =
       assistantAudioStatusRef.current ===
@@ -396,6 +410,26 @@ export default function MainApplication() {
         duckAssistantAudio();
       }, BARGE_IN_CONFIRMATION_MS);
 
+    bargeInPauseTimerRef.current =
+      window.setTimeout(() => {
+        bargeInPauseTimerRef.current = null;
+
+        if (!vadSpeechActiveRef.current) {
+          return;
+        }
+
+        const assistantStillActive =
+          assistantAudioStatusRef.current ===
+            'synthesising' ||
+          assistantAudioStatusRef.current ===
+            'playing';
+
+        if (!assistantStillActive) {
+          return;
+        }
+
+        pauseAssistantAudio();
+      }, BARGE_IN_PAUSE_MS);
   };
 
   const handleVadSpeechEnd = (
@@ -406,7 +440,11 @@ export default function MainApplication() {
       performance.now() -
       Math.max(0, silenceDurationMs);
     clearDuckingTimer();
-    restoreAssistantAudio();
+    clearBargeInPauseTimer();
+
+    if (!assistantPlaybackPausedRef.current) {
+      restoreAssistantAudio();
+    }
   };
 
   const scheduleSmartTurnForcedFinalisation = ({
@@ -510,6 +548,7 @@ export default function MainApplication() {
       clearSilenceReevaluationTimer();
       clearSmartTurnForcedTimer();
       clearDuckingTimer();
+      clearBargeInPauseTimer();
       resumeAssistantAudio();
       restoreAssistantAudio();
     }
@@ -537,6 +576,7 @@ export default function MainApplication() {
       clearSilenceReevaluationTimer();
       clearSmartTurnForcedTimer();
       clearDuckingTimer();
+      clearBargeInPauseTimer();
 
       ttsAbortControllerRef.current?.abort();
 
@@ -1014,6 +1054,7 @@ export default function MainApplication() {
 
   const stopAssistantAudio = () => {
     clearDuckingTimer();
+    clearBargeInPauseTimer();
 
     ttsAbortControllerRef.current?.abort();
     ttsAbortControllerRef.current = null;
@@ -1319,6 +1360,7 @@ export default function MainApplication() {
           routeType === 'backchannel' ||
           routeType === 'noise'
         ) {
+          resumeAssistantAudio();
           restoreAssistantAudio();
           return;
         }
