@@ -115,6 +115,20 @@ class Settings():
         )
     )
 
+    moonshine_save_input_wav_path_raw: str = os.getenv(
+        "MOONSHINE_SAVE_INPUT_WAV_PATH",
+        "",
+    ).strip()
+
+    moonshine_save_input_wav_path: Path | None = (
+        (
+            backend_root
+            / moonshine_save_input_wav_path_raw
+        ).resolve()
+        if moonshine_save_input_wav_path_raw
+        else None
+    )
+
     warm_up_moonshine_on_startup: bool = _read_bool(
         "WARM_UP_MOONSHINE_ON_STARTUP",
         True,

@@ -454,18 +454,33 @@ class MoonshineStreamingTranscriptionService:
                     )
                 )
 
+                options = {
+                    # We do not currently need Moonshine to retain
+                    # another copy of each line's PCM audio.
+                    "return_audio_data": "false",
+                    "identify_speakers": "false",
+                }
+
+                if (
+                    settings.moonshine_save_input_wav_path
+                    is not None
+                ):
+                    settings.moonshine_save_input_wav_path.mkdir(
+                        parents=True,
+                        exist_ok=True,
+                    )
+
+                    options["save_input_wav_path"] = str(
+                        settings.moonshine_save_input_wav_path
+                    )
+
                 self._transcriber = Transcriber(
                     model_path=model_path,
                     model_arch=resolved_arch,
                     update_interval=(
                         self.update_interval
                     ),
-                    options={
-                        # We do not currently need Moonshine to retain
-                        # another copy of each line's PCM audio.
-                        "return_audio_data": "false",
-                        "identify_speakers": "false",
-                    },
+                    options=options,
                 )
 
         return self._transcriber
