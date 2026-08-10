@@ -147,7 +147,7 @@ class Settings():
     ).strip()
     tts_voice: str = os.getenv(
         "TTS_VOICE",
-        "alba",
+        "jane",
     ).strip()
     tts_language_code: str = os.getenv(
         "TTS_LANGUAGE_CODE",

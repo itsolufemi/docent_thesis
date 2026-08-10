@@ -24,7 +24,13 @@ const ASSISTANT_DUCK_GAIN = 0.08;
 const ASSISTANT_NORMAL_GAIN = 1.0;
 const DUCK_RAMP_SECONDS = 0.05;
 const RESTORE_RAMP_SECONDS = 0.03;
+const INTER_SENTENCE_PAUSE_MS = 400;
 const MIN_PROGRESSIVE_TTS_CHARACTERS = 24;
+
+const wait = (milliseconds) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
 
 function shouldSpeakSentence(
   sentence,
@@ -2677,6 +2683,16 @@ export default function MainApplication() {
               requestId,
             },
           );
+
+          if (
+            !isProgressiveResponseCancelled(
+              requestId,
+            )
+          ) {
+            await wait(
+              INTER_SENTENCE_PAUSE_MS,
+            );
+          }
 
           if (
             isProgressiveResponseCancelled(
