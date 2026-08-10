@@ -32,7 +32,7 @@ with these fields:
 - route_type: one of response_request, call_to_action, interruption,
   backchannel, or noise. Use backchannel for brief acknowledgements such as
   "yeah", "right", "mm-hm", "okay", "I see", or similar signals of continued
-  attention that do not request a response. Use noise only for input that has no
+  attention. Use noise only for input that has no
   meaningful conversational content.
 - requires_retrieval: true only when external artwork information is needed to
   answer the current utterance.

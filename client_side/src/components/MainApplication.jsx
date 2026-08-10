@@ -19,11 +19,11 @@ import {
 
 const FORCED_FINALISATION_SILENCE_MS = 3000;
 const INITIAL_VAD_SILENCE_MS = 500;
-const BARGE_IN_CONFIRMATION_MS = 200;
-const ASSISTANT_DUCK_GAIN = 0.3;
+const BARGE_IN_CONFIRMATION_MS = 120;
+const ASSISTANT_DUCK_GAIN = 0.08;
 const ASSISTANT_NORMAL_GAIN = 1.0;
-const DUCK_RAMP_SECONDS = 0.08;
-const RESTORE_RAMP_SECONDS = 0.12;
+const DUCK_RAMP_SECONDS = 0.05;
+const RESTORE_RAMP_SECONDS = 0.03;
 const MIN_PROGRESSIVE_TTS_CHARACTERS = 24;
 
 function shouldSpeakSentence(
@@ -145,6 +145,8 @@ export default function MainApplication() {
   const assistantGainNodeRef = useRef(null);
   const duckingTimerRef = useRef(null);
   const assistantIsDuckedRef = useRef(false);
+  const assistantPlaybackPausedRef =
+    useRef(false);
   const assistantAudioStatusRef = useRef('idle');
   const audioStreamClientRef = useRef(null);
   const turnStreamClientRef = useRef(null);
@@ -294,6 +296,28 @@ export default function MainApplication() {
     );
   };
 
+  const pauseAssistantAudio = () => {
+    if (assistantPlaybackPausedRef.current) {
+      return;
+    }
+
+    assistantPlaybackPausedRef.current = true;
+    ttsPlayerNodeRef.current?.port.postMessage({
+      type: 'pause',
+    });
+  };
+
+  const resumeAssistantAudio = () => {
+    if (!assistantPlaybackPausedRef.current) {
+      return;
+    }
+
+    assistantPlaybackPausedRef.current = false;
+    ttsPlayerNodeRef.current?.port.postMessage({
+      type: 'resume',
+    });
+  };
+
   const clearDuckingTimer = () => {
     if (!duckingTimerRef.current) {
       return;
@@ -359,10 +383,13 @@ export default function MainApplication() {
           assistantAudioStatusRef.current ===
             'playing';
 
-        if (assistantStillActive) {
-          duckAssistantAudio();
+        if (!assistantStillActive) {
+          return;
         }
+
+        duckAssistantAudio();
       }, BARGE_IN_CONFIRMATION_MS);
+
   };
 
   const handleVadSpeechEnd = (
@@ -373,6 +400,7 @@ export default function MainApplication() {
       performance.now() -
       Math.max(0, silenceDurationMs);
     clearDuckingTimer();
+    restoreAssistantAudio();
   };
 
   const scheduleSmartTurnForcedFinalisation = ({
@@ -476,6 +504,7 @@ export default function MainApplication() {
       clearSilenceReevaluationTimer();
       clearSmartTurnForcedTimer();
       clearDuckingTimer();
+      resumeAssistantAudio();
       restoreAssistantAudio();
     }
   }, [recording]);
@@ -992,6 +1021,7 @@ export default function MainApplication() {
     ttsPlayerNodeRef.current?.port.postMessage({
       type: 'flush',
     });
+    assistantPlaybackPausedRef.current = false;
 
     if (currentAudio.current) {
       const source = currentAudio.current;
@@ -1252,6 +1282,7 @@ export default function MainApplication() {
           floorIntent === 'backchannel' ||
           floorIntent === 'none'
         ) {
+          resumeAssistantAudio();
           restoreAssistantAudio();
         }
       },
@@ -1273,6 +1304,40 @@ export default function MainApplication() {
         if (pendingRequest) {
           pendingRequest.selfRouting =
             payload.assessment ?? null;
+        }
+
+        const routeType =
+          payload.assessment?.route_type;
+
+        if (
+          routeType === 'backchannel' ||
+          routeType === 'noise'
+        ) {
+          restoreAssistantAudio();
+          return;
+        }
+
+        if (
+          routeType === 'response_request' ||
+          routeType === 'call_to_action' ||
+          routeType === 'interruption'
+        ) {
+          const activeResponse =
+            activeProgressiveResponseRef.current;
+
+          if (
+            activeResponse?.requestId &&
+            activeResponse.requestId !== requestId
+          ) {
+            activeResponse.cancelled = true;
+            cancelProgressiveTtsResponse(
+              activeResponse.requestId,
+            );
+          } else if (
+            assistantPlaybackPausedRef.current
+          ) {
+            stopAssistantAudio();
+          }
         }
       },
 
@@ -1877,6 +1942,7 @@ export default function MainApplication() {
 
       isPlaying.current = false;
       activeTtsStreamIdRef.current = null;
+      assistantPlaybackPausedRef.current = false;
       restoreAssistantAudio();
       setAssistantAudioStatus('idle');
       notifyPlaybackComplete();
@@ -2018,6 +2084,9 @@ export default function MainApplication() {
           }
 
           case 'playback_complete':
+            assistantPlaybackPausedRef.current =
+              false;
+
             if (
               activeProgressiveResponseRef.current
             ) {
@@ -2049,6 +2118,8 @@ export default function MainApplication() {
 
           case 'playback_flushed':
             isPlaying.current = false;
+            assistantPlaybackPausedRef.current =
+              false;
             restoreAssistantAudio();
 
             if (
@@ -2060,6 +2131,16 @@ export default function MainApplication() {
               completeProgressiveResponseIfReady();
             }
 
+            break;
+
+          case 'playback_paused':
+            assistantPlaybackPausedRef.current =
+              true;
+            break;
+
+          case 'playback_resumed':
+            assistantPlaybackPausedRef.current =
+              false;
             break;
 
           case 'buffer_underrun': {
@@ -2096,6 +2177,12 @@ export default function MainApplication() {
 
       ttsPlayerNodeRef.current =
         playerNode;
+
+      if (assistantPlaybackPausedRef.current) {
+        playerNode.port.postMessage({
+          type: 'pause',
+        });
+      }
     }
 
     return ttsPlayerNodeRef.current;

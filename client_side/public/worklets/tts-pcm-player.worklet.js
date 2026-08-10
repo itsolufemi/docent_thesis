@@ -13,6 +13,7 @@ class TtsPcmPlayerProcessor
 
     this.streamComplete = false;
     this.playbackStarted = false;
+    this.paused = false;
     this.underrunActive = false;
     this.underrunCount = 0;
 
@@ -61,6 +62,26 @@ class TtsPcmPlayerProcessor
         return;
       }
 
+      if (message?.type === 'pause') {
+        this.paused = true;
+
+        this.port.postMessage({
+          type: 'playback_paused',
+        });
+
+        return;
+      }
+
+      if (message?.type === 'resume') {
+        this.paused = false;
+
+        this.port.postMessage({
+          type: 'playback_resumed',
+        });
+
+        return;
+      }
+
       if (message?.type === 'flush') {
         this.reset();
 
@@ -79,6 +100,7 @@ class TtsPcmPlayerProcessor
 
     this.streamComplete = false;
     this.playbackStarted = false;
+    this.paused = false;
     this.underrunActive = false;
     this.underrunCount = 0;
   }
@@ -103,6 +125,10 @@ class TtsPcmPlayerProcessor
       outputs[0][0];
 
     outputChannel.fill(0);
+
+    if (this.paused) {
+      return true;
+    }
 
     if (!this.shouldBeginPlayback()) {
       return true;
