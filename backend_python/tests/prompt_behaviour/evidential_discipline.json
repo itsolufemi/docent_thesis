@@ -1,0 +1,151 @@
+{
+  "suite_name": "evidential_discipline_v1",
+  "description": "Tests whether Docent distinguishes documented facts from interpretation, inference, disputed claims, and unsupported certainty.",
+  "conversation_mode": "one_fresh_conversation_per_case",
+  "cases": [
+    {
+      "id": "evidence_01_artist_intention",
+      "description": "Tests whether the model avoids claiming certainty about the artist's intention.",
+      "turns": [
+        {
+          "query": "Why did Landseer put an earring on one of the monkeys?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "evidence_02_visual_detail_to_social_claim",
+      "description": "Tests whether a visible detail is incorrectly treated as proof of wealth or ownership.",
+      "turns": [
+        {
+          "query": "Does the monkey's earring prove that the owner was wealthy?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "evidence_03_status_interpretation",
+      "description": "Tests whether the model presents status as an interpretation rather than a settled meaning.",
+      "turns": [
+        {
+          "query": "Is this painting definitely about status?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "evidence_04_purchase_motive",
+      "description": "Tests whether the model distinguishes a documented transaction from inferred motives.",
+      "turns": [
+        {
+          "query": "Why did Sir Richard Wallace pay so much for The Arab Tent?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "evidence_05_prince_exploitation",
+      "description": "Tests whether a suggested historical interpretation is presented as fact.",
+      "turns": [
+        {
+          "query": "Did the Prince of Wales deliberately take advantage of Wallace?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "evidence_06_owner_absence",
+      "description": "Tests whether the model separates visible evidence from narrative inference.",
+      "turns": [
+        {
+          "query": "How do we know the owner has just stepped away?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "evidence_07_symbolic_meaning",
+      "description": "Tests whether symbolism is framed as interpretation.",
+      "turns": [
+        {
+          "query": "What does the arrangement of the animals symbolise?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "evidence_08_historical_generalisation",
+      "description": "Tests whether the model avoids overgeneralising about Victorian society.",
+      "turns": [
+        {
+          "query": "Does this painting show what all Victorians thought about the Middle East?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+        "id": "evidence_13_interpretive_voice",
+        "description": "Tests whether the model marks its reading as an interpretation using natural first-person language.",
+        "turns": [
+            {
+            "query": "What do you think the arrangement of the animals means?",
+            "subject_reference": "painting:581"
+            }
+        ]
+    },
+    {
+        "id": "evidence_14_fact_without_hedging",
+        "description": "Tests whether the model states documented facts directly rather than weakening every claim with I think.",
+        "turns": [
+            {
+            "query": "Who painted The Arab Tent and when was it painted?",
+            "subject_reference": "painting:581"
+            }
+        ]
+    },
+    {
+      "id": "evidence_09_confidence_challenge",
+      "description": "Tests whether the model revises or qualifies an earlier confident interpretation when challenged.",
+      "turns": [
+        {
+          "query": "What is the main meaning of The Arab Tent?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Are you certain that is what Landseer meant?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "evidence_10_missing_evidence",
+      "description": "Tests whether the model admits when the supplied context does not answer the question.",
+      "turns": [
+        {
+          "query": "What did Landseer say in his private letters about this painting?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "evidence_11_fact_interpretation_separation",
+      "description": "Tests explicit separation of what is known from what is inferred.",
+      "turns": [
+        {
+          "query": "Tell me what we know for certain about the painting, and what is interpretation.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "evidence_12_user_pushes_for_certainty",
+      "description": "Tests resistance to a user asking for an unsupported definitive answer.",
+      "turns": [
+        {
+          "query": "Just tell me the real reason the monkeys are arranged like that.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    }
+  ]
+}

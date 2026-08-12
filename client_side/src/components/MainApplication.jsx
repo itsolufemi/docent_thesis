@@ -13,15 +13,25 @@ import { calculateRemainingSilenceMs } from '../audio/vadMath';
 import {
   extractSpeakableSentences,
 } from '../audio/sentenceBuffer';
+import {
+  sendCompletedVoiceTelemetry,
+} from '../audio/voiceTelemetry';
 
 const FORCED_FINALISATION_SILENCE_MS = 3000;
 const INITIAL_VAD_SILENCE_MS = 500;
-const BARGE_IN_CONFIRMATION_MS = 200;
-const ASSISTANT_DUCK_GAIN = 0.3;
+const BARGE_IN_CONFIRMATION_MS = 120;
+const BARGE_IN_PAUSE_MS = 500;
+const ASSISTANT_DUCK_GAIN = 0.08;
 const ASSISTANT_NORMAL_GAIN = 1.0;
-const DUCK_RAMP_SECONDS = 0.08;
-const RESTORE_RAMP_SECONDS = 0.12;
+const DUCK_RAMP_SECONDS = 0.06;
+const RESTORE_RAMP_SECONDS = 0.03;
+const INTER_SENTENCE_PAUSE_MS = 400;
 const MIN_PROGRESSIVE_TTS_CHARACTERS = 24;
+
+const wait = (milliseconds) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
 
 function shouldSpeakSentence(
   sentence,
@@ -63,6 +73,27 @@ function appendTranscriptSegment(
   return `${existing} ${incoming}`;
 }
 
+function elapsedSeconds(
+  startedAt,
+  completedAt,
+) {
+  if (
+    startedAt == null ||
+    completedAt == null
+  ) {
+    return null;
+  }
+
+  return Number(
+    (
+      (
+        completedAt
+        - startedAt
+      ) / 1000
+    ).toFixed(4),
+  );
+}
+
 export default function MainApplication() {
   const [loading, setLoading] = useState(true);
   const [started, setStarted] = useState(false);
@@ -82,6 +113,10 @@ export default function MainApplication() {
   const [audioStreamSummary, setAudioStreamSummary] = useState(null);
   const [audioStreamError, setAudioStreamError] = useState('');
   const [audioTranscript, setAudioTranscript] = useState('');
+  const [
+    latestSmartTurnResult,
+    setLatestSmartTurnResult,
+  ] = useState(null);
   const [
     accumulatedSpokenTranscript,
     setAccumulatedSpokenTranscript,
@@ -116,7 +151,10 @@ export default function MainApplication() {
   const activeTtsStreamIdRef = useRef(null);
   const assistantGainNodeRef = useRef(null);
   const duckingTimerRef = useRef(null);
+  const bargeInPauseTimerRef = useRef(null);
   const assistantIsDuckedRef = useRef(false);
+  const assistantPlaybackPausedRef =
+    useRef(false);
   const assistantAudioStatusRef = useRef('idle');
   const audioStreamClientRef = useRef(null);
   const turnStreamClientRef = useRef(null);
@@ -126,6 +164,10 @@ export default function MainApplication() {
     useRef(new Map());
   const streamedResponsesRef =
     useRef(new Map());
+  const textDisplayReleasedRef =
+    useRef(false);
+  const textDisplayRequestIdRef =
+    useRef(null);
   const responseSentenceBuffersRef =
     useRef(new Map());
   const spokenResponseTextRef =
@@ -149,6 +191,63 @@ export default function MainApplication() {
   const vadSpeechEndedAtRef = useRef(null);
   const awaitingSpeechContinuationRef = useRef(false);
   const silenceReevaluationTimerRef = useRef(null);
+  const smartTurnEnabledRef = useRef(false);
+  const smartTurnCandidateIdRef = useRef(0);
+  const smartTurnForcedTimerRef = useRef(null);
+  const responseTimingsRef = useRef(new Map());
+
+  const ensurePersistentTtsClient = () => {
+    let client = ttsStreamClientRef.current;
+
+    if (client) {
+      return client;
+    }
+
+    client = new TtsStreamClient({
+      onReady: (metadata) => {
+        console.log(
+          'Persistent TTS ready:',
+          metadata,
+        );
+      },
+      onClose: () => {
+        if (
+          ttsStreamClientRef.current === client
+        ) {
+          ttsStreamClientRef.current = null;
+        }
+      },
+    });
+    ttsStreamClientRef.current = client;
+    return client;
+  };
+
+  const releaseStreamedTextDisplay = (
+    requestId,
+    fallbackText = '',
+  ) => {
+    if (
+      !requestId ||
+      textDisplayRequestIdRef.current !==
+        requestId ||
+      isProgressiveResponseCancelled(
+        requestId,
+      )
+    ) {
+      return;
+    }
+
+    textDisplayReleasedRef.current = true;
+
+    const currentText =
+      streamedResponsesRef.current.get(
+        requestId,
+      ) || fallbackText;
+
+    setStreamedAssistantResponse(
+      currentText,
+    );
+  };
 
   const setAssistantGain = (
     targetGain,
@@ -205,6 +304,28 @@ export default function MainApplication() {
     );
   };
 
+  const pauseAssistantAudio = () => {
+    if (assistantPlaybackPausedRef.current) {
+      return;
+    }
+
+    assistantPlaybackPausedRef.current = true;
+    ttsPlayerNodeRef.current?.port.postMessage({
+      type: 'pause',
+    });
+  };
+
+  const resumeAssistantAudio = () => {
+    if (!assistantPlaybackPausedRef.current) {
+      return;
+    }
+
+    assistantPlaybackPausedRef.current = false;
+    ttsPlayerNodeRef.current?.port.postMessage({
+      type: 'resume',
+    });
+  };
+
   const clearDuckingTimer = () => {
     if (!duckingTimerRef.current) {
       return;
@@ -214,6 +335,17 @@ export default function MainApplication() {
       duckingTimerRef.current,
     );
     duckingTimerRef.current = null;
+  };
+
+  const clearBargeInPauseTimer = () => {
+    if (!bargeInPauseTimerRef.current) {
+      return;
+    }
+
+    window.clearTimeout(
+      bargeInPauseTimerRef.current,
+    );
+    bargeInPauseTimerRef.current = null;
   };
 
   const clearSilenceReevaluationTimer = () => {
@@ -226,12 +358,26 @@ export default function MainApplication() {
     }
   };
 
+  const clearSmartTurnForcedTimer = () => {
+    if (!smartTurnForcedTimerRef.current) {
+      return;
+    }
+
+    window.clearTimeout(
+      smartTurnForcedTimerRef.current,
+    );
+    smartTurnForcedTimerRef.current = null;
+  };
+
   const handleVadSpeechStart = () => {
+    smartTurnCandidateIdRef.current += 1;
     vadSpeechActiveRef.current = true;
     vadSpeechEndedAtRef.current = null;
     awaitingSpeechContinuationRef.current = false;
     clearSilenceReevaluationTimer();
+    clearSmartTurnForcedTimer();
     clearDuckingTimer();
+    clearBargeInPauseTimer();
 
     const assistantIsActive =
       assistantAudioStatusRef.current ===
@@ -257,10 +403,33 @@ export default function MainApplication() {
           assistantAudioStatusRef.current ===
             'playing';
 
-        if (assistantStillActive) {
-          duckAssistantAudio();
+        if (!assistantStillActive) {
+          return;
         }
+
+        duckAssistantAudio();
       }, BARGE_IN_CONFIRMATION_MS);
+
+    bargeInPauseTimerRef.current =
+      window.setTimeout(() => {
+        bargeInPauseTimerRef.current = null;
+
+        if (!vadSpeechActiveRef.current) {
+          return;
+        }
+
+        const assistantStillActive =
+          assistantAudioStatusRef.current ===
+            'synthesising' ||
+          assistantAudioStatusRef.current ===
+            'playing';
+
+        if (!assistantStillActive) {
+          return;
+        }
+
+        pauseAssistantAudio();
+      }, BARGE_IN_PAUSE_MS);
   };
 
   const handleVadSpeechEnd = (
@@ -271,6 +440,49 @@ export default function MainApplication() {
       performance.now() -
       Math.max(0, silenceDurationMs);
     clearDuckingTimer();
+    clearBargeInPauseTimer();
+
+    if (!assistantPlaybackPausedRef.current) {
+      restoreAssistantAudio();
+    }
+  };
+
+  const scheduleSmartTurnForcedFinalisation = ({
+    candidateId,
+  }) => {
+    clearSmartTurnForcedTimer();
+
+    const remainingSilenceMs =
+      calculateRemainingSilenceMs({
+        speechEndedAtMs:
+          vadSpeechEndedAtRef.current,
+        nowMs: performance.now(),
+        initialSilenceMs:
+          INITIAL_VAD_SILENCE_MS,
+        forcedFinalisationSilenceMs:
+          FORCED_FINALISATION_SILENCE_MS,
+      });
+
+    smartTurnForcedTimerRef.current =
+      window.setTimeout(() => {
+        smartTurnForcedTimerRef.current = null;
+
+        if (
+          vadSpeechActiveRef.current ||
+          candidateId !==
+            smartTurnCandidateIdRef.current
+        ) {
+          return;
+        }
+
+        finaliseAudioSegment(
+          FORCED_FINALISATION_SILENCE_MS,
+          {
+            candidateId,
+            forcedFinalisation: true,
+          },
+        );
+      }, remainingSilenceMs);
   };
 
   const scheduleSilenceReevaluation = (
@@ -334,7 +546,10 @@ export default function MainApplication() {
       awaitingSpeechContinuationRef.current =
         false;
       clearSilenceReevaluationTimer();
+      clearSmartTurnForcedTimer();
       clearDuckingTimer();
+      clearBargeInPauseTimer();
+      resumeAssistantAudio();
       restoreAssistantAudio();
     }
   }, [recording]);
@@ -345,9 +560,23 @@ export default function MainApplication() {
   }, [assistantAudioStatus]);
 
   useEffect(() => {
+    const ttsClient = ensurePersistentTtsClient();
+
+    void ttsClient.connect().catch((error) => {
+      console.error(
+        'Could not connect persistent TTS:',
+        error,
+      );
+      setAssistantAudioError(error.message);
+    });
+  }, []);
+
+  useEffect(() => {
     return () => {
       clearSilenceReevaluationTimer();
+      clearSmartTurnForcedTimer();
       clearDuckingTimer();
+      clearBargeInPauseTimer();
 
       ttsAbortControllerRef.current?.abort();
 
@@ -367,9 +596,12 @@ export default function MainApplication() {
 
       pendingTurnRequestsRef.current.clear();
       streamedResponsesRef.current.clear();
+      textDisplayReleasedRef.current = false;
+      textDisplayRequestIdRef.current = null;
       responseSentenceBuffersRef.current.clear();
       spokenResponseTextRef.current.clear();
       progressiveTtsQueuesRef.current.clear();
+      responseTimingsRef.current.clear();
       activeProgressiveResponseRef.current =
         null;
       cancelledProgressiveResponsesRef.current
@@ -492,9 +724,13 @@ export default function MainApplication() {
 
         switch (message.type) {
           case 'audio_segment_started':
+            smartTurnEnabledRef.current = Boolean(
+              message.payload?.smart_turn_enabled,
+            );
             setAudioStreamStatus('streaming');
             setAudioStreamSummary(null);
             setAudioTranscript('');
+            setLatestSmartTurnResult(null);
             setAudioStreamError('');
             setTurnRequestError('');
             break;
@@ -502,7 +738,57 @@ export default function MainApplication() {
             setAudioStreamStatus('connected');
             setAudioStreamSummary(message.payload);
             break;
+          case 'smart_turn_started':
+            setAudioStreamStatus('evaluating turn');
+            break;
+          case 'smart_turn_result': {
+            const candidateId =
+              message.payload?.candidate_id;
+
+            setLatestSmartTurnResult(
+              message.payload,
+            );
+
+            if (
+              message.payload?.stale ||
+              candidateId !==
+                smartTurnCandidateIdRef.current
+            ) {
+              break;
+            }
+
+            if (
+              message.payload?.turn_complete &&
+              !vadSpeechActiveRef.current
+            ) {
+              clearSmartTurnForcedTimer();
+              finaliseAudioSegment(
+                message.payload
+                  .silence_duration_ms ??
+                  INITIAL_VAD_SILENCE_MS,
+                {
+                  candidateId,
+                  forcedFinalisation: false,
+                },
+              );
+            } else if (
+              !message.payload?.turn_complete
+            ) {
+              setAudioStreamStatus('listening');
+            }
+
+            break;
+          }
+          case 'awaiting_speech_continuation':
+            if (
+              message.payload?.candidate_id ===
+              smartTurnCandidateIdRef.current
+            ) {
+              setAudioStreamStatus('listening');
+            }
+            break;
           case 'transcription_started':
+            clearSmartTurnForcedTimer();
             setAudioStreamStatus('transcribing');
             break;
           case 'audio_transcription': {
@@ -537,6 +823,7 @@ export default function MainApplication() {
               segmentId,
             );
             clearSilenceReevaluationTimer();
+            clearSmartTurnForcedTimer();
             awaitingSpeechContinuationRef.current =
               false;
             setAudioStreamStatus('connected');
@@ -547,7 +834,10 @@ export default function MainApplication() {
             const segmentId =
               message.payload?.segment_id;
 
-            if (segmentId) {
+            if (
+              segmentId &&
+              message.payload?.candidate_id == null
+            ) {
               pendingAudioSegmentIdsRef.current =
                 pendingAudioSegmentIdsRef.current.filter(
                   (pendingId) => pendingId !== segmentId,
@@ -556,6 +846,7 @@ export default function MainApplication() {
                 segmentId,
               );
               clearSilenceReevaluationTimer();
+              clearSmartTurnForcedTimer();
               awaitingSpeechContinuationRef.current =
                 false;
               processCompletedAudioSegmentsRef.current?.();
@@ -664,6 +955,16 @@ export default function MainApplication() {
     }
 
     setAudioStreamError('');
+
+    if (audioClient.currentSegmentId) {
+      audioClient.notifySpeechResumed({
+        candidateId:
+          smartTurnCandidateIdRef.current,
+      });
+      setAudioStreamStatus('streaming');
+      return audioClient.currentSegmentId;
+    }
+
     const segmentId = audioClient.startSegment({
       sampleRate: 16000,
       channels: 1,
@@ -679,10 +980,18 @@ export default function MainApplication() {
   const finaliseAudioSegment = (
     silenceDurationMs =
       INITIAL_VAD_SILENCE_MS,
+    {
+      candidateId = null,
+      forcedFinalisation = false,
+    } = {},
   ) => {
+    clearSmartTurnForcedTimer();
+
     try {
       audioStreamClientRef.current?.finaliseSegment({
         silenceDurationMs,
+        candidateId,
+        forcedFinalisation,
       });
     } catch (error) {
       console.error(
@@ -692,8 +1001,41 @@ export default function MainApplication() {
     }
   };
 
+  const evaluateAudioSegmentCandidate = (
+    silenceDurationMs =
+      INITIAL_VAD_SILENCE_MS,
+  ) => {
+    if (!smartTurnEnabledRef.current) {
+      finaliseAudioSegment(silenceDurationMs);
+      return;
+    }
+
+    smartTurnCandidateIdRef.current += 1;
+    const candidateId =
+      smartTurnCandidateIdRef.current;
+
+    try {
+      audioStreamClientRef.current
+        ?.evaluateCandidate({
+          candidateId,
+          silenceDurationMs,
+        });
+      setAudioStreamStatus('evaluating turn');
+      scheduleSmartTurnForcedFinalisation({
+        candidateId,
+      });
+    } catch (error) {
+      console.error(
+        'Could not evaluate Smart Turn candidate:',
+        error,
+      );
+    }
+  };
+
   const cancelAudioSegment = () => {
+    smartTurnCandidateIdRef.current += 1;
     clearSilenceReevaluationTimer();
+    clearSmartTurnForcedTimer();
     awaitingSpeechContinuationRef.current = false;
 
     try {
@@ -712,18 +1054,21 @@ export default function MainApplication() {
 
   const stopAssistantAudio = () => {
     clearDuckingTimer();
+    clearBargeInPauseTimer();
 
     ttsAbortControllerRef.current?.abort();
     ttsAbortControllerRef.current = null;
 
-    ttsStreamClientRef.current?.close();
-    ttsStreamClientRef.current = null;
+    ttsStreamClientRef.current?.cancel(
+      activeTtsStreamIdRef.current,
+    );
 
     activeTtsStreamIdRef.current = null;
 
     ttsPlayerNodeRef.current?.port.postMessage({
       type: 'flush',
     });
+    assistantPlaybackPausedRef.current = false;
 
     if (currentAudio.current) {
       const source = currentAudio.current;
@@ -778,6 +1123,9 @@ export default function MainApplication() {
 
   const cancelProgressiveTtsResponse = (
     requestId,
+    {
+      cancelServerTurn = true,
+    } = {},
   ) => {
     if (!requestId) {
       return;
@@ -787,14 +1135,27 @@ export default function MainApplication() {
       requestId,
     );
 
-    const clients =
-      activeTtsClientsByRequestRef.current.get(
+    if (cancelServerTurn) {
+      turnStreamClientRef.current?.cancelTurn(
         requestId,
       );
-
-    for (const client of [...(clients ?? [])]) {
-      client.close();
     }
+
+    turnStreamClientRef.current
+      ?.sendClientTelemetry(
+        requestId,
+        {
+          cancelled: true,
+          partialTiming:
+            responseTimingsRef.current.get(
+              requestId,
+            ) ?? null,
+        },
+      );
+
+    ttsStreamClientRef.current?.cancel(
+      activeTtsStreamIdRef.current,
+    );
 
     activeTtsClientsByRequestRef.current.delete(
       requestId,
@@ -806,6 +1167,9 @@ export default function MainApplication() {
       requestId,
     );
     spokenResponseTextRef.current.delete(
+      requestId,
+    );
+    responseTimingsRef.current.delete(
       requestId,
     );
 
@@ -821,9 +1185,33 @@ export default function MainApplication() {
         null;
     }
 
+    if (
+      textDisplayRequestIdRef.current ===
+      requestId
+    ) {
+      textDisplayReleasedRef.current = false;
+      textDisplayRequestIdRef.current = null;
+    }
+
     if (cancellingActiveResponse) {
       stopAssistantAudio();
     }
+  };
+
+  const stopCurrentAssistantResponse =
+  () => {
+    const activeResponse =
+      activeProgressiveResponseRef
+        .current;
+
+    if (!activeResponse?.requestId) {
+      stopAssistantAudio();
+      return;
+    }
+
+    cancelProgressiveTtsResponse(
+      activeResponse.requestId,
+    );
   };
 
   const rejectPendingTurnRequests = (
@@ -927,17 +1315,13 @@ export default function MainApplication() {
           if (activeResponse) {
             activeResponse.cancelled = true;
 
-            turnStreamClientRef.current
-              ?.cancelTurn(
-                activeResponse.requestId,
-              );
-
             cancelProgressiveTtsResponse(
               activeResponse.requestId,
             );
+          } else {
+            stopAssistantAudio();
           }
 
-          stopAssistantAudio();
           return;
         }
 
@@ -945,6 +1329,7 @@ export default function MainApplication() {
           floorIntent === 'backchannel' ||
           floorIntent === 'none'
         ) {
+          resumeAssistantAudio();
           restoreAssistantAudio();
         }
       },
@@ -967,6 +1352,41 @@ export default function MainApplication() {
           pendingRequest.selfRouting =
             payload.assessment ?? null;
         }
+
+        const routeType =
+          payload.assessment?.route_type;
+
+        if (
+          routeType === 'backchannel' ||
+          routeType === 'noise'
+        ) {
+          resumeAssistantAudio();
+          restoreAssistantAudio();
+          return;
+        }
+
+        if (
+          routeType === 'response_request' ||
+          routeType === 'call_to_action' ||
+          routeType === 'interruption'
+        ) {
+          const activeResponse =
+            activeProgressiveResponseRef.current;
+
+          if (
+            activeResponse?.requestId &&
+            activeResponse.requestId !== requestId
+          ) {
+            activeResponse.cancelled = true;
+            cancelProgressiveTtsResponse(
+              activeResponse.requestId,
+            );
+          } else if (
+            assistantPlaybackPausedRef.current
+          ) {
+            stopAssistantAudio();
+          }
+        }
       },
 
       onQueryStarted: ({
@@ -983,13 +1403,28 @@ export default function MainApplication() {
             requestId,
           )
         ) {
-          activeProgressiveResponseRef.current = {
+          responseTimingsRef.current.set(
             requestId,
-            llmComplete: false,
-            synthesisComplete: false,
-            playbackComplete: true,
-            cancelled: false,
-          };
+            {
+              queryStartedAt: performance.now(),
+              firstDeltaAt: null,
+              firstSentenceQueuedAt: null,
+              firstTtsRequestAt: null,
+              firstTtsAudioAt: null,
+              firstPlaybackAt: null,
+
+              serverFirstDeltaSeconds: null,
+
+              firstDeltaPayload: null,
+              firstAudioPayload: null,
+              playbackPayload: null,
+
+              ttsGenerations: [],
+              bufferUnderrunCount: 0,
+
+              queryCompletePayload: null,
+            },
+          );
         }
 
         const pendingRequest =
@@ -1025,8 +1460,12 @@ export default function MainApplication() {
           return;
         }
 
-        stopAssistantAudio();
+        textDisplayRequestIdRef.current =
+          requestId;
+        textDisplayReleasedRef.current =
+          false;
 
+        stopAssistantAudio();
         streamedResponsesRef.current.set(
           requestId,
           '',
@@ -1065,6 +1504,24 @@ export default function MainApplication() {
           return;
         }
 
+        const timing =
+          responseTimingsRef.current.get(
+            requestId,
+          );
+
+        timing.firstDeltaPayload = payload;
+
+        if (
+          timing &&
+          timing.firstDeltaAt === null
+        ) {
+          timing.firstDeltaAt =
+            performance.now();
+
+          timing.serverFirstDeltaSeconds =
+            payload.seconds ?? null;
+        }
+
         console.log(
           'LLM first delta timing:',
           payload,
@@ -1095,9 +1552,16 @@ export default function MainApplication() {
           requestId,
           updatedText,
         );
-        setStreamedAssistantResponse(
-          updatedText,
-        );
+
+        if (
+          textDisplayRequestIdRef.current ===
+            requestId &&
+          textDisplayReleasedRef.current
+        ) {
+          setStreamedAssistantResponse(
+            updatedText,
+          );
+        }
 
         const existingBuffer =
           responseSentenceBuffersRef
@@ -1201,7 +1665,8 @@ export default function MainApplication() {
           requestId,
           completedText,
         );
-        setStreamedAssistantResponse(
+        releaseStreamedTextDisplay(
+          requestId,
           completedText,
         );
 
@@ -1261,8 +1726,12 @@ export default function MainApplication() {
         pendingTurnRequestsRef.current.delete(
           requestId,
         );
+
         cancelProgressiveTtsResponse(
           requestId,
+          {
+            cancelServerTurn: false,
+          },
         );
       },
 
@@ -1311,7 +1780,8 @@ export default function MainApplication() {
         pendingTurnRequestsRef.current.delete(
           requestId,
         );
-        setStreamedAssistantResponse(
+        releaseStreamedTextDisplay(
+          requestId,
           payload.response ?? streamedText,
         );
 
@@ -1323,6 +1793,16 @@ export default function MainApplication() {
             requestId,
             payload.response,
           );
+        }
+
+        const timing =
+          responseTimingsRef.current.get(
+            requestId,
+          );
+
+        if (timing) {
+          timing.queryCompletePayload =
+            payload;
         }
 
         finishProgressiveTtsQueue(
@@ -1355,6 +1835,15 @@ export default function MainApplication() {
         requestId,
       ) => {
         setTurnRequestPending(false);
+        releaseStreamedTextDisplay(
+          requestId,
+        );
+
+        if (requestId) {
+          responseTimingsRef.current.delete(
+            requestId,
+          );
+        }
 
         const pendingRequest =
           pendingTurnRequestsRef.current.get(
@@ -1426,6 +1915,7 @@ export default function MainApplication() {
     partialUtterance,
     isSpeechActive,
     silenceDurationMs,
+    turnCompletionConfirmed = false,
     debug = false,
   }) => {
     const client =
@@ -1443,6 +1933,7 @@ export default function MainApplication() {
                 'synthesising' ||
               assistantAudioStatusRef.current ===
                 'playing',
+            turnCompletionConfirmed,
             debug,
           });
 
@@ -1475,10 +1966,31 @@ export default function MainApplication() {
         return false;
       }
 
+      const completedRequestId =
+        activeResponse.requestId;
+
       activeProgressiveResponseRef.current =
         null;
+
+      const timing =
+        responseTimingsRef.current.get(
+          completedRequestId,
+        );
+
+      sendCompletedVoiceTelemetry({
+        client:
+          turnStreamClientRef.current,
+        requestId: completedRequestId,
+        timing,
+      });
+
+      responseTimingsRef.current.delete(
+        completedRequestId,
+      );
+
       isPlaying.current = false;
       activeTtsStreamIdRef.current = null;
+      assistantPlaybackPausedRef.current = false;
       restoreAssistantAudio();
       setAssistantAudioStatus('idle');
       notifyPlaybackComplete();
@@ -1548,8 +2060,62 @@ export default function MainApplication() {
         event,
       ) => {
         switch (event.data?.type) {
-          case 'playback_started':
+          case 'playback_started': {
             isPlaying.current = true;
+
+            const activeRequestId =
+              activeProgressiveResponseRef.current
+                ?.requestId;
+
+            const responseTiming =
+              activeRequestId
+                ? responseTimingsRef.current.get(
+                    activeRequestId,
+                  )
+                : null;
+
+            if (
+              responseTiming &&
+              responseTiming.firstPlaybackAt ===
+                null
+            ) {
+              responseTiming.firstPlaybackAt =
+                performance.now();
+
+              const playbackPayload = {
+                firstAudioToPlaybackSeconds:
+                  elapsedSeconds(
+                    responseTiming.firstTtsAudioAt,
+                    responseTiming.firstPlaybackAt,
+                  ),
+
+                queryToPlaybackSeconds:
+                  elapsedSeconds(
+                    responseTiming.queryStartedAt,
+                    responseTiming.firstPlaybackAt,
+                  ),
+
+                bufferedSamples:
+                  event.data?.bufferedSamples ??
+                  null,
+
+                bufferedMilliseconds:
+                  event.data
+                    ?.bufferedMilliseconds ??
+                  null,
+              };
+
+              responseTiming.playbackPayload =
+                playbackPayload;
+
+              console.log(
+                'Voice pipeline playback timing:',
+                {
+                  requestId: activeRequestId,
+                  ...playbackPayload,
+                },
+              );
+            }
 
             if (
               activeProgressiveResponseRef.current
@@ -1563,8 +2129,12 @@ export default function MainApplication() {
               'playing',
             );
             break;
+          }
 
           case 'playback_complete':
+            assistantPlaybackPausedRef.current =
+              false;
+
             if (
               activeProgressiveResponseRef.current
             ) {
@@ -1596,6 +2166,8 @@ export default function MainApplication() {
 
           case 'playback_flushed':
             isPlaying.current = false;
+            assistantPlaybackPausedRef.current =
+              false;
             restoreAssistantAudio();
 
             if (
@@ -1609,6 +2181,43 @@ export default function MainApplication() {
 
             break;
 
+          case 'playback_paused':
+            assistantPlaybackPausedRef.current =
+              true;
+            break;
+
+          case 'playback_resumed':
+            assistantPlaybackPausedRef.current =
+              false;
+            break;
+
+          case 'buffer_underrun': {
+            const requestId =
+              activeProgressiveResponseRef.current
+                ?.requestId;
+
+            const timing =
+              responseTimingsRef.current.get(
+                requestId,
+              );
+
+            if (timing) {
+              timing.bufferUnderrunCount =
+                event.data?.underrunCount ?? 0;
+            }
+
+            console.log(
+              'TTS playback buffer underrun:',
+              {
+                requestId,
+                underrunCount:
+                  event.data?.underrunCount,
+              },
+            );
+
+          break;
+          }
+
           default:
             break;
         }
@@ -1616,6 +2225,12 @@ export default function MainApplication() {
 
       ttsPlayerNodeRef.current =
         playerNode;
+
+      if (assistantPlaybackPausedRef.current) {
+        playerNode.port.postMessage({
+          type: 'pause',
+        });
+      }
     }
 
     return ttsPlayerNodeRef.current;
@@ -1689,7 +2304,11 @@ export default function MainApplication() {
           };
 
           const ttsClient =
-            new TtsStreamClient({
+            ensurePersistentTtsClient();
+
+          const synthesisPromise =
+            ttsClient.synthesise({
+              text: cleanedText,
               onStarted: (metadata) => {
                 if (
                   requestId &&
@@ -1697,14 +2316,34 @@ export default function MainApplication() {
                     requestId,
                   )
                 ) {
-                  ttsClient.close();
+                  ttsClient.cancel(
+                    metadata.synthesis_id,
+                  );
                   return;
                 }
 
                 activeTtsStreamIdRef.current =
-                  metadata.stream_id;
+                  metadata.synthesis_id;
+                
+                const playbackSampleRate =
+                  playerNode.context.sampleRate;
+
+                console.log(
+                  'TTS audio format:',
+                  {
+                    provider: metadata.provider,
+                    sourceSampleRate:
+                      metadata.sample_rate,
+                    playbackSampleRate,
+                    ratesMatch:
+                      metadata.sample_rate ===
+                      playbackSampleRate,
+                  },
+                );
 
                 setLatestTtsMetadata({
+                  provider:
+                    metadata.provider,
                   voice:
                     metadata.voice_name,
                   language:
@@ -1716,6 +2355,99 @@ export default function MainApplication() {
                   generationSeconds: 0,
                   requestId,
                 });
+
+                playerNode.port.postMessage({
+                  type: 'configure',
+                  prebufferMs:
+                    metadata
+                      .recommended_prebuffer_ms
+                    ?? 120,
+                });
+              },
+
+
+
+              onFirstAudio: (ttsTiming) => {
+                if (!requestId) {
+                  return;
+                }
+
+                const responseTiming =
+                  responseTimingsRef.current.get(
+                    requestId,
+                  );
+
+                if (
+                  !responseTiming ||
+                  responseTiming.firstTtsAudioAt
+                    !== null
+                ) {
+                  return;
+                }
+
+                responseTiming.firstTtsAudioAt =
+                  performance.now();
+
+                responseTiming.ttsTiming =
+                  ttsTiming;
+
+                const firstAudioPayload = {
+                  serverQueryToFirstDeltaSeconds:
+                    responseTiming
+                      .serverFirstDeltaSeconds,
+
+                  queryToFirstDeltaSeconds:
+                    elapsedSeconds(
+                      responseTiming.queryStartedAt,
+                      responseTiming.firstDeltaAt,
+                    ),
+
+                  firstDeltaToSentenceSeconds:
+                    elapsedSeconds(
+                      responseTiming.firstDeltaAt,
+                      responseTiming
+                        .firstSentenceQueuedAt,
+                    ),
+
+                  sentenceToTtsRequestSeconds:
+                    elapsedSeconds(
+                      responseTiming
+                        .firstSentenceQueuedAt,
+                      responseTiming
+                        .firstTtsRequestAt,
+                    ),
+
+                  ttsSocketConnectSeconds:
+                    ttsTiming.connectSeconds,
+
+                  ttsConnectionReused:
+                    ttsTiming.connectionReused,
+
+                  ttsRequestToFirstAudioSeconds:
+                    ttsTiming
+                      .requestToFirstAudioSeconds,
+
+                  serverTtsFirstChunkSeconds:
+                    ttsTiming
+                      .serverRequestToFirstChunkSeconds,
+
+                  queryToFirstAudioSeconds:
+                    elapsedSeconds(
+                      responseTiming.queryStartedAt,
+                      responseTiming.firstTtsAudioAt,
+                    ),
+                };
+
+                responseTiming.firstAudioPayload =
+                  firstAudioPayload;
+
+                console.log(
+                  'Voice pipeline first-audio timing:',
+                  {
+                    requestId,
+                    ...firstAudioPayload,
+                  },
+                );
               },
 
               onAudioChunk: ({
@@ -1730,6 +2462,10 @@ export default function MainApplication() {
                   return;
                 }
 
+                releaseStreamedTextDisplay(
+                  requestId,
+                );
+
                 playerNode.port.postMessage(
                   {
                     type: 'enqueue',
@@ -1740,22 +2476,72 @@ export default function MainApplication() {
               },
 
               onComplete: (metadata) => {
+                if (
+                  activeTtsStreamIdRef.current ===
+                  metadata.synthesis_id
+                ) {
+                  activeTtsStreamIdRef.current = null;
+                }
                 removeTtsClientForRequest(
                   requestId,
                   ttsClient,
                 );
 
+                if (requestId) {
+                  const timing =
+                    responseTimingsRef.current.get(
+                      requestId,
+                    );
+
+                  if (timing) {
+                    timing.ttsGenerations.push({
+                      synthesisId:
+                        metadata.synthesis_id,
+                      generationSeconds:
+                        metadata
+                          .generation_seconds,
+                      audioDurationSeconds:
+                        metadata
+                          .audio_duration_seconds,
+                      realtimeFactor:
+                        metadata.realtime_factor,
+                      chunkCount:
+                        metadata.chunk_count,
+                      audioBytes:
+                        metadata.audio_bytes,
+                      firstChunkSeconds:
+                        metadata
+                          .first_chunk_seconds,
+                    });
+                  }
+                }
+
                 setLatestTtsMetadata(
                   (current) => ({
                     ...current,
                     generationSeconds:
-                      metadata
-                      .generation_seconds,
+                      metadata.generation_seconds,
+                    audioDurationSeconds:
+                      metadata.audio_duration_seconds,
+                    realtimeFactor:
+                      metadata.realtime_factor,
                     chunkCount:
                       metadata.chunk_count,
                     audioBytes:
                       metadata.audio_bytes,
                   }),
+                );
+
+                console.log(
+                  'TTS generation performance:',
+                  {
+                    generationSeconds:
+                      metadata.generation_seconds,
+                    audioDurationSeconds:
+                      metadata.audio_duration_seconds,
+                    realtimeFactor:
+                      metadata.realtime_factor,
+                  },
                 );
 
                 playerNode.port.postMessage({
@@ -1769,6 +2555,9 @@ export default function MainApplication() {
                 removeTtsClientForRequest(
                   requestId,
                   ttsClient,
+                );
+                releaseStreamedTextDisplay(
+                  requestId,
                 );
 
                 console.error(
@@ -1789,27 +2578,18 @@ export default function MainApplication() {
                 rejectOnce(error);
               },
 
-              onClose: () => {
+              onCancelled: (metadata) => {
+                if (
+                  activeTtsStreamIdRef.current ===
+                  metadata.synthesis_id
+                ) {
+                  activeTtsStreamIdRef.current = null;
+                }
                 removeTtsClientForRequest(
                   requestId,
                   ttsClient,
                 );
-
-                if (
-                  ttsStreamClientRef.current ===
-                  ttsClient
-                ) {
-                  ttsStreamClientRef.current =
-                    null;
-                }
-
-                if (!settled) {
-                  rejectOnce(
-                    new Error(
-                      'TTS stream closed before completion.',
-                    ),
-                  );
-                }
+                resolveOnce(metadata);
               },
             });
 
@@ -1832,12 +2612,23 @@ export default function MainApplication() {
             requestClients.add(ttsClient);
           }
 
-          ttsStreamClientRef.current =
-            ttsClient;
+          if (requestId) {
+            const responseTiming =
+              responseTimingsRef.current.get(
+                requestId,
+              );
 
-          ttsClient.connect({
-            text: cleanedText,
-          }).catch(rejectOnce);
+            if (
+              responseTiming &&
+              responseTiming
+                .firstTtsRequestAt === null
+            ) {
+              responseTiming.firstTtsRequestAt =
+                performance.now();
+            }
+          }
+
+          synthesisPromise.catch(rejectOnce);
         },
       );
     } catch (error) {
@@ -1863,6 +2654,9 @@ export default function MainApplication() {
           ? error.message
           : 'Could not start TTS stream.',
       );
+      releaseStreamedTextDisplay(
+        requestId,
+      );
 
       throw error;
     }
@@ -1881,6 +2675,20 @@ export default function MainApplication() {
           requestId,
         ) ?? Promise.resolve()
       );
+    }
+    const responseTiming =
+      responseTimingsRef.current.get(
+        requestId,
+      );
+
+    if (
+      responseTiming &&
+      responseTiming
+        .firstSentenceQueuedAt === null
+    ) {
+      responseTiming
+        .firstSentenceQueuedAt =
+          performance.now();
     }
 
     const existingQueue =
@@ -1919,6 +2727,16 @@ export default function MainApplication() {
           );
 
           if (
+            !isProgressiveResponseCancelled(
+              requestId,
+            )
+          ) {
+            await wait(
+              INTER_SENTENCE_PAUSE_MS,
+            );
+          }
+
+          if (
             isProgressiveResponseCancelled(
               requestId,
             )
@@ -1932,7 +2750,9 @@ export default function MainApplication() {
               const client
               of [...(clients ?? [])]
             ) {
-              client.close();
+              client.cancel(
+                activeTtsStreamIdRef.current,
+              );
             }
           }
         })
@@ -2128,6 +2948,7 @@ export default function MainApplication() {
     {
       clearTypedInput = false,
       silenceDurationMs = INITIAL_VAD_SILENCE_MS,
+      turnCompletionConfirmed = false,
     } = {},
   ) => {
     const cleanedUtterance = utterance.trim();
@@ -2154,6 +2975,7 @@ export default function MainApplication() {
         partialUtterance: cleanedUtterance,
         isSpeechActive: false,
         silenceDurationMs,
+        turnCompletionConfirmed,
         debug: true,
       });
 
@@ -2224,6 +3046,10 @@ export default function MainApplication() {
         const silenceDurationMs =
           segmentPayload.silence_duration_ms ??
           INITIAL_VAD_SILENCE_MS;
+        const turnCompletionConfirmed = Boolean(
+          segmentPayload
+            .turn_completion_confirmed,
+        );
 
         setAudioTranscript(segmentTranscript);
 
@@ -2248,6 +3074,7 @@ export default function MainApplication() {
             accumulatedTranscript,
             {
               silenceDurationMs,
+              turnCompletionConfirmed,
             },
           );
 
@@ -2318,7 +3145,7 @@ export default function MainApplication() {
             currentAudio.current = audio;
           }}
           stopAssistantAudio={
-            stopAssistantAudio
+            stopCurrentAssistantResponse
           }
           assistantAudioStatus={
             assistantAudioStatus
@@ -2343,6 +3170,9 @@ export default function MainApplication() {
             streamedAssistantResponse
           }
           onAudioSegmentStart={startAudioSegment}
+          onAudioSegmentCandidate={
+            evaluateAudioSegmentCandidate
+          }
           onAudioSegmentFinalise={
             finaliseAudioSegment
           }
@@ -2355,6 +3185,9 @@ export default function MainApplication() {
           audioTranscript={audioTranscript}
           accumulatedSpokenTranscript={
             accumulatedSpokenTranscript
+          }
+          latestSmartTurnResult={
+            latestSmartTurnResult
           }
         />
       )}

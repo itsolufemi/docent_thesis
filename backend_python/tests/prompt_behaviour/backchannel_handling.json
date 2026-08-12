@@ -1,0 +1,183 @@
+{
+  "suite_name": "backchannel_handling_v1",
+  "description": "Tests whether Docent recognises brief acknowledgements and backchannels without treating them as requests for another full explanation.",
+  "conversation_mode": "one_fresh_conversation_per_case",
+  "cases": [
+    {
+      "id": "backchannel_01_plain_yeah",
+      "description": "Tests a simple acknowledgement after an explanation.",
+      "turns": [
+        {
+          "query": "Tell me about The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Yeah.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_02_plain_right",
+      "description": "Tests whether 'right' is treated as acknowledgement rather than a request.",
+      "turns": [
+        {
+          "query": "Why are the monkeys placed at the top?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Right.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_03_mmhmm",
+      "description": "Tests a non-lexical acknowledgement.",
+      "turns": [
+        {
+          "query": "Explain why The Arab Tent matters.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Mm-hm.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_04_okay",
+      "description": "Tests whether 'okay' produces minimal continuation.",
+      "turns": [
+        {
+          "query": "What is the main idea behind The Arab Tent?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Okay.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_05_i_see",
+      "description": "Tests acknowledgement of understanding.",
+      "turns": [
+        {
+          "query": "What does the arrangement of the animals mean?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "I see.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_06_got_it",
+      "description": "Tests an explicit signal that the explanation has been understood.",
+      "turns": [
+        {
+          "query": "Why is one of the monkeys wearing an earring?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Got it.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_07_acknowledgement_then_question",
+      "description": "Tests whether the model recognises both acknowledgement and a genuine follow-up request.",
+      "turns": [
+        {
+          "query": "Tell me about the painting's connection with status.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Yeah, but why does that matter?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_08_acknowledgement_then_challenge",
+      "description": "Tests a backchannel combined with disagreement.",
+      "turns": [
+        {
+          "query": "What is the point of The Arab Tent?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Right, although I am not convinced.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_09_acknowledgement_then_continue",
+      "description": "Tests whether the model continues only when the user explicitly asks it to.",
+      "turns": [
+        {
+          "query": "Start explaining the animals in The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Mm-hm, go on.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_10_acknowledgement_then_stop",
+      "description": "Tests whether a closing acknowledgement is respected.",
+      "turns": [
+        {
+          "query": "Tell me why The Arab Tent matters.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Okay, that is enough.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_11_repeated_backchannels",
+      "description": "Tests whether repeated acknowledgements trigger unnecessary repeated explanations.",
+      "turns": [
+        {
+          "query": "Explain the hierarchy of animals in The Arab Tent.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Yeah.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Right.",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Mm-hm.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "backchannel_12_ambiguous_okay",
+      "description": "Tests whether 'okay' is handled minimally when no continuation request is present.",
+      "turns": [
+        {
+          "query": "What should I notice first in The Arab Tent?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "Okay.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    }
+  ]
+}

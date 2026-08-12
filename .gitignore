@@ -4,6 +4,7 @@
 backend_python/.env
 backend_python/venv/
 backend_python/x_bin/
+backend_python/runtime_logs/
 
 # Python generated files
 __pycache__/
@@ -21,6 +22,9 @@ node_modules/
 /components/utils/ipv4_module.js
 *.env
 .tmp.driveupload/
+
+# Local Smart Turn benchmark and human-recording archives
+ml_lab/**/*.zip
 
 # Expo
 .expo/

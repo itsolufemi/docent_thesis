@@ -73,6 +73,9 @@ def create_turn_buffer_router(
             assistant_was_speaking=(
                 request.assistant_was_speaking
             ),
+            turn_completion_confirmed=(
+                request.turn_completion_confirmed
+            ),
         )
 
         return process_conversation_turn(

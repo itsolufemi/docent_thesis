@@ -18,8 +18,8 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from config import settings  # noqa: E402
 from conversation_core.memory.conversation_store import (  # noqa: E402
+    add_dialogue_turn,
     create_conversation,
-    set_active_branch_subject,
 )
 from conversation_core.schemas.llm_stream_schemas import (  # noqa: E402
     LLMStreamEvent,
@@ -36,38 +36,32 @@ CASES = [
             "Tell me about The Arab Tent."
         ),
         "route_type": "response_request",
-        "should_ignore": False,
+        "is_relevant": True,
         "retrieval_used": True,
-        "candidate_reference": (
+        "candidate_subjects": [
             "painting:581"
-        ),
+        ],
         "expected_tool": None,
-        "current_subject": None,
     },
     {
         "case_id": "greeting",
         "text": "Hi, how are you?",
         "route_type": "response_request",
-        "should_ignore": False,
+        "is_relevant": True,
         "retrieval_used": False,
-        "candidate_reference": None,
+        "candidate_subjects": None,
         "expected_tool": None,
-        "current_subject": None,
     },
     {
         "case_id": "current_subject",
         "text": "What painting is this?",
         "route_type": "response_request",
-        "should_ignore": False,
+        "is_relevant": True,
         "retrieval_used": True,
-        "candidate_reference": (
-            "painting:581"
-        ),
+        "candidate_subjects": ["The Arab Tent"],
         "expected_tool": None,
-        "current_subject": {
-            "reference": "painting:581",
-            "label": "The Arab Tent",
-        },
+        "current_subject_reference": "painting:581",
+        "current_subject_label": "The Arab Tent",
     },
     {
         "case_id": "highlights_tour",
@@ -75,13 +69,12 @@ CASES = [
             "Start a highlights tour."
         ),
         "route_type": "call_to_action",
-        "should_ignore": False,
+        "is_relevant": True,
         "retrieval_used": True,
-        "candidate_reference": None,
+        "candidate_subjects": None,
         "expected_tool": (
             "create_conversation_branch"
         ),
-        "current_subject": None,
     },
     {
         "case_id": "noise",
@@ -89,11 +82,10 @@ CASES = [
             "[unintelligible background noise]"
         ),
         "route_type": "noise",
-        "should_ignore": True,
+        "is_relevant": False,
         "retrieval_used": False,
-        "candidate_reference": None,
+        "candidate_subjects": None,
         "expected_tool": None,
-        "current_subject": None,
     },
 ]
 
@@ -119,18 +111,20 @@ def run_sample(
     conversation_id = (
         conversation.conversation_id
     )
-    current_subject = case[
-        "current_subject"
-    ]
+    current_subject_reference = case.get(
+        "current_subject_reference"
+    )
 
-    if current_subject is not None:
-        set_active_branch_subject(
+    if current_subject_reference is not None:
+        add_dialogue_turn(
             conversation_id=conversation_id,
-            subject_reference=(
-                current_subject["reference"]
+            role="assistant",
+            content="Previous subject context.",
+            current_subject=case.get(
+                "current_subject_label"
             ),
-            subject_label=(
-                current_subject["label"]
+            current_subject_reference=(
+                current_subject_reference
             ),
         )
 
@@ -250,12 +244,12 @@ def run_sample(
             and assessment["retrieval_used"]
             == case["retrieval_used"]
         )
-        candidate_subject_correct = (
+        candidate_subjects_correct = (
             assessment is not None
             and assessment.get(
-                "candidate_subject_reference"
+                "candidate_subjects"
             )
-            == case["candidate_reference"]
+            == case["candidate_subjects"]
         )
         proposed_action_correct = (
             assessment is not None
@@ -285,8 +279,8 @@ def run_sample(
             "retrieval_used_correct": (
                 retrieval_used_correct
             ),
-            "candidate_subject_correct": (
-                candidate_subject_correct
+            "candidate_subjects_correct": (
+                candidate_subjects_correct
             ),
             "proposed_action_correct": (
                 proposed_action_correct
@@ -382,8 +376,8 @@ def build_summary(
         "retrieval_used_accuracy": count(
             "retrieval_used_correct"
         ),
-        "candidate_subject_accuracy": count(
-            "candidate_subject_correct"
+        "candidate_subjects_accuracy": count(
+            "candidate_subjects_correct"
         ),
         "proposed_action_accuracy": count(
             "proposed_action_correct"
@@ -480,7 +474,7 @@ def write_markdown(
         ),
         (
             "| Candidate-subject accuracy | "
-            f"{summary['candidate_subject_accuracy']}/{count} |"
+            f"{summary['candidate_subjects_accuracy']}/{count} |"
         ),
         (
             "| Proposed-action accuracy | "
@@ -520,7 +514,7 @@ def write_markdown(
             f"{result.get('route_valid')} | "
             f"{result.get('route_correct')} | "
             f"{result.get('retrieval_used_correct')} | "
-            f"{result.get('candidate_subject_correct')} | "
+            f"{result.get('candidate_subjects_correct')} | "
             f"{result.get('tool_correct')} | "
             f"{result.get('time_to_self_routing_seconds')}s | "
             f"{result.get('time_to_first_spoken_seconds')}s | "
@@ -606,7 +600,7 @@ def main() -> None:
                         ),
                         "candidate": (
                             result.get(
-                                "candidate_subject_correct"
+                                "candidate_subjects_correct"
                             )
                         ),
                         "tool": result.get(

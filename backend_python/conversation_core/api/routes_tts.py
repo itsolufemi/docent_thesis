@@ -6,18 +6,20 @@ from fastapi.responses import Response
 from conversation_core.schemas.tts_schemas import (
     TextToSpeechRequest,
 )
-from conversation_core.services.google_tts_service import (
-    GoogleTextToSpeechService,
-    google_tts_service,
+from conversation_core.services.tts_service import (
+    TextToSpeechService,
+)
+from conversation_core.services.tts_service_factory import (
+    default_tts_service,
 )
 
 
 def create_tts_router(
-    tts_service: GoogleTextToSpeechService | None = None,
+    tts_service: TextToSpeechService | None = None,
 ) -> APIRouter:
     router = APIRouter()
     active_tts_service = (
-        tts_service or google_tts_service
+        tts_service or default_tts_service
     )
 
     @router.post(
@@ -42,8 +44,9 @@ def create_tts_router(
             raise HTTPException(
                 status_code=502,
                 detail=(
-                    "Google text-to-speech synthesis "
-                    f"failed: {error}"
+                    f"{active_tts_service.provider_name} "
+                    "text-to-speech synthesis failed: "
+                    f"{error}"
                 ),
             ) from error
 
@@ -51,6 +54,7 @@ def create_tts_router(
             content=result.audio,
             media_type="audio/wav",
             headers={
+                "X-TTS-Provider": result.provider_name,
                 "X-TTS-Voice": result.voice_name,
                 "X-TTS-Language": (
                     result.language_code

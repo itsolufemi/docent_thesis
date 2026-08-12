@@ -110,6 +110,29 @@ export class TurnStreamClient {
     );
   }
 
+  sendClientTelemetry(
+  requestId,
+  payload,
+  ) {
+    if (
+      !this.socket ||
+      this.socket.readyState !==
+        WebSocket.OPEN
+    ) {
+      return false;
+    }
+
+    this.socket.send(
+      JSON.stringify({
+        type: 'client_telemetry',
+        request_id: requestId,
+        payload,
+      }),
+    );
+
+    return true;
+  }
+
   handleMessage(rawMessage) {
     let message;
 
@@ -248,6 +271,7 @@ export class TurnStreamClient {
     isSpeechActive,
     silenceDurationMs,
     assistantWasSpeaking,
+    turnCompletionConfirmed = false,
     debug = false,
   }) {
     if (
@@ -275,6 +299,8 @@ export class TurnStreamClient {
             silenceDurationMs,
           assistant_was_speaking:
             assistantWasSpeaking,
+          turn_completion_confirmed:
+            turnCompletionConfirmed,
           debug,
         },
       }),

@@ -32,7 +32,7 @@ docent_classifier_profile = ClassifierDomainProfile(
                 "or periods."
             ),
             (
-                "Requests to construct a tour or another bounded "
+                "Requests to construct a tour or another ordered "
                 "sequence of artworks."
             ),
         ],
@@ -46,17 +46,16 @@ docent_classifier_profile = ClassifierDomainProfile(
             ),
             (
                 "Requests to move to the next, previous or current "
-                "subject in an existing bounded conversation."
+                "subject in an ongoing tour."
             ),
         ],
     ),
     available_actions=[
         ClassifierActionDefinition(
-            name="create_bounded_branch",
+            name="start_highlights_tour",
             description=(
-                "Begin a structured conversational activity with "
-                "a predefined or ordered set of subjects, such as "
-                "a guided tour."
+                "Begin a guided highlights tour or another supported "
+                "tour experience."
             ),
             example_requests=[
                 "Give me a highlights tour.",
@@ -65,10 +64,9 @@ docent_classifier_profile = ClassifierDomainProfile(
             ],
         ),
         ClassifierActionDefinition(
-            name="close_bounded_branch",
+            name="stop_tour",
             description=(
-                "End or abandon the currently active structured "
-                "conversational activity."
+                "End or abandon the visitor's current tour."
             ),
             example_requests=[
                 "Stop the tour.",

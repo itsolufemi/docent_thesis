@@ -29,6 +29,7 @@ export default function MainApp({
   latestTurnResult,
   streamedAssistantResponse,
   onAudioSegmentStart,
+  onAudioSegmentCandidate,
   onAudioSegmentFinalise,
   onAudioSegmentCancel,
   onVadSpeechStart,
@@ -38,6 +39,7 @@ export default function MainApp({
   audioStreamError,
   audioTranscript,
   accumulatedSpokenTranscript,
+  latestSmartTurnResult,
 }) {
   const [questionTranscript, setQuestionTranscript] = useState('');
   const [caption, setCaption] = useState('');
@@ -92,6 +94,9 @@ export default function MainApp({
           streamRef={streamRef}
           sendChunkToServer={sendChunkToServer}
           onAudioSegmentStart={onAudioSegmentStart}
+          onAudioSegmentCandidate={
+            onAudioSegmentCandidate
+          }
           onAudioSegmentFinalise={
             onAudioSegmentFinalise
           }
@@ -114,6 +119,26 @@ export default function MainApp({
         <p>
           Assistant audio: {assistantAudioStatus}
         </p>
+
+        {latestSmartTurnResult && (
+          <p>
+            Smart Turn:{' '}
+            {latestSmartTurnResult.turn_complete
+              ? 'complete'
+              : 'awaiting continuation'}
+            {' '}(
+            {(
+              latestSmartTurnResult
+                .completion_probability * 100
+            ).toFixed(1)}
+            %,{' '}
+            {(
+              latestSmartTurnResult.total_seconds *
+              1000
+            ).toFixed(0)}
+            {' '}ms)
+          </p>
+        )}
 
         {latestTtsMetadata && (
           <p>

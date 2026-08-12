@@ -37,6 +37,26 @@ _docent_indexed_chunks: list[IndexedRetrievalChunk] | None = None
 _docent_chunk_embeddings: list[IndexedChunkEmbedding] | None = None
 
 
+def warm_up_docent_retrieval() -> dict:
+    started_at = perf_counter()
+    result = retrieve_docent_chunks_by_vector_similarity(
+        query="The Swing",
+        limit=1,
+        expand_parent_documents=False,
+        use_hybrid_scoring=False,
+        apply_confidence_gate=False,
+    )
+
+    return {
+        "seconds": round(
+            perf_counter() - started_at,
+            4,
+        ),
+        "result_count": len(result.results),
+        "retrieval_timings": result.timings.model_dump(),
+    }
+
+
 def get_docent_vector_index(
     force_refresh: bool = False,
 ) -> tuple[list[IndexedRetrievalChunk], list[IndexedChunkEmbedding]]:

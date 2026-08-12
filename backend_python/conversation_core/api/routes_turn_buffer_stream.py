@@ -35,6 +35,10 @@ from conversation_core.services.turn_buffer_service import (
     process_turn_event,
 )
 
+from conversation_core.services.conversation_log_service import (
+    append_telemetry_log,
+)
+
 
 UtteranceClassifier = Callable[
     [str, bool],
@@ -167,6 +171,12 @@ async def process_streamed_turn_event(
                     False,
                 )
             ),
+            turn_completion_confirmed=bool(
+                payload.get(
+                    "turn_completion_confirmed",
+                    False,
+                )
+            ),
         )
 
         turn_result = await asyncio.to_thread(
@@ -233,10 +243,14 @@ async def process_streamed_turn_event(
         def handle_stream_event(
             event: LLMStreamEvent,
         ) -> None:
-            event_loop.call_soon_threadsafe(
-                stream_queue.put_nowait,
-                event,
+            queued_event = (
+                asyncio.run_coroutine_threadsafe(
+                    stream_queue.put(event),
+                    event_loop,
+                )
             )
+
+            queued_event.result()
 
         async def run_query():
             try:
@@ -266,6 +280,7 @@ async def process_streamed_turn_event(
         query_started_at = perf_counter()
         first_delta_sent = False
         cancellation_event_sent = False
+        query_timing_events: list[dict] = []
         query_task = asyncio.create_task(
             run_query()
         )
@@ -279,12 +294,28 @@ async def process_streamed_turn_event(
                 if stream_event is None:
                     break
 
+                if stream_event.event_type == "timing":
+                    query_timing_events.append(
+                        {
+                            "name": stream_event.timing_name,
+                            "seconds": (
+                                stream_event.timing_seconds
+                            ),
+                            **stream_event.timing_payload,
+                        }
+                    )
+                    continue
+
                 if (
                     stream_event.event_type
                     == "content_delta"
                     and not first_delta_sent
                 ):
                     first_delta_sent = True
+
+                    first_delta_seconds = (
+                        perf_counter() - query_started_at
+                    )
 
                     await send_message(
                         {
@@ -294,9 +325,11 @@ async def process_streamed_turn_event(
                             "request_id": request_id,
                             "payload": {
                                 "seconds": round(
-                                    perf_counter()
-                                    - query_started_at,
+                                    first_delta_seconds,
                                     4,
+                                ),
+                                "timings": (
+                                    query_timing_events.copy()
                                 ),
                             },
                         }
@@ -333,7 +366,61 @@ async def process_streamed_turn_event(
                         "payload": {},
                     }
                 )
+
+            append_telemetry_log(
+                conversation_id=conversation_id,
+                request_id=request_id,
+                event_type="backend_turn_cancelled",
+                payload={
+                    "utterance": finalised_utterance,
+                    "turn_evaluation": (
+                        turn_result.model_dump(
+                            mode="json"
+                        )
+                    ),
+                    "utterance_route": (
+                        utterance_route.model_dump(
+                            mode="json"
+                        )
+                        if utterance_route is not None
+                        else None
+                    ),
+                    "stream_timings": (
+                        query_timing_events
+                    ),
+                },
+            )
+
             return
+
+        append_telemetry_log(
+            conversation_id=conversation_id,
+            request_id=request_id,
+            event_type="backend_turn_complete",
+            payload={
+                "utterance": finalised_utterance,
+                "turn_evaluation": (
+                    turn_result.model_dump(
+                        mode="json"
+                    )
+                ),
+                "utterance_route": (
+                    utterance_route.model_dump(
+                        mode="json"
+                    )
+                    if utterance_route is not None
+                    else None
+                ),
+                "stream_timings": (
+                    query_timing_events
+                ),
+                "query_result": (
+                    query_result.model_dump(
+                        mode="json"
+                    )
+                ),
+            },
+        )
 
         await send_message(
             {
@@ -431,6 +518,59 @@ def create_turn_buffer_stream_router(
             while True:
                 message = await websocket.receive_json()
                 message_type = message.get("type")
+
+                if message_type == "client_telemetry":
+                    request_id_value = message.get(
+                        "request_id"
+                    )
+                    telemetry_payload = message.get(
+                        "payload"
+                    )
+
+                    if (
+                        not isinstance(
+                            request_id_value,
+                            str,
+                        )
+                        or not request_id_value
+                        or not isinstance(
+                            telemetry_payload,
+                            dict,
+                        )
+                    ):
+                        await send_message(
+                            {
+                                "type": "turn_error",
+                                "request_id": (
+                                    request_id_value
+                                ),
+                                "payload": {
+                                    "detail": (
+                                        "client_telemetry requires "
+                                        "a request_id and object payload."
+                                    ),
+                                },
+                            }
+                        )
+                        continue
+
+                    append_telemetry_log(
+                        conversation_id=conversation_id,
+                        request_id=request_id_value,
+                        event_type="client_voice_telemetry",
+                        payload=telemetry_payload,
+                    )
+
+                    await send_message(
+                        {
+                            "type": (
+                                "client_telemetry_recorded"
+                            ),
+                            "request_id": request_id_value,
+                            "payload": {},
+                        }
+                    )
+                    continue
 
                 if message_type == "cancel_turn":
                     request_id_value = message.get(

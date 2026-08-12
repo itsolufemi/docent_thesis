@@ -57,6 +57,8 @@ export async function synthesiseSpeech({
   return {
     audioData,
     metadata: {
+      provider:
+        response.headers.get('X-TTS-Provider'),
       voice:
         response.headers.get('X-TTS-Voice'),
       language:

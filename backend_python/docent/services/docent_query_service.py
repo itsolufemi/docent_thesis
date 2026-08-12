@@ -1,454 +1,282 @@
-from conversation_core.schemas.conversation_schemas import (
-    DialogueTurn,
-    ConversationBranch,
-)
-from conversation_core.schemas.query_schemas import ResolvedContext
-from conversation_core.schemas.source_schemas import QuerySource
-from conversation_core.schemas.utterance_route_schemas import (
-    UtteranceRoute,
-)
-from conversation_core.services.query_service import (
-    QueryEngine,
-    self_routing_response_generator,
-)
-from conversation_core.services.utterance_router_service import route_utterance
-from conversation_core.services.prompt_service import (
-    format_conversation_branch_for_prompt,
-)
+import json
+from time import perf_counter
 
-from docent.config.docent_classifier_profile import docent_classifier_profile
-from docent.services.artwork_service import get_painting_by_index
+from conversation_core.schemas.context_resolution_schemas import (
+    ContextResolutionAssessment,
+)
+from conversation_core.schemas.conversation_schemas import DialogueTurn
+from conversation_core.schemas.query_schemas import ResolvedContext
+from conversation_core.services.llm_service import generate_llm_response
+from conversation_core.services.prompt_service import (
+    format_dialogue_history_for_prompt,
+)
+from conversation_core.services.query_service import QueryEngine
 from docent.services.docent_prompt_service import docent_build_prompt
-from docent.services.docent_retrieval_adapter import (
-    get_docent_retrieval_documents,
-)
-from docent.services.source_service import (
-    build_source_from_artwork,
-    build_sources_from_retrieved_chunks,
-    build_sources_from_retrieved_documents,
-)
-from extensions.retrieval.services.keyword_retrieval_service import (
-    retrieve_documents_by_keyword,
-)
 from docent.services.docent_vector_retrieval_service import (
     retrieve_docent_chunks_by_vector_similarity,
 )
 from docent.services.introduction_service import build_docent_introduction
+from docent.services.source_service import (
+    build_sources_from_retrieved_chunks,
+)
 
-def docent_parse_subject_reference(
-    subject_reference: str,
-) -> int | None:
-    if subject_reference.startswith("painting:"):
-        raw_value = subject_reference.replace("painting:", "", 1)
-    else:
-        raw_value = subject_reference
+
+CONTEXT_RESOLUTION_INSTRUCTIONS = """
+You resolve conversational context for a museum guide before retrieval.
+
+Use the current utterance and recent dialogue to return exactly one JSON object
+with these fields:
+
+- is_relevant: true when the utterance contains meaningful conversational input,
+  including a backchannel; false only for noise or input that should be ignored.
+- route_type: one of response_request, call_to_action, interruption,
+  backchannel, or noise. Use backchannel for brief acknowledgements such as
+  "yeah", "right", "mm-hm", "okay", "I see", or similar signals of continued
+  attention. Use noise only for input that has no
+  meaningful conversational content.
+- requires_retrieval: true only when external artwork information is needed to
+  answer the current utterance.
+- subjects: readable names of every subject for which information should be
+  retrieved or retained as conversational context. Use an empty list when no
+  subject is identifiable.
+
+Resolve references from the dialogue. For example, if the current utterance is
+"Who painted it?" and the recent dialogue concerns The Arab Tent, include
+"The Arab Tent" in subjects.
+
+For comparisons, include every compared subject. Do not choose a primary
+subject. Do not add references, identifiers, confidence, reasons, explanations,
+or any fields other than the four listed above.
+
+Return JSON only. Do not use markdown fences.
+""".strip()
+
+
+def _clean_subjects(subjects: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+
+    for subject in subjects:
+        if not isinstance(subject, str):
+            continue
+
+        value = subject.strip()
+        normalised = value.casefold()
+
+        if not value or normalised in seen:
+            continue
+
+        seen.add(normalised)
+        cleaned.append(value)
+
+    return cleaned
+
+
+def _extract_json_object(text: str) -> str:
+    stripped = text.strip()
+
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        stripped = "\n".join(lines).strip()
+
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+
+    if start == -1 or end == -1 or end < start:
+        raise ValueError("Context resolver did not return a JSON object.")
+
+    return stripped[start:end + 1]
+
+
+def resolve_context_assessment(
+    dialogue_history: list[DialogueTurn],
+    user_input: str,
+) -> tuple[ContextResolutionAssessment, dict]:
+    started_at = perf_counter()
+    formatted_history = format_dialogue_history_for_prompt(
+        dialogue_history=dialogue_history,
+        user_label="Visitor",
+        assistant_label="Docent",
+    )
+
+    prompt = f"""
+{CONTEXT_RESOLUTION_INSTRUCTIONS}
+
+RECENT DIALOGUE
+{formatted_history}
+
+CURRENT UTTERANCE
+{user_input}
+
+JSON:
+""".strip()
+
+    raw_response = generate_llm_response(
+        prompt=prompt,
+        options={
+            "temperature": 0,
+        },
+        think=False,
+    )
+
+    validation_error: str | None = None
 
     try:
-        return int(raw_value)
-    except ValueError:
-        return None
-    
-def build_utterance_route_debug_payload(
-    utterance_route,
-    retrieval_skipped_by_utterance_route: bool,
-) -> dict:
-    return {
-        "utterance_route_type": utterance_route.route_type,
-        "utterance_floor_intent": utterance_route.floor_intent,
-        "utterance_route_confidence": utterance_route.confidence,
-        "utterance_route_reason": utterance_route.reason,
-        "utterance_is_relevant": utterance_route.is_relevant,
-        "utterance_should_ignore": utterance_route.should_ignore,
-        "utterance_requires_retrieval": (
-            utterance_route.requires_retrieval
+        assessment = ContextResolutionAssessment.model_validate(
+            json.loads(_extract_json_object(raw_response))
+        )
+        assessment.subjects = _clean_subjects(assessment.subjects)
+    except Exception as error:
+        validation_error = str(error)
+        assessment = ContextResolutionAssessment(
+            is_relevant=True,
+            route_type="response_request",
+            requires_retrieval=True,
+            subjects=[user_input.strip()] if user_input.strip() else [],
+        )
+
+    debug = {
+        "context_resolution": assessment.model_dump(mode="json"),
+        "context_resolution_raw": raw_response,
+        "context_resolution_validation_error": validation_error,
+        "context_resolution_model_seconds": round(
+            perf_counter() - started_at,
+            4,
         ),
-        "utterance_proposed_action": utterance_route.proposed_action,
-        "utterance_candidate_subjects": utterance_route.candidate_subjects,
-        "utterance_routing_seconds": utterance_route.routing_seconds,
-        "retrieval_skipped_by_utterance_route": retrieval_skipped_by_utterance_route,
     }
 
-
-def build_utterance_route_prompt_payload(
-    utterance_route,
-) -> dict:
-    return {
-        "route_type": utterance_route.route_type,
-        "floor_intent": utterance_route.floor_intent,
-        "requires_retrieval": utterance_route.requires_retrieval,
-        "proposed_action": utterance_route.proposed_action,
-        "candidate_subjects": utterance_route.candidate_subjects,
-    }
+    return assessment, debug
 
 
-def build_route_handled_context(
-    utterance_route,
-) -> ResolvedContext | None:
-    if utterance_route.route_type == "noise":
-        return ResolvedContext(
-            context_source="noise",
-            subject_reference=None,
-            sources=[],
-            prompt_payload={
-                **build_utterance_route_prompt_payload(utterance_route),
-                "route_handled_without_retrieval": True,
-                "route_message": "The utterance was treated as noise.",
-                "artwork": None,
-                "retrieved_chunks": [],
-                "retrieved_documents": [],
-            },
-            debug_payload=build_utterance_route_debug_payload(
-                utterance_route=utterance_route,
-                retrieval_skipped_by_utterance_route=True,
-            ),
+def _retrieve_subjects(
+    subjects: list[str],
+    *,
+    per_subject_limit: int = 4,
+    merged_limit: int = 10,
+) -> tuple[list, list[dict]]:
+    merged_results = []
+    seen_chunk_ids: set[str] = set()
+    subject_retrievals: list[dict] = []
+
+    for subject in subjects:
+        retrieval_result = retrieve_docent_chunks_by_vector_similarity(
+            query=subject,
+            limit=per_subject_limit,
+            expand_parent_documents=True,
+            use_hybrid_scoring=True,
+            apply_confidence_gate=True,
+            min_confidence_score=0.45,
         )
 
-    if utterance_route.route_type == "interruption":
-        return ResolvedContext(
-            context_source="utterance_interruption",
-            subject_reference=None,
-            sources=[],
-            prompt_payload={
-                **build_utterance_route_prompt_payload(utterance_route),
-                "route_handled_without_retrieval": True,
-                "route_message": (
-                    "The utterance was classified as an interruption. "
-                    "No artwork retrieval was performed."
-                ),
-                "artwork": None,
-                "retrieved_chunks": [],
-                "retrieved_documents": [],
-            },
-            debug_payload=build_utterance_route_debug_payload(
-                utterance_route=utterance_route,
-                retrieval_skipped_by_utterance_route=True,
-            ),
-        )
+        accepted_references: list[str] = []
+        accepted_chunk_ids: list[str] = []
 
-    if not utterance_route.requires_retrieval:
-        route_message = (
-            "The classifier determined that external domain retrieval "
-            "is not required for this utterance."
-        )
+        for retrieved in retrieval_result.results:
+            chunk = retrieved.chunk
+            chunk_id = chunk.chunk_id
 
-        if utterance_route.route_type == "call_to_action":
-            route_message = (
-                "The utterance requests a supported structural action. "
-                "No domain retrieval is required. Use the proposed action "
-                "and available conversation tools when appropriate."
-            )
+            if chunk_id in seen_chunk_ids:
+                continue
 
-        return ResolvedContext(
-            context_source="utterance_without_retrieval",
-            subject_reference=None,
-            sources=[],
-            prompt_payload={
-                **build_utterance_route_prompt_payload(utterance_route),
-                "route_handled_without_retrieval": True,
-                "route_message": route_message,
-                "artwork": None,
-                "retrieved_chunks": [],
-                "retrieved_documents": [],
-            },
-            debug_payload={
-                **build_utterance_route_debug_payload(
-                    utterance_route=utterance_route,
-                    retrieval_skipped_by_utterance_route=True,
-                ),
-                "action_execution_available": (
-                    utterance_route.route_type == "call_to_action"
-                ),
-            },
-        )
+            seen_chunk_ids.add(chunk_id)
+            merged_results.append(retrieved)
+            accepted_chunk_ids.append(chunk_id)
 
-    return None
+            reference = chunk.source_reference or chunk.parent_document_id
+            if reference and reference not in accepted_references:
+                accepted_references.append(reference)
 
-
-def docent_resolve_context(
-    subject_reference: str | None,
-    user_input: str,
-    utterance_route: UtteranceRoute | None = None,
-) -> ResolvedContext:
-    sources: list[QuerySource] = []
-    active_utterance_route = (
-        utterance_route
-        or route_utterance(
-            text=user_input,
-            domain_profile=docent_classifier_profile,
-        )
-    )
-
-    route_handled_context = build_route_handled_context(
-        active_utterance_route
-    )
-
-    if route_handled_context is not None:
-        return route_handled_context
-
-    if subject_reference is not None:
-        painting_index = docent_parse_subject_reference(subject_reference)
-
-        if painting_index is not None:
-            artwork = get_painting_by_index(painting_index)
-
-            if artwork is not None:
-                sources = [
-                    build_source_from_artwork(
-                        artwork=artwork,
-                        source_type="artwork_context",
-                    )
-                ]
-
-                return ResolvedContext(
-                    context_source="subject_reference",
-                    subject_reference=subject_reference,
-                    sources=sources,
-                    prompt_payload={
-                        **build_utterance_route_prompt_payload(
-                            active_utterance_route
-                        ),
-                        "artwork": artwork,
-                        "retrieved_chunks": [],
-                        "retrieved_documents": [],
-                    },
-                    debug_payload={
-                        **build_utterance_route_debug_payload(
-                            utterance_route=active_utterance_route,
-                            retrieval_skipped_by_utterance_route=False,
-                        ),
-                        "painting_index": painting_index,
-                        "artwork_found": True,
-                    },
-                )
-
-            return ResolvedContext(
-                context_source="subject_not_found",
-                subject_reference=subject_reference,
-                sources=[],
-                prompt_payload={
-                    **build_utterance_route_prompt_payload(
-                        active_utterance_route
-                    ),
-                    "artwork": None,
-                    "retrieved_chunks": [],
-                    "retrieved_documents": [],
-                },
-                debug_payload={
-                    **build_utterance_route_debug_payload(
-                        utterance_route=active_utterance_route,
-                        retrieval_skipped_by_utterance_route=False,
-                    ),
-                    "painting_index": painting_index,
-                    "artwork_found": False,
-                },
-            )
-
-    vector_retrieval_result = retrieve_docent_chunks_by_vector_similarity(
-        query=user_input,
-        limit=8,
-        expand_parent_documents=True,
-        use_hybrid_scoring=True,
-        apply_confidence_gate=True,
-        min_confidence_score=0.45,
-    )
-    retrieved_chunks = vector_retrieval_result.results
-
-    if retrieved_chunks:
-        return ResolvedContext(
-            context_source="vector_retrieved_chunks",
-            subject_reference=None,
-            sources=build_sources_from_retrieved_chunks(retrieved_chunks),
-            prompt_payload={
-                **build_utterance_route_prompt_payload(
-                    active_utterance_route
-                ),
-                "artwork": None,
-                "retrieved_chunks": retrieved_chunks,
-                "retrieved_documents": [],
-            },
-            debug_payload={
-                **build_utterance_route_debug_payload(
-                    utterance_route=active_utterance_route,
-                    retrieval_skipped_by_utterance_route=False,
-                ),
-                "vector_retrieval_used": True,
-                "parent_document_expansion_used": True,
-                "hybrid_scoring_used": True,
-                "confidence_gate_used": True,
-                "min_confidence_score": 0.45,
-                "retrieved_chunk_count": len(retrieved_chunks),
-                "vector_retrieval_timings": (
-                    vector_retrieval_result.timings.model_dump()
-                ),
+        subject_retrievals.append(
+            {
+                "subject": subject,
+                "result_count": len(retrieval_result.results),
+                "accepted_chunk_ids": accepted_chunk_ids,
+                "references": accepted_references,
+                "timings": retrieval_result.timings.model_dump(),
             }
         )
 
-    documents = get_docent_retrieval_documents()
-
-    retrieved_documents = retrieve_documents_by_keyword(
-        query=user_input,
-        documents=documents,
-        limit=3,
+    merged_results.sort(
+        key=lambda retrieved: float(retrieved.score),
+        reverse=True,
     )
 
-    if retrieved_documents:
-        return ResolvedContext(
-            context_source="retrieved_documents",
-            subject_reference=None,
-            sources=build_sources_from_retrieved_documents(retrieved_documents),
-            prompt_payload={
-                **build_utterance_route_prompt_payload(
-                    active_utterance_route
-                ),
-                "artwork": None,
-                "retrieved_chunks": [],
-                "retrieved_documents": retrieved_documents,
-            },
-            debug_payload={
-                **build_utterance_route_debug_payload(
-                    utterance_route=active_utterance_route,
-                    retrieval_skipped_by_utterance_route=False,
-                ),
-                "document_retrieval_used": True,
-                "retrieved_document_count": len(retrieved_documents),
-                "vector_retrieval_timings": (
-                    vector_retrieval_result.timings.model_dump()
-                ),
-            },
+    return merged_results[:merged_limit], subject_retrievals
+
+
+def docent_resolve_context(
+    dialogue_history: list[DialogueTurn],
+    user_input: str,
+    utterance_route=None,
+) -> ResolvedContext:
+    assessment, resolution_debug = resolve_context_assessment(
+        dialogue_history=dialogue_history,
+        user_input=user_input,
+    )
+
+    retrieved_chunks = []
+    subject_retrievals: list[dict] = []
+
+    if assessment.requires_retrieval and assessment.subjects:
+        retrieved_chunks, subject_retrievals = _retrieve_subjects(
+            assessment.subjects
         )
 
+    context_source = (
+        "subject_vector_retrieval"
+        if retrieved_chunks
+        else "no_external_context"
+    )
+
     return ResolvedContext(
-        context_source="no_external_context",
+        context_source=context_source,
         subject_reference=None,
-        sources=[],
+        sources=build_sources_from_retrieved_chunks(retrieved_chunks),
         prompt_payload={
-            **build_utterance_route_prompt_payload(
-                active_utterance_route
-            ),
-            "artwork": None,
-            "retrieved_chunks": [],
+            "context_resolution": assessment.model_dump(mode="json"),
+            "subjects": assessment.subjects,
+            "retrieved_chunks": retrieved_chunks,
             "retrieved_documents": [],
+            "artwork": None,
         },
         debug_payload={
-            **build_utterance_route_debug_payload(
-                utterance_route=active_utterance_route,
-                retrieval_skipped_by_utterance_route=False,
-            ),
-            "vector_retrieval_timings": (
-                vector_retrieval_result.timings.model_dump()
-            ),
+            **resolution_debug,
+            "subject_retrievals": subject_retrievals,
+            "retrieved_chunk_count": len(retrieved_chunks),
         },
     )
 
 
-def docent_build_prompt_from_context(
+def docent_build_context_resolved_prompt(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     resolved_context: ResolvedContext,
-    active_branch: ConversationBranch | None,
 ) -> str:
-    branch_context = format_conversation_branch_for_prompt(
-        active_branch
-    )
-
     payload = resolved_context.prompt_payload
-    route_type = payload.get("route_type", "response_request")
-    floor_intent = payload.get("floor_intent", "none")
-    proposed_action = payload.get("proposed_action")
-    candidate_subjects = payload.get("candidate_subjects", [])
+    assessment = payload.get("context_resolution", {})
 
-    classification_context = f"""
-    UTTERANCE CLASSIFICATION
+    routing_guidance = f"""
+CONTEXT RESOLUTION
+is_relevant: {assessment.get('is_relevant', True)}
+route_type: {assessment.get('route_type', 'response_request')}
+requires_retrieval: {assessment.get('requires_retrieval', False)}
+subjects: {assessment.get('subjects', [])}
 
-    Route type:
-    {route_type}
+If is_relevant is false, produce no visitor-facing response.
+Otherwise, answer the original visitor utterance naturally. Use the retrieved
+evidence when available. The subject list is retrieval and dialogue metadata;
+do not recite or explain it to the visitor.
 
-    Floor intent:
-    {floor_intent}
-
-    Proposed structural action:
-    {proposed_action or "None"}
-
-    Candidate subjects:
-    {candidate_subjects or "None"}
-    """.strip()
-
-    action_guidance = """
-    The proposed action is advisory classifier output.
-
-    Use a conversation-tree tool only when the user's request and the
-    current conversation state justify it.
-
-    For create_bounded_branch:
-    - use retrieved artwork evidence to form an ordered remaining-subject list;
-    - create the bounded branch with current_subjects empty;
-    - do not mark the first subject current until the conversation actually
-      begins discussing it.
-
-    For close_bounded_branch:
-    - close the active bounded branch only when the user clearly requests
-      its termination or it has completed.
-    """.strip()
-
-    if payload.get("route_handled_without_retrieval"):
-        return f"""
-    You are Docent, a voice-led conversational guide.
-
-    The user's utterance has already been classified by the conversation router.
-
-    {classification_context}
-
-    ACTIVE CONVERSATION BRANCH
-
-    {branch_context}
-
-    Routing note:
-    {payload.get("route_message")}
-
-    User utterance:
-    {user_input}
-
-    Respond briefly and naturally.
-
-    The active branch represents the current overarching conversational activity.
-    A digression does not automatically close a bounded branch.
-
-    Use conversation-tree tools only when the branch state genuinely needs to change.
-
-    {action_guidance}
-
-    Do not invent artwork information.
-    Do not use external context because none was retrieved.
-    """.strip()
-
-    user_input_with_branch_context = f"""
-    {classification_context}
-
-    ACTIVE CONVERSATION BRANCH
-
-    {branch_context}
-
-    CONVERSATION-TREE GUIDANCE
-
-    The active branch represents the current overarching conversational activity.
-
-    Do not close a bounded branch merely because the user asks a digressive or unrelated question.
-
-    Keep a bounded branch active until:
-    - its defined activity is complete; or
-    - the user clearly asks to stop it.
-
-    Use operational tools only when the conversation-tree state genuinely needs to change.
-
-    {action_guidance}
-
-    USER UTTERANCE
-
-    {user_input}
-    """.strip()
+ORIGINAL VISITOR UTTERANCE
+{user_input}
+""".strip()
 
     return docent_build_prompt(
-        user_input=user_input_with_branch_context,
+        user_input=routing_guidance,
         dialogue_history=dialogue_history,
         artwork=payload.get("artwork"),
         retrieved_documents=payload.get("retrieved_documents", []),
@@ -456,455 +284,9 @@ def docent_build_prompt_from_context(
     )
 
 
-def build_candidate_subjects_from_chunks(
-    retrieved_chunks,
-) -> list[dict]:
-    candidate_subjects: list[dict] = []
-    seen_references: set[str] = set()
-
-    for retrieved in retrieved_chunks:
-        chunk = retrieved.chunk
-        reference = (
-            chunk.parent_document_id
-        )
-
-        if (
-            not reference
-            or reference in seen_references
-        ):
-            continue
-
-        seen_references.add(reference)
-        candidate_subjects.append(
-            {
-                "reference": reference,
-                "label": (
-                    chunk.title
-                    or reference
-                ),
-                "score": float(
-                    retrieved.score
-                ),
-            }
-        )
-
-    return candidate_subjects
-
-
-def build_candidate_subjects_from_documents(
-    retrieved_documents,
-) -> list[dict]:
-    candidate_subjects: list[dict] = []
-    seen_references: set[str] = set()
-
-    for retrieved in retrieved_documents:
-        document = retrieved.document
-        reference = (
-            document.source_reference
-            or document.document_id
-        )
-
-        if (
-            not reference
-            or reference in seen_references
-        ):
-            continue
-
-        seen_references.add(reference)
-        candidate_subjects.append(
-            {
-                "reference": reference,
-                "label": (
-                    document.title
-                    or reference
-                ),
-                "score": float(
-                    retrieved.score
-                ),
-            }
-        )
-
-    return candidate_subjects
-
-
-def docent_resolve_self_routing_context(
-    subject_reference: str | None,
-    user_input: str,
-    utterance_route: UtteranceRoute | None = None,
-) -> ResolvedContext:
-    if subject_reference is not None:
-        painting_index = (
-            docent_parse_subject_reference(
-                subject_reference
-            )
-        )
-
-        if painting_index is not None:
-            artwork = get_painting_by_index(
-                painting_index
-            )
-
-            if artwork is not None:
-                return ResolvedContext(
-                    context_source=(
-                        "subject_reference"
-                    ),
-                    subject_reference=(
-                        subject_reference
-                    ),
-                    sources=[
-                        build_source_from_artwork(
-                            artwork=artwork,
-                            source_type=(
-                                "artwork_context"
-                            ),
-                        )
-                    ],
-                    prompt_payload={
-                        "artwork": artwork,
-                        "retrieved_chunks": [],
-                        "retrieved_documents": [],
-                        "candidate_subjects": [
-                            {
-                                "reference": (
-                                    subject_reference
-                                ),
-                                "label": (
-                                    artwork.title
-                                ),
-                                "score": 1.0,
-                            }
-                        ],
-                    },
-                    debug_payload={
-                        "self_routing_context_resolver": (
-                            True
-                        ),
-                        "painting_index": (
-                            painting_index
-                        ),
-                        "artwork_found": True,
-                    },
-                )
-
-    vector_retrieval_result = (
-        retrieve_docent_chunks_by_vector_similarity(
-            query=user_input,
-            limit=8,
-            expand_parent_documents=True,
-            use_hybrid_scoring=True,
-            apply_confidence_gate=True,
-            min_confidence_score=0.45,
-        )
-    )
-    retrieved_chunks = (
-        vector_retrieval_result.results
-    )
-
-    if retrieved_chunks:
-        candidate_subjects = (
-            build_candidate_subjects_from_chunks(
-                retrieved_chunks
-            )
-        )
-
-        return ResolvedContext(
-            context_source=(
-                "vector_retrieved_chunks"
-            ),
-            subject_reference=None,
-            sources=(
-                build_sources_from_retrieved_chunks(
-                    retrieved_chunks
-                )
-            ),
-            prompt_payload={
-                "artwork": None,
-                "retrieved_chunks": (
-                    retrieved_chunks
-                ),
-                "retrieved_documents": [],
-                "candidate_subjects": (
-                    candidate_subjects
-                ),
-            },
-            debug_payload={
-                "self_routing_context_resolver": (
-                    True
-                ),
-                "vector_retrieval_used": True,
-                "parent_document_expansion_used": (
-                    True
-                ),
-                "hybrid_scoring_used": True,
-                "confidence_gate_used": True,
-                "min_confidence_score": 0.45,
-                "retrieved_chunk_count": len(
-                    retrieved_chunks
-                ),
-                "candidate_subject_count": len(
-                    candidate_subjects
-                ),
-                "vector_retrieval_timings": (
-                    vector_retrieval_result
-                    .timings.model_dump()
-                ),
-            },
-        )
-
-    documents = get_docent_retrieval_documents()
-    retrieved_documents = (
-        retrieve_documents_by_keyword(
-            query=user_input,
-            documents=documents,
-            limit=3,
-        )
-    )
-
-    if retrieved_documents:
-        candidate_subjects = (
-            build_candidate_subjects_from_documents(
-                retrieved_documents
-            )
-        )
-
-        return ResolvedContext(
-            context_source="retrieved_documents",
-            subject_reference=None,
-            sources=(
-                build_sources_from_retrieved_documents(
-                    retrieved_documents
-                )
-            ),
-            prompt_payload={
-                "artwork": None,
-                "retrieved_chunks": [],
-                "retrieved_documents": (
-                    retrieved_documents
-                ),
-                "candidate_subjects": (
-                    candidate_subjects
-                ),
-            },
-            debug_payload={
-                "self_routing_context_resolver": (
-                    True
-                ),
-                "document_retrieval_used": True,
-                "retrieved_document_count": len(
-                    retrieved_documents
-                ),
-                "candidate_subject_count": len(
-                    candidate_subjects
-                ),
-                "vector_retrieval_timings": (
-                    vector_retrieval_result
-                    .timings.model_dump()
-                ),
-            },
-        )
-
-    return ResolvedContext(
-        context_source="no_external_context",
-        subject_reference=None,
-        sources=[],
-        prompt_payload={
-            "artwork": None,
-            "retrieved_chunks": [],
-            "retrieved_documents": [],
-            "candidate_subjects": [],
-        },
-        debug_payload={
-            "self_routing_context_resolver": (
-                True
-            ),
-            "candidate_subject_count": 0,
-            "vector_retrieval_timings": (
-                vector_retrieval_result
-                .timings.model_dump()
-            ),
-        },
-    )
-
-
-SELF_ROUTING_OUTPUT_INSTRUCTIONS = """
-SELF-ROUTING OUTPUT
-
-Before the spoken answer, output exactly one
-internal routing block:
-
-<route>{"route_type":"response_request","is_relevant":true,"should_ignore":false,"retrieval_available":true,"retrieval_used":true,"candidate_subject_reference":"painting:581","should_update_subject":false,"proposed_action":null,"confidence":0.98,"reason":"Artwork information was requested and matching evidence was supplied."}</route>
-
-The route block must contain valid JSON with exactly
-the supplied fields and must appear before any
-visitor-facing response. After </route>, respond
-naturally to the visitor.
-
-Always classify the original USER UTTERANCE. If an
-operational tool has already returned a result, do
-not reclassify the current post-tool stage.
-
-ROUTE RULES
-
-- noise: the original utterance contains no
-  meaningful conversational language. Set
-  is_relevant=false and should_ignore=true.
-- response_request: the original utterance expects a
-  spoken answer, including greetings, questions,
-  explanations, and ordinary follow-ups.
-- call_to_action: the original utterance explicitly
-  asks the system to begin, end, or change a
-  structured activity such as a guided tour. Keep
-  this route and proposed_action even after its tool
-  has executed.
-- interruption: the original utterance stops,
-  corrects, or redirects the assistant while it is
-  speaking.
-
-retrieval_available means retrieved evidence was
-supplied in this prompt. retrieval_used means the
-answer or operational tool arguments actually rely
-on that evidence. Do not claim retrieval was used
-merely because evidence was available.
-If a retrieved candidate reference or label appears
-in operational tool arguments, retrieval_used must
-be true.
-
-candidate_subject_reference must be null or one of
-the explicitly supplied current/candidate references.
-Set should_update_subject only when the user's focus
-should move to that candidate. This metadata is
-observational and does not itself mutate state.
-
-For an explicit request to begin or end a tour, use
-call_to_action, populate proposed_action, and call an
-appropriate registered conversation-tree tool when
-state actually needs to change.
-
-Emit this route block only once for the user turn.
-If a tool returns a result, continue without
-repeating the route block.
-""".strip()
-
-
-def docent_build_self_routing_prompt(
-    user_input: str,
-    dialogue_history: list[DialogueTurn],
-    resolved_context: ResolvedContext,
-    active_branch: ConversationBranch | None,
-) -> str:
-    payload = resolved_context.prompt_payload
-    current_subject = (
-        active_branch.current_subjects[0]
-        if (
-            active_branch is not None
-            and active_branch.current_subjects
-        )
-        else None
-    )
-    current_subject_section = (
-        "\n".join(
-            [
-                (
-                    "Reference: "
-                    f"{current_subject.reference or 'None'}"
-                ),
-                (
-                    "Label: "
-                    f"{current_subject.label}"
-                ),
-            ]
-        )
-        if current_subject is not None
-        else "Reference: None\nLabel: None"
-    )
-    candidate_subjects = payload.get(
-        "candidate_subjects",
-        [],
-    )
-    candidate_lines = [
-        (
-            f"- {candidate['reference']} | "
-            f"{candidate['label']} | "
-            f"score {candidate['score']:.4f}"
-        )
-        for candidate in candidate_subjects
-    ]
-    candidate_section = (
-        "\n".join(candidate_lines)
-        or "None"
-    )
-    retrieval_available = bool(
-        payload.get("artwork")
-        or payload.get("retrieved_chunks")
-        or payload.get("retrieved_documents")
-    )
-    branch_context = (
-        format_conversation_branch_for_prompt(
-            active_branch
-        )
-    )
-    routed_user_input = f"""
-{SELF_ROUTING_OUTPUT_INSTRUCTIONS}
-
-RETRIEVAL AVAILABLE
-
-{str(retrieval_available).lower()}
-
-CURRENT SUBJECT
-
-{current_subject_section}
-
-CANDIDATE SUBJECTS
-
-{candidate_section}
-
-ACTIVE CONVERSATION BRANCH
-
-{branch_context}
-
-The active branch is the current overarching
-conversational activity. A digression does not close
-a bounded branch. Use operational tools only when
-conversation-tree state genuinely needs to change.
-
-USER UTTERANCE
-
-{user_input}
-""".strip()
-
-    return docent_build_prompt(
-        user_input=routed_user_input,
-        dialogue_history=dialogue_history,
-        artwork=payload.get("artwork"),
-        retrieved_documents=payload.get(
-            "retrieved_documents",
-            [],
-        ),
-        retrieved_chunks=payload.get(
-            "retrieved_chunks",
-            [],
-        ),
-    )
-
-
-docent_query_engine = QueryEngine(
+context_resolved_docent_query_engine = QueryEngine(
     subject_resolver=docent_resolve_context,
-    prompt_builder=docent_build_prompt_from_context,
-)
-
-self_routing_docent_query_engine = QueryEngine(
-    subject_resolver=(
-        docent_resolve_self_routing_context
-    ),
-    prompt_builder=(
-        docent_build_self_routing_prompt
-    ),
-    response_generator=(
-        self_routing_response_generator
-    ),
-    self_routing_enabled=True,
-    introduction_provider=(
-        build_docent_introduction
-    )
+    prompt_builder=docent_build_context_resolved_prompt,
+    self_routing_enabled=False,
+    introduction_provider=build_docent_introduction,
 )

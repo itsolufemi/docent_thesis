@@ -63,6 +63,16 @@ def process_turn_event(
             reason="Speech is active and the buffer has been updated.",
         )
 
+    if event.turn_completion_confirmed:
+        return finalise_buffer(
+            event=event,
+            buffer=buffer,
+            reason=(
+                "Audio turn completion was confirmed before "
+                "transcription."
+            ),
+        )
+
     already_evaluated = (
         buffer.last_evaluated_transcript == latest_transcript
     )

@@ -2,31 +2,24 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterator
+from threading import Event
 from time import perf_counter
 from uuid import uuid4
 
 from fastapi import APIRouter, WebSocket
 from fastapi.websockets import WebSocketDisconnect
 
-from conversation_core.services.google_tts_service import (
-    DEFAULT_LANGUAGE_CODE,
-    DEFAULT_SAMPLE_RATE,
-    DEFAULT_VOICE_NAME,
-    GoogleTextToSpeechService,
-    google_tts_service,
+from conversation_core.services.tts_service import (
+    TextToSpeechService,
+)
+from conversation_core.services.tts_service_factory import (
+    default_tts_service,
 )
 
 
 def _next_audio_chunk(
     iterator: Iterator[bytes],
 ) -> bytes | None:
-    """
-    Return the next Google audio chunk.
-
-    StopIteration must not escape through
-    asyncio.to_thread(), because asyncio cannot safely
-    propagate StopIteration through a Future.
-    """
     try:
         return next(iterator)
     except StopIteration:
@@ -34,167 +27,310 @@ def _next_audio_chunk(
 
 
 def create_tts_stream_router(
-    tts_service: GoogleTextToSpeechService | None = None,
+    tts_service: TextToSpeechService | None = None,
 ) -> APIRouter:
     router = APIRouter()
-    active_tts_service = (
-        tts_service or google_tts_service
-    )
+    active_tts_service = tts_service or default_tts_service
 
     @router.websocket("/api/tts/stream")
-    async def stream_speech(
-        websocket: WebSocket,
-    ) -> None:
+    async def stream_speech(websocket: WebSocket) -> None:
         await websocket.accept()
+        send_lock = asyncio.Lock()
+        active_task: asyncio.Task | None = None
+        active_synthesis_id: str | None = None
+        cancellation_event: Event | None = None
 
-        stream_id: str | None = None
+        async def send_json(message: dict) -> None:
+            async with send_lock:
+                await websocket.send_json(message)
 
-        try:
-            request = await websocket.receive_json()
+        async def send_audio_chunk(
+            metadata: dict,
+            audio: bytes,
+        ) -> None:
+            async with send_lock:
+                await websocket.send_json(metadata)
+                await websocket.send_bytes(audio)
 
-            if request.get("type") != "synthesise":
-                await websocket.send_json({
-                    "type": "tts_error",
-                    "payload": {
-                        "detail": (
-                            "First message must be a "
-                            "synthesise request."
-                        ),
-                    },
-                })
-                await websocket.close(code=1008)
-                return
-
-            payload = request.get(
-                "payload",
-                {},
-            )
-            text = str(
-                payload.get("text", "")
-            ).strip()
-            voice_name = (
-                payload.get("voice_name")
-                or DEFAULT_VOICE_NAME
-            )
-            language_code = (
-                payload.get("language_code")
-                or DEFAULT_LANGUAGE_CODE
-            )
-
-            if not text:
-                await websocket.send_json({
-                    "type": "tts_error",
-                    "payload": {
-                        "detail": (
-                            "Text-to-speech input "
-                            "cannot be empty."
-                        ),
-                    },
-                })
-                await websocket.close(code=1008)
-                return
-
-            if len(text) > 5_000:
-                await websocket.send_json({
-                    "type": "tts_error",
-                    "payload": {
-                        "detail": (
-                            "Text-to-speech input "
-                            "exceeds 5,000 characters."
-                        ),
-                    },
-                })
-                await websocket.close(code=1008)
-                return
-
-            stream_id = str(uuid4())
+        async def run_synthesis(
+            *,
+            synthesis_id: str,
+            text: str,
+            voice_name: str,
+            language_code: str,
+            cancelled: Event,
+        ) -> None:
             started_at = perf_counter()
+            iterator: Iterator[bytes] | None = None
 
-            await websocket.send_json({
-                "type": "tts_started",
-                "payload": {
-                    "stream_id": stream_id,
-                    "voice_name": voice_name,
-                    "language_code": (
-                        language_code
-                    ),
-                    "sample_rate": (
-                        DEFAULT_SAMPLE_RATE
-                    ),
-                    "encoding": "pcm_s16le",
-                    "character_count": len(text),
-                },
-            })
-
-            iterator = (
-                active_tts_service
-                .stream_synthesise(
+            try:
+                await send_json({
+                    "type": "tts_started",
+                    "payload": {
+                        "synthesis_id": synthesis_id,
+                        "stream_id": synthesis_id,
+                        "provider": (
+                            active_tts_service.provider_name
+                        ),
+                        "voice_name": voice_name,
+                        "language_code": language_code,
+                        "sample_rate": (
+                            active_tts_service.sample_rate
+                        ),
+                        "recommended_prebuffer_ms": (active_tts_service.recommended_prebuffer_ms),
+                        "encoding": "pcm_s16le",
+                        "character_count": len(text),
+                    },
+                })
+                iterator = active_tts_service.stream_synthesise(
                     text,
                     voice_name=voice_name,
                     language_code=language_code,
                 )
-            )
+                chunk_index = 0
+                audio_bytes = 0
+                first_chunk_seconds: float | None = None
 
-            chunk_index = 0
-            audio_bytes = 0
+                while not cancelled.is_set():
+                    chunk = await asyncio.to_thread(
+                        _next_audio_chunk,
+                        iterator,
+                    )
 
-            while True:
-                chunk = await asyncio.to_thread(
-                    _next_audio_chunk,
-                    iterator,
+                    if chunk is None or cancelled.is_set():
+                        break
+
+                    is_first_chunk = chunk_index == 0
+
+                    if is_first_chunk:
+                        first_chunk_seconds = (
+                            perf_counter() - started_at
+                        )
+
+                    await send_audio_chunk(
+                        {
+                            "type": "tts_chunk",
+                            "payload": {
+                                "synthesis_id": synthesis_id,
+                                "stream_id": synthesis_id,
+                                "chunk_index": chunk_index,
+                                "byte_length": len(chunk),
+                                "first_chunk": is_first_chunk,
+                                "request_to_first_chunk_seconds": (
+                                    round(first_chunk_seconds, 4)
+                                    if is_first_chunk
+                                    and first_chunk_seconds is not None
+                                    else None
+                                ),
+                            },
+                        },
+                        chunk,
+                    )
+                    audio_bytes += len(chunk)
+                    chunk_index += 1
+
+                if cancelled.is_set():
+                    return
+
+                generation_seconds = (
+                    perf_counter() - started_at
                 )
 
-                if chunk is None:
-                    break
+                audio_duration_seconds = (
+                    audio_bytes
+                    / (
+                        active_tts_service.sample_rate
+                        * 2
+                    )
+                )
 
-                await websocket.send_json({
-                    "type": "tts_chunk",
+                realtime_factor = (
+                    generation_seconds
+                    / audio_duration_seconds
+                    if audio_duration_seconds > 0
+                    else None
+                )
+
+                await send_json({
+                    "type": "tts_complete",
                     "payload": {
-                        "stream_id": stream_id,
-                        "chunk_index": chunk_index,
-                        "byte_length": len(chunk),
+                        "synthesis_id": synthesis_id,
+                        "stream_id": synthesis_id,
+                        "chunk_count": chunk_index,
+                        "audio_bytes": audio_bytes,
+                        "generation_seconds": round(
+                            generation_seconds,
+                            4,
+                        ),
+                        "audio_duration_seconds": round(
+                            audio_duration_seconds,
+                            4,
+                        ),
+                        "realtime_factor": (
+                            round(realtime_factor, 4)
+                            if realtime_factor is not None
+                            else None
+                        ),
+                        "first_chunk_seconds": (
+                            round(first_chunk_seconds, 4)
+                            if first_chunk_seconds is not None
+                            else None
+                        ),
                     },
                 })
-                await websocket.send_bytes(chunk)
 
-                audio_bytes += len(chunk)
-                chunk_index += 1
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+            except Exception as error:
+                if not cancelled.is_set():
+                    await send_json({
+                        "type": "tts_error",
+                        "payload": {
+                            "synthesis_id": synthesis_id,
+                            "stream_id": synthesis_id,
+                            "detail": str(error),
+                        },
+                    })
+            finally:
+                close_iterator = getattr(iterator, "close", None)
 
-            elapsed_seconds = (
-                perf_counter() - started_at
-            )
+                if callable(close_iterator):
+                    close_iterator()
 
-            await websocket.send_json({
-                "type": "tts_complete",
-                "payload": {
-                    "stream_id": stream_id,
-                    "chunk_count": chunk_index,
-                    "audio_bytes": audio_bytes,
-                    "generation_seconds": round(
-                        elapsed_seconds,
-                        4,
-                    ),
-                },
-            })
+        await send_json({
+            "type": "tts_ready",
+            "payload": {
+                "provider": active_tts_service.provider_name,
+                "sample_rate": active_tts_service.sample_rate,
+                "recommended_prebuffer_ms": (active_tts_service.recommended_prebuffer_ms),
+                "voice_name": (
+                    active_tts_service.default_voice_name
+                ),
+                "language_code": (
+                    active_tts_service.default_language_code
+                ),
+                "encoding": "pcm_s16le",
+            },
+        })
 
+        try:
+            while True:
+                request = await websocket.receive_json()
+                request_type = request.get("type")
+                payload = request.get("payload") or {}
+
+                if request_type == "cancel":
+                    requested_id = payload.get("synthesis_id")
+
+                    if (
+                        cancellation_event is not None
+                        and requested_id == active_synthesis_id
+                        and active_task is not None
+                        and not active_task.done()
+                    ):
+                        cancellation_event.set()
+                        await send_json({
+                            "type": "tts_cancelled",
+                            "payload": {
+                                "synthesis_id": requested_id,
+                                "stream_id": requested_id,
+                            },
+                        })
+                    continue
+
+                if request_type != "synthesise":
+                    await send_json({
+                        "type": "tts_error",
+                        "payload": {
+                            "detail": (
+                                "Message type must be synthesise "
+                                "or cancel."
+                            ),
+                        },
+                    })
+                    continue
+
+                if active_task is not None and not active_task.done():
+                    if (
+                        cancellation_event is not None
+                        and cancellation_event.is_set()
+                    ):
+                        try:
+                            await active_task
+                        except (
+                            asyncio.CancelledError,
+                            Exception,
+                        ):
+                            pass
+                    else:
+                        await send_json({
+                            "type": "tts_error",
+                            "payload": {
+                                "synthesis_id": payload.get(
+                                    "synthesis_id"
+                                ),
+                                "detail": (
+                                    "A synthesis request is already active."
+                                ),
+                            },
+                        })
+                        continue
+
+                text = str(payload.get("text", "")).strip()
+                synthesis_id = str(
+                    payload.get("synthesis_id") or uuid4()
+                )
+
+                if not text or len(text) > 5_000:
+                    detail = (
+                        "Text-to-speech input cannot be empty."
+                        if not text
+                        else (
+                            "Text-to-speech input exceeds "
+                            "5,000 characters."
+                        )
+                    )
+                    await send_json({
+                        "type": "tts_error",
+                        "payload": {
+                            "synthesis_id": synthesis_id,
+                            "detail": detail,
+                        },
+                    })
+                    continue
+
+                voice_name = str(
+                    payload.get("voice_name")
+                    or active_tts_service.default_voice_name
+                )
+                language_code = str(
+                    payload.get("language_code")
+                    or active_tts_service.default_language_code
+                )
+                cancellation_event = Event()
+                active_synthesis_id = synthesis_id
+                active_task = asyncio.create_task(
+                    run_synthesis(
+                        synthesis_id=synthesis_id,
+                        text=text,
+                        voice_name=voice_name,
+                        language_code=language_code,
+                        cancelled=cancellation_event,
+                    )
+                )
         except WebSocketDisconnect:
-            return
-        except Exception as error:
-            try:
-                await websocket.send_json({
-                    "type": "tts_error",
-                    "payload": {
-                        "stream_id": stream_id,
-                        "detail": str(error),
-                    },
-                })
-            except Exception:
-                pass
-
+            pass
         finally:
-            try:
-                await websocket.close()
-            except Exception:
-                pass
+            if cancellation_event is not None:
+                cancellation_event.set()
+
+            if active_task is not None and not active_task.done():
+                active_task.cancel()
+
+                try:
+                    await active_task
+                except (asyncio.CancelledError, Exception):
+                    pass
 
     return router

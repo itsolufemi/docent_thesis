@@ -14,6 +14,9 @@ from conversation_core.schemas.turn_buffer_schemas import TurnBufferEvent
 from conversation_core.schemas.turn_detection_schemas import (
     TurnDetectionResult,
 )
+from conversation_core.services.turn_detection_service import (
+    FORCED_FINALISATION_SILENCE_MS,
+)
 from conversation_core.services.turn_buffer_service import process_turn_event
 
 
@@ -197,7 +200,9 @@ class TurnBufferServiceTest(unittest.TestCase):
                 conversation_id=conversation_id,
                 partial_utterance="I think that the painting is",
                 is_speech_active=False,
-                silence_duration_ms=2000,
+                silence_duration_ms=(
+                    FORCED_FINALISATION_SILENCE_MS
+                ),
             )
         )
 
@@ -210,6 +215,40 @@ class TurnBufferServiceTest(unittest.TestCase):
         )
         self.assertIn("maximum silence", final_result.reason)
         detect_turn.assert_called_once()
+
+    @patch(
+        "conversation_core.services.turn_buffer_service."
+        "detect_turn_completion"
+    )
+    def test_confirmed_audio_turn_bypasses_text_trp(
+        self,
+        detect_turn,
+    ) -> None:
+        conversation_id = "smart-turn-confirmed"
+        turn_buffer_store.clear(conversation_id)
+
+        result = process_turn_event(
+            TurnBufferEvent(
+                conversation_id=conversation_id,
+                partial_utterance=(
+                    "Tell me about The Arab Tent."
+                ),
+                is_speech_active=False,
+                silence_duration_ms=500,
+                turn_completion_confirmed=True,
+            )
+        )
+
+        self.assertTrue(result.should_finalise_turn)
+        self.assertEqual(
+            result.finalised_utterance,
+            "Tell me about The Arab Tent.",
+        )
+        self.assertIn(
+            "confirmed before transcription",
+            result.reason,
+        )
+        detect_turn.assert_not_called()
 
 
 if __name__ == "__main__":

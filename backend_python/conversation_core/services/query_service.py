@@ -4,61 +4,31 @@ from time import perf_counter
 
 from conversation_core.memory.conversation_store import (
     add_dialogue_turn,
+    complete_dialogue_turn,
     create_conversation,
-    get_active_branch,
     get_conversation,
     get_conversation_introduction,
     get_recent_conversation_history,
     set_conversation_introduction,
 )
 from conversation_core.schemas.context_schemas import QueryDebugInfo
-from conversation_core.schemas.conversation_schemas import (
-    DialogueTurn,
-    ConversationBranch,
+from conversation_core.schemas.conversation_schemas import DialogueTurn
+from conversation_core.schemas.llm_stream_schemas import LLMStreamEvent
+from conversation_core.schemas.prompt_schemas import PromptProfile
+from conversation_core.schemas.query_schemas import QueryResult, ResolvedContext
+from conversation_core.schemas.utterance_route_schemas import UtteranceRoute
+from conversation_core.services.cancellation import CancellationToken
+from conversation_core.services.introduction_service import IntroductionProvider
+from conversation_core.services.llm_service import generate_llm_response
+from conversation_core.services.plain_llm_stream_service import (
+    stream_llm_response,
 )
-from conversation_core.schemas.llm_stream_schemas import (
-    LLMStreamEvent,
-)
-from conversation_core.schemas.self_routing_schemas import (
-    SelfRoutingAssessment,
-)
-from conversation_core.schemas.prompt_schemas import (
-    PromptProfile,
-    PromptSection,
-)
-
-from conversation_core.schemas.query_schemas import (
-    QueryResult,
-    ResolvedContext,
-)
-from conversation_core.schemas.utterance_route_schemas import (
-    UtteranceRoute,
-)
-from conversation_core.services.llm_service import (
-    generate_llm_response,
-    generate_tool_aware_llm_response,
-    stream_tool_aware_llm_response,
-)
-from conversation_core.services.cancellation import (
-    CancellationToken,
-)
-from conversation_core.services.prompt_service import (
-    build_prompt,
-    format_conversation_branch_for_prompt,
-)
-from conversation_core.services.self_routing_parser import (
-    SelfRoutingStreamParser,
-)
-from conversation_core.services.introduction_service import (
-    IntroductionProvider,
-)
+from conversation_core.services.prompt_service import build_prompt
 
 
 NON_RETRIEVAL_CONTEXT_SOURCES = {
     "no_context",
     "no_external_context",
-    "subject_reference",
-    "subject_not_found",
     "noise",
     "utterance_interruption",
     "utterance_call_to_action",
@@ -67,29 +37,17 @@ NON_RETRIEVAL_CONTEXT_SOURCES = {
 
 
 SubjectResolver = Callable[
-    [str | None, str, UtteranceRoute | None],
+    [list[DialogueTurn], str, UtteranceRoute | None],
     ResolvedContext,
 ]
-
 PromptBuilder = Callable[
-    [
-        str,
-        list[DialogueTurn],
-        ResolvedContext,
-        ConversationBranch | None,
-    ],
+    [str, list[DialogueTurn], ResolvedContext],
     str,
 ]
+ResponseGenerator = Callable[[str, str | None], str]
+LLMStreamCallback = Callable[[LLMStreamEvent], None]
+IntroductionResponseGenerator = Callable[[str], str]
 
-ResponseGenerator = Callable[
-    [str, str | None],
-    str,
-]
-
-LLMStreamCallback = Callable[
-    [LLMStreamEvent],
-    None,
-]
 
 IntroductionResponseGenerator = Callable[
     [str],
@@ -100,33 +58,91 @@ def default_response_generator(
     prompt: str,
     conversation_id: str | None,
 ) -> str:
-    if conversation_id is None:
-        return generate_llm_response(prompt)
+    return generate_llm_response(prompt)
 
-    return generate_tool_aware_llm_response(
-        prompt=prompt,
-        conversation_id=conversation_id,
+
+def get_latest_subjects(
+    dialogue_history: list[DialogueTurn],
+) -> list[str]:
+    for turn in reversed(dialogue_history):
+        if turn.subject:
+            return list(turn.subject)
+
+    return []
+
+
+def get_resolved_subjects(
+    resolved_context: ResolvedContext,
+) -> list[str]:
+    raw_subjects = resolved_context.prompt_payload.get(
+        "subjects",
+        [],
     )
 
+    if not isinstance(raw_subjects, list):
+        return []
 
-def self_routing_response_generator(
-    prompt: str,
-    conversation_id: str | None,
-) -> str:
-    if conversation_id is None:
-        return generate_llm_response(prompt)
+    subjects: list[str] = []
+    seen: set[str] = set()
 
-    response_parts: list[str] = []
+    for subject in raw_subjects:
+        if not isinstance(subject, str):
+            continue
 
-    for event in stream_tool_aware_llm_response(
-        prompt=prompt,
-        conversation_id=conversation_id,
-        buffer_for_tool_decision=False,
-    ):
-        if event.event_type == "content_delta":
-            response_parts.append(event.text)
+        value = subject.strip()
+        normalised = value.casefold()
 
-    return "".join(response_parts).strip()
+        if not value or normalised in seen:
+            continue
+
+        seen.add(normalised)
+        subjects.append(value)
+
+    return subjects
+
+
+def get_resolved_references(
+    resolved_context: ResolvedContext,
+) -> list[str]:
+    references: list[str] = []
+    seen: set[str] = set()
+
+    for source in resolved_context.sources:
+        reference = source.reference
+
+        if not isinstance(reference, str):
+            continue
+
+        value = reference.strip()
+        normalised = value.casefold()
+
+        if not value or normalised in seen:
+            continue
+
+        seen.add(normalised)
+        references.append(value)
+
+    return references
+
+
+def should_suppress_response(
+    resolved_context: ResolvedContext,
+) -> bool:
+    assessment = resolved_context.prompt_payload.get(
+        "context_resolution",
+        {},
+    )
+
+    if not isinstance(assessment, dict):
+        return False
+
+    if assessment.get("is_relevant") is False:
+        return True
+
+    return assessment.get("route_type") in {
+        "backchannel",
+        "noise",
+    }
 
 
 class QueryEngine:
@@ -146,8 +162,197 @@ class QueryEngine:
         self.response_generator = (
             response_generator or default_response_generator
         )
-        self.self_routing_enabled = (
-            self_routing_enabled
+        self.self_routing_enabled = self_routing_enabled
+        self.introduction_provider = introduction_provider
+        self.introduction_response_generator = (
+            introduction_response_generator
+            or generate_llm_response
+        )
+        self._introduction_lock = RLock()
+
+    def ensure_introduction(
+        self,
+        *,
+        conversation_id: str,
+    ) -> tuple[str | None, bool]:
+        with self._introduction_lock:
+            existing = get_conversation_introduction(
+                conversation_id
+            )
+
+            if existing is not None:
+                return existing, False
+
+            if get_conversation(conversation_id) is None:
+                return None, False
+
+            definition = (
+                self.introduction_provider()
+                if self.introduction_provider is not None
+                else None
+            )
+
+            if definition is None:
+                return None, False
+
+            try:
+                response = self.introduction_response_generator(
+                    definition.prompt
+                ).strip()
+
+                if response.lower().startswith(
+                    ("error:", "ollama error:")
+                ):
+                    raise RuntimeError(response)
+            except Exception:
+                response = (
+                    definition.fallback_text or ""
+                ).strip()
+
+            if not response:
+                return None, False
+
+            if definition.store_as_dialogue_turn:
+                add_dialogue_turn(
+                    conversation_id=conversation_id,
+                    assistant=response,
+                )
+
+            set_conversation_introduction(
+                conversation_id,
+                response,
+            )
+
+            return response, True
+
+    def generate_introduction(
+        self,
+        *,
+        conversation_id: str,
+    ) -> str | None:
+        introduction, _ = self.ensure_introduction(
+            conversation_id=conversation_id
+        )
+        return introduction
+
+    def _prepare_conversation(
+        self,
+        conversation_id: str | None,
+    ) -> tuple[object, str, bool, list[DialogueTurn]]:
+        conversation_created = False
+        conversation_state = (
+            get_conversation(conversation_id)
+            if conversation_id is not None
+            else None
+        )
+
+        if conversation_state is None:
+            conversation_state = create_conversation()
+            conversation_id = conversation_state.conversation_id
+            conversation_created = True
+
+        dialogue_history = get_recent_conversation_history(
+            conversation_id=conversation_id,
+        )
+
+        return (
+            conversation_state,
+            conversation_id,
+            conversation_created,
+            dialogue_history,
+        )
+
+    def _create_exchange(
+        self,
+        *,
+        conversation_id: str,
+        dialogue_history: list[DialogueTurn],
+        text: str,
+        resolved_context: ResolvedContext,
+    ) -> DialogueTurn:
+        exchange = add_dialogue_turn(
+            conversation_id=conversation_id,
+            user=text,
+            previous_subject=get_latest_subjects(
+                dialogue_history
+            ),
+            subject=get_resolved_subjects(
+                resolved_context
+            ),
+            reference=get_resolved_references(
+                resolved_context
+            ),
+        )
+
+        if exchange is None:
+            raise RuntimeError(
+                "Could not create dialogue exchange."
+            )
+
+        return exchange
+
+    def _build_suppressed_result(
+        self,
+        *,
+        text: str,
+        conversation_id: str,
+        conversation_created: bool,
+        dialogue_history: list[DialogueTurn],
+        resolved_context: ResolvedContext,
+        subjects: list[str],
+        references: list[str],
+        request_started_at: float,
+        context_resolution_seconds: float,
+        include_debug: bool,
+    ) -> QueryResult:
+        total_request_seconds = (
+            perf_counter() - request_started_at
+        )
+        debug_payload = {
+            **resolved_context.debug_payload,
+            "conversation_created": conversation_created,
+            "previous_subject": get_latest_subjects(
+                dialogue_history
+            ),
+            "subjects": subjects,
+            "references": references,
+            "response_suppressed": True,
+            "timings": {
+                "total_request_seconds": round(
+                    total_request_seconds,
+                    4,
+                ),
+                "context_resolution_seconds": round(
+                    context_resolution_seconds,
+                    4,
+                ),
+                "response_generation_seconds": 0.0,
+                "first_spoken_token_seconds": None,
+            },
+        }
+
+        debug = None
+        if include_debug:
+            debug = QueryDebugInfo(
+                conversation_found=True,
+                subject_reference=None,
+                context_source=resolved_context.context_source,
+                context_used=True,
+                dialogue_turns_used=len(dialogue_history),
+                prompt="",
+                retrieval_used=False,
+                sources_count=0,
+                sources=[],
+                debug_payload=debug_payload,
+            )
+
+        return QueryResult(
+            request=text,
+            response="",
+            conversation_id=conversation_id,
+            subject_reference=None,
+            sources=[],
+            debug=debug,
         )
         self.introduction_provider = (
             introduction_provider
@@ -245,145 +450,80 @@ class QueryEngine:
         utterance_route: UtteranceRoute | None = None,
         include_debug: bool = False,
     ) -> QueryResult:
-        """
-        Process one user query.
-
-        The method:
-        1. Creates a conversation or loads its stored context.
-        2. Resolves external/domain context.
-        3. Builds the final prompt.
-        4. Generates a response with conversation tools available.
-        5. Saves the user and assistant turns.
-        """
         request_started_at = perf_counter()
-
-        conversation_created = False
-        dialogue_history: list[DialogueTurn] = []
-        active_branch: ConversationBranch | None = None
-
-        conversation_state = None
-
-        if conversation_id is not None:
-            conversation_state = get_conversation(
-                conversation_id
-            )
-
-        if conversation_state is None:
-            conversation_state = create_conversation()
-            conversation_id = conversation_state.conversation_id
-            conversation_created = True
-
-        if conversation_state is not None:
-            dialogue_history = get_recent_conversation_history(
-                conversation_id=conversation_id,
-            )
-
-            active_branch = get_active_branch(
-                conversation_id=conversation_id,
-            )
-
-            # Preserve compatibility with the existing resolver,
-            # which currently accepts one subject reference.
-            if (
-                subject_reference is None
-                and active_branch is not None
-                and active_branch.current_subjects
-            ):
-                current_subject = active_branch.current_subjects[0]
-
-                subject_reference = (
-                    current_subject.reference
-                    or current_subject.label
-                )
-
-        # Context resolution must happen for every request,
-        # including requests without a stored conversation.
+        (
+            _conversation_state,
+            conversation_id,
+            conversation_created,
+            dialogue_history,
+        ) = self._prepare_conversation(conversation_id)
 
         context_resolution_started_at = perf_counter()
-
         resolved_context = self.subject_resolver(
-            subject_reference,
+            dialogue_history,
             text,
             utterance_route,
         )
-
         context_resolution_seconds = (
             perf_counter() - context_resolution_started_at
         )
+
+        subjects = get_resolved_subjects(resolved_context)
+        references = get_resolved_references(resolved_context)
+
+        if should_suppress_response(resolved_context):
+            return self._build_suppressed_result(
+                text=text,
+                conversation_id=conversation_id,
+                conversation_created=conversation_created,
+                dialogue_history=dialogue_history,
+                resolved_context=resolved_context,
+                subjects=subjects,
+                references=references,
+                request_started_at=request_started_at,
+                context_resolution_seconds=(
+                    context_resolution_seconds
+                ),
+                include_debug=include_debug,
+            )
 
         prompt = self.prompt_builder(
             text,
             dialogue_history,
             resolved_context,
-            active_branch,
+        )
+        exchange = self._create_exchange(
+            conversation_id=conversation_id,
+            dialogue_history=dialogue_history,
+            text=text,
+            resolved_context=resolved_context,
         )
 
         response_generation_started_at = perf_counter()
-
         response = self.response_generator(
             prompt,
             conversation_id,
         )
-
         response_generation_seconds = (
             perf_counter() - response_generation_started_at
         )
-        self_routing_assessment: (
-            SelfRoutingAssessment | None
-        ) = None
-        self_routing_validation_error: (
-            str | None
-        ) = None
 
-        if self.self_routing_enabled:
-            parser = SelfRoutingStreamParser()
-            response = parser.consume(
-                response
-            ) + parser.finish()
-            response = response.strip()
-            self_routing_assessment = (
-                parser.route
-            )
-            self_routing_validation_error = (
-                parser.validation_error
+        if response:
+            complete_dialogue_turn(
+                conversation_id,
+                exchange,
+                assistant=response,
             )
 
-        # Store dialogue for newly created and existing conversations.
-        if conversation_state is not None:
-            add_dialogue_turn(
-                conversation_id=conversation_state.conversation_id,
-                role="user",
-                content=text,
-            )
-
-            add_dialogue_turn(
-                conversation_id=conversation_state.conversation_id,
-                role="assistant",
-                content=response,
-            )
-        
         total_request_seconds = (
             perf_counter() - request_started_at
         )
-
-        timing_debug_payload = {
+        debug_payload = {
             **resolved_context.debug_payload,
             "conversation_created": conversation_created,
-            "self_routing": (
-                self_routing_assessment.model_dump(
-                    mode="json"
-                )
-                if self_routing_assessment
-                is not None
-                else None
-            ),
-            "self_routing_valid": (
-                self_routing_assessment
-                is not None
-            ),
-            "self_routing_validation_error": (
-                self_routing_validation_error
-            ),
+            "previous_subject": exchange.previous_subject,
+            "subjects": subjects,
+            "references": references,
             "timings": {
                 "total_request_seconds": round(
                     total_request_seconds,
@@ -397,23 +537,14 @@ class QueryEngine:
                     response_generation_seconds,
                     4,
                 ),
-                "self_routing_seconds": (
-                    round(
-                        response_generation_seconds,
-                        4,
-                    )
-                    if self.self_routing_enabled
-                    else None
-                ),
             },
         }
 
         debug = None
-
         if include_debug:
             debug = QueryDebugInfo(
-                conversation_found=conversation_state is not None,
-                subject_reference=resolved_context.subject_reference,
+                conversation_found=True,
+                subject_reference=None,
                 context_source=resolved_context.context_source,
                 context_used=bool(
                     resolved_context.sources
@@ -427,14 +558,14 @@ class QueryEngine:
                 ),
                 sources_count=len(resolved_context.sources),
                 sources=resolved_context.sources,
-                debug_payload=timing_debug_payload,
+                debug_payload=debug_payload,
             )
 
         return QueryResult(
             request=text,
             response=response,
             conversation_id=conversation_id,
-            subject_reference=resolved_context.subject_reference,
+            subject_reference=None,
             sources=resolved_context.sources,
             debug=debug,
         )
@@ -451,376 +582,155 @@ class QueryEngine:
     ) -> QueryResult:
         request_started_at = perf_counter()
 
-        conversation_created = False
-        dialogue_history: list[DialogueTurn] = []
-        active_branch: ConversationBranch | None = None
-        conversation_state = None
+        def emit_timing(
+            name: str,
+            seconds: float,
+            **payload,
+        ) -> None:
+            if on_stream_event is None:
+                return
 
-        if conversation_id is not None:
-            conversation_state = get_conversation(
-                conversation_id
-            )
-
-        if conversation_state is None:
-            conversation_state = create_conversation()
-            conversation_id = conversation_state.conversation_id
-            conversation_created = True
-
-        if conversation_state is not None:
-            dialogue_history = get_recent_conversation_history(
-                conversation_id=conversation_id,
-            )
-            active_branch = get_active_branch(
-                conversation_id=conversation_id,
-            )
-
-            if (
-                subject_reference is None
-                and active_branch is not None
-                and active_branch.current_subjects
-            ):
-                current_subject = (
-                    active_branch.current_subjects[0]
+            on_stream_event(
+                LLMStreamEvent(
+                    event_type="timing",
+                    timing_name=name,
+                    timing_seconds=round(seconds, 4),
+                    timing_payload=payload,
                 )
-                subject_reference = (
-                    current_subject.reference
-                    or current_subject.label
-                )
+            )
+
+        preparation_started_at = perf_counter()
+        (
+            _conversation_state,
+            conversation_id,
+            conversation_created,
+            dialogue_history,
+        ) = self._prepare_conversation(conversation_id)
+        emit_timing(
+            "conversation_preparation_seconds",
+            perf_counter() - preparation_started_at,
+        )
 
         context_resolution_started_at = perf_counter()
-
         resolved_context = self.subject_resolver(
-            subject_reference,
+            dialogue_history,
             text,
             utterance_route,
         )
-
         context_resolution_seconds = (
-            perf_counter()
-            - context_resolution_started_at
+            perf_counter() - context_resolution_started_at
+        )
+        subjects = get_resolved_subjects(resolved_context)
+        references = get_resolved_references(resolved_context)
+
+        emit_timing(
+            "context_resolution_seconds",
+            context_resolution_seconds,
+            context_source=resolved_context.context_source,
+            source_count=len(resolved_context.sources),
+            subjects=subjects,
+            references=references,
         )
 
+        context_resolution = (
+            resolved_context.prompt_payload.get(
+                "context_resolution"
+            )
+        )
+        if (
+            on_stream_event is not None
+            and isinstance(context_resolution, dict)
+        ):
+            on_stream_event(
+                LLMStreamEvent(
+                    event_type="self_routing",
+                    route_assessment=context_resolution,
+                )
+            )
+
+        if should_suppress_response(resolved_context):
+            return self._build_suppressed_result(
+                text=text,
+                conversation_id=conversation_id,
+                conversation_created=conversation_created,
+                dialogue_history=dialogue_history,
+                resolved_context=resolved_context,
+                subjects=subjects,
+                references=references,
+                request_started_at=request_started_at,
+                context_resolution_seconds=(
+                    context_resolution_seconds
+                ),
+                include_debug=include_debug,
+            )
+
+        prompt_started_at = perf_counter()
         prompt = self.prompt_builder(
             text,
             dialogue_history,
             resolved_context,
-            active_branch,
+        )
+        emit_timing(
+            "prompt_build_seconds",
+            perf_counter() - prompt_started_at,
+            prompt_characters=len(prompt),
+            dialogue_turns=len(dialogue_history),
         )
 
-        if conversation_state is not None:
-            add_dialogue_turn(
-                conversation_id=(
-                    conversation_state.conversation_id
-                ),
-                role="user",
-                content=text,
-            )
+        exchange = self._create_exchange(
+            conversation_id=conversation_id,
+            dialogue_history=dialogue_history,
+            text=text,
+            resolved_context=resolved_context,
+        )
 
         response_generation_started_at = perf_counter()
-        self_routing_parser = (
-            SelfRoutingStreamParser()
-            if self.self_routing_enabled
-            else None
+        emit_timing(
+            "pre_llm_total_seconds",
+            response_generation_started_at - request_started_at,
         )
-        self_routing_assessment: (
-            SelfRoutingAssessment | None
-        ) = None
-        self_routing_seconds: float | None = None
-        first_spoken_token_seconds: (
-            float | None
-        ) = None
 
+        response_parts: list[str] = []
         response_cancelled = (
             cancellation_token is not None
             and cancellation_token.is_cancelled
         )
+        first_spoken_token_seconds: float | None = None
 
         if response_cancelled:
-            response = ""
-
             if on_stream_event is not None:
                 on_stream_event(
                     LLMStreamEvent(
-                        event_type=(
-                            "response_cancelled"
-                        ),
-                        done=True,
-                    )
-                )
-        elif conversation_id is None:
-            response = generate_llm_response(
-                prompt
-            )
-
-            response_cancelled = (
-                cancellation_token is not None
-                and cancellation_token.is_cancelled
-            )
-
-            if (
-                on_stream_event is not None
-                and response_cancelled
-            ):
-                on_stream_event(
-                    LLMStreamEvent(
-                        event_type=(
-                            "response_cancelled"
-                        ),
-                        done=True,
-                    )
-                )
-            elif on_stream_event is not None:
-                on_stream_event(
-                    LLMStreamEvent(
-                        event_type="response_started",
-                    )
-                )
-                on_stream_event(
-                    LLMStreamEvent(
-                        event_type="content_delta",
-                        text=response,
-                    )
-                )
-                on_stream_event(
-                    LLMStreamEvent(
-                        event_type="response_complete",
-                        text=response,
+                        event_type="response_cancelled",
                         done=True,
                     )
                 )
         else:
-            response_parts: list[str] = []
-            deferred_tool_events: list[
-                LLMStreamEvent
-            ] = []
-            buffer_for_tool_decision = (
-                utterance_route is not None
-                and utterance_route.route_type
-                == "call_to_action"
-            )
-
-            for stream_event in (
-                stream_tool_aware_llm_response(
-                    prompt=prompt,
-                    conversation_id=conversation_id,
-                    buffer_for_tool_decision=(
-                        buffer_for_tool_decision
-                    ),
-                    cancellation_token=(
-                        cancellation_token
-                    ),
-                )
+            for stream_event in stream_llm_response(
+                prompt=prompt,
+                cancellation_token=cancellation_token,
             ):
-                if (
-                    stream_event.event_type
-                    == "content_delta"
-                ):
-                    spoken_delta = (
-                        stream_event.text
-                    )
+                if stream_event.event_type == "content_delta":
+                    if stream_event.text:
+                        response_parts.append(stream_event.text)
 
-                    if (
-                        self_routing_parser
-                        is not None
-                    ):
-                        spoken_delta = (
-                            self_routing_parser
-                            .consume(
-                                stream_event.text
-                            )
-                        )
-
-                        if (
-                            self_routing_parser
-                            .route_just_completed
-                            and self_routing_seconds
-                            is None
-                        ):
-                            self_routing_seconds = (
-                                perf_counter()
-                                - response_generation_started_at
-                            )
-                            self_routing_assessment = (
-                                self_routing_parser
-                                .route
-                            )
-
-                            if (
-                                on_stream_event
-                                is not None
-                            ):
-                                on_stream_event(
-                                    LLMStreamEvent(
-                                        event_type=(
-                                            "self_routing"
-                                        ),
-                                        route_assessment=(
-                                            self_routing_assessment
-                                            .model_dump(
-                                                mode="json"
-                                            )
-                                            if self_routing_assessment
-                                            is not None
-                                            else None
-                                        ),
-                                    )
-                                )
-
-                                for deferred_event in (
-                                    deferred_tool_events
-                                ):
-                                    on_stream_event(
-                                        deferred_event
-                                    )
-
-                                deferred_tool_events.clear()
-
-                    if spoken_delta:
-                        response_parts.append(
-                            spoken_delta
-                        )
-
-                        if (
-                            first_spoken_token_seconds
-                            is None
-                        ):
+                        if first_spoken_token_seconds is None:
                             first_spoken_token_seconds = (
                                 perf_counter()
                                 - response_generation_started_at
                             )
-
-                        if on_stream_event is not None:
-                            on_stream_event(
-                                LLMStreamEvent(
-                                    event_type=(
-                                        "content_delta"
-                                    ),
-                                    text=spoken_delta,
-                                )
+                            emit_timing(
+                                "first_spoken_token_seconds",
+                                first_spoken_token_seconds,
                             )
 
-                    continue
-
-                if (
-                    stream_event.event_type
-                    == "response_complete"
-                    and self_routing_parser
-                    is not None
-                ):
-                    final_spoken_text = (
-                        self_routing_parser.finish()
-                    )
-
-                    if (
-                        self_routing_parser
-                        .route_just_completed
-                        and self_routing_seconds
-                        is None
-                    ):
-                        self_routing_seconds = (
-                            perf_counter()
-                            - response_generation_started_at
-                        )
-                        self_routing_assessment = (
-                            self_routing_parser.route
-                        )
-
-                        if on_stream_event is not None:
-                            on_stream_event(
-                                LLMStreamEvent(
-                                    event_type=(
-                                        "self_routing"
-                                    ),
-                                    route_assessment=(
-                                        self_routing_assessment
-                                        .model_dump(
-                                            mode="json"
-                                        )
-                                        if self_routing_assessment
-                                        is not None
-                                        else None
-                                    ),
-                                )
-                            )
-
-                            for deferred_event in (
-                                deferred_tool_events
-                            ):
-                                on_stream_event(
-                                    deferred_event
-                                )
-
-                            deferred_tool_events.clear()
-
-                    if final_spoken_text:
-                        response_parts.append(
-                            final_spoken_text
-                        )
-
-                        if (
-                            first_spoken_token_seconds
-                            is None
-                        ):
-                            first_spoken_token_seconds = (
-                                perf_counter()
-                                - response_generation_started_at
-                            )
-
-                        if on_stream_event is not None:
-                            on_stream_event(
-                                LLMStreamEvent(
-                                    event_type=(
-                                        "content_delta"
-                                    ),
-                                    text=final_spoken_text,
-                                )
-                            )
-
-                    if on_stream_event is not None:
-                        on_stream_event(
-                            LLMStreamEvent(
-                                event_type=(
-                                    "response_complete"
-                                ),
-                                text="".join(
-                                    response_parts
-                                ).strip(),
-                                done=True,
-                            )
-                        )
-                    continue
-
-                if (
-                    stream_event.event_type
-                    == "response_cancelled"
-                ):
+                elif stream_event.event_type == "response_cancelled":
                     response_cancelled = True
 
-                if (
-                    self_routing_parser
-                    is not None
-                    and not self_routing_parser
-                    .route_complete
-                    and stream_event.event_type
-                    in {
-                        "tool_call",
-                        "tool_result",
-                    }
-                ):
-                    deferred_tool_events.append(
-                        stream_event
-                    )
-                    continue
-
                 if on_stream_event is not None:
-                    on_stream_event(
-                        stream_event
-                    )
+                    on_stream_event(stream_event)
 
-            response = "".join(
-                response_parts
-            ).strip()
-
+        response = "".join(response_parts).strip()
         response_cancelled = (
             response_cancelled
             or (
@@ -830,47 +740,25 @@ class QueryEngine:
         )
 
         response_generation_seconds = (
-            perf_counter()
-            - response_generation_started_at
+            perf_counter() - response_generation_started_at
         )
 
-        if conversation_state is not None:
-            if not response_cancelled:
-                add_dialogue_turn(
-                    conversation_id=(
-                        conversation_state
-                        .conversation_id
-                    ),
-                    role="assistant",
-                    content=response,
-                )
+        if not response_cancelled and response:
+            complete_dialogue_turn(
+                conversation_id,
+                exchange,
+                assistant=response,
+            )
 
         total_request_seconds = (
             perf_counter() - request_started_at
         )
-
-        timing_debug_payload = {
+        debug_payload = {
             **resolved_context.debug_payload,
             "conversation_created": conversation_created,
-            "self_routing": (
-                self_routing_assessment.model_dump(
-                    mode="json"
-                )
-                if self_routing_assessment
-                is not None
-                else None
-            ),
-            "self_routing_valid": (
-                self_routing_assessment
-                is not None
-            ),
-            "self_routing_validation_error": (
-                self_routing_parser
-                .validation_error
-                if self_routing_parser
-                is not None
-                else None
-            ),
+            "previous_subject": exchange.previous_subject,
+            "subjects": subjects,
+            "references": references,
             "timings": {
                 "total_request_seconds": round(
                     total_request_seconds,
@@ -884,69 +772,44 @@ class QueryEngine:
                     response_generation_seconds,
                     4,
                 ),
-                "self_routing_seconds": (
-                    round(
-                        self_routing_seconds,
-                        4,
-                    )
-                    if self_routing_seconds
-                    is not None
-                    else None
-                ),
                 "first_spoken_token_seconds": (
-                    round(
-                        first_spoken_token_seconds,
-                        4,
-                    )
-                    if first_spoken_token_seconds
-                    is not None
+                    round(first_spoken_token_seconds, 4)
+                    if first_spoken_token_seconds is not None
                     else None
                 ),
             },
         }
 
         debug = None
-
         if include_debug:
             debug = QueryDebugInfo(
-                conversation_found=(
-                    conversation_state is not None
-                ),
-                subject_reference=(
-                    resolved_context.subject_reference
-                ),
-                context_source=(
-                    resolved_context.context_source
-                ),
+                conversation_found=True,
+                subject_reference=None,
+                context_source=resolved_context.context_source,
                 context_used=bool(
                     resolved_context.sources
                     or resolved_context.prompt_payload
                 ),
-                dialogue_turns_used=len(
-                    dialogue_history
-                ),
+                dialogue_turns_used=len(dialogue_history),
                 prompt=prompt,
                 retrieval_used=(
                     resolved_context.context_source
                     not in NON_RETRIEVAL_CONTEXT_SOURCES
                 ),
-                sources_count=len(
-                    resolved_context.sources
-                ),
+                sources_count=len(resolved_context.sources),
                 sources=resolved_context.sources,
-                debug_payload=timing_debug_payload,
+                debug_payload=debug_payload,
             )
 
         return QueryResult(
             request=text,
             response=response,
             conversation_id=conversation_id,
-            subject_reference=(
-                resolved_context.subject_reference
-            ),
+            subject_reference=None,
             sources=resolved_context.sources,
             debug=debug,
         )
+
 
 DEFAULT_CONVERSATION_PROFILE = PromptProfile(
     assistant_name="Assistant",
@@ -961,17 +824,20 @@ DEFAULT_CONVERSATION_PROFILE = PromptProfile(
 
 
 def default_resolve_context(
-    subject_reference: str | None,
+    dialogue_history: list[DialogueTurn],
     user_input: str,
     utterance_route: UtteranceRoute | None = None,
 ) -> ResolvedContext:
     return ResolvedContext(
         context_source="no_external_context",
-        subject_reference=subject_reference,
+        subject_reference=None,
         sources=[],
-        prompt_payload={},
+        prompt_payload={"subjects": []},
         debug_payload={
-            "note": "Default conversation engine used; no domain resolver configured.",
+            "note": (
+                "Default conversation engine used; "
+                "no domain resolver configured."
+            ),
         },
     )
 
@@ -980,30 +846,14 @@ def default_build_prompt(
     user_input: str,
     dialogue_history: list[DialogueTurn],
     resolved_context: ResolvedContext,
-    active_branch: ConversationBranch | None,
 ) -> str:
-    branch_context = format_conversation_branch_for_prompt(
-        active_branch
-    )
-
     return build_prompt(
         user_input=user_input,
         dialogue_history=dialogue_history,
         profile=DEFAULT_CONVERSATION_PROFILE,
-        context_sections=[
-            PromptSection(
-                title="Active conversation branch",
-                content=f"""
-                    {branch_context}
-
-                    Operational rules:
-                    - A digression does not close an active bounded branch.
-                    - Keep a bounded branch active until its activity is complete or the user clearly asks to stop.
-                    - Use operational tools only when conversation-tree state actually needs to change.
-                """.strip(),
-            )
-        ],
+        context_sections=[],
     )
+
 
 default_query_engine = QueryEngine(
     subject_resolver=default_resolve_context,

@@ -1,0 +1,257 @@
+"""
+DEPRECATED REFERENCE IMPLEMENTATION.
+
+This module belongs to the retired conversation-tree architecture.
+It is intentionally disconnected from the active application and may
+not import successfully because its former state models and store
+operations have been removed.
+
+Restore the associated schemas and conversation-store functions before
+attempting to reactivate this implementation.
+"""
+
+from conversation_core.memory.conversation_store import (
+    close_active_branch,
+    create_conversation_branch,
+    get_active_branch,
+)
+
+from conversation_core.schemas.conversation_schemas import (
+    ConversationSubject,
+)
+
+from conversation_core.schemas.dep_conversation_tool_schemas import (
+    CloseActiveBranchArguments,
+    CreateConversationBranchArguments,
+    ToolSubjectInput,
+)
+
+from conversation_core.schemas.tool_schemas import (
+    ToolDefinition,
+    ToolExecutionContext,
+    ToolExecutionResult,
+)
+
+from conversation_core.tools.tool_registry import ToolRegistry
+
+def convert_subject_inputs(
+    subject_inputs: list[ToolSubjectInput] | None,
+) -> list[ConversationSubject] | None:
+    if subject_inputs is None:
+        return None
+
+    return [
+        ConversationSubject(
+            label=subject.label,
+            reference=subject.reference,
+        )
+        for subject in subject_inputs
+    ]
+
+def handle_create_conversation_branch(
+    context: ToolExecutionContext,
+    raw_arguments: dict,
+) -> ToolExecutionResult:
+    arguments = CreateConversationBranchArguments.model_validate(
+        raw_arguments
+    )
+
+    state = create_conversation_branch(
+        conversation_id=context.conversation_id,
+        name=arguments.name,
+        branch_type=arguments.branch_type,
+        current_subjects=(
+            convert_subject_inputs(arguments.current_subjects)
+            or []
+        ),
+        remaining_subjects=(
+            convert_subject_inputs(arguments.remaining_subjects)
+            or []
+        ),
+    )
+
+    if state is None:
+        return ToolExecutionResult(
+            tool_name="create_conversation_branch",
+            success=False,
+            message="The conversation could not be found.",
+        )
+
+    active_branch = get_active_branch(
+        context.conversation_id
+    )
+
+    if active_branch is None:
+        return ToolExecutionResult(
+            tool_name="create_conversation_branch",
+            success=False,
+            message="The branch was created but could not be retrieved.",
+        )
+
+    return ToolExecutionResult(
+        tool_name="create_conversation_branch",
+        success=True,
+        message=(
+            f"Created and activated the "
+            f"'{active_branch.name}' branch."
+        ),
+        data={
+            "active_branch": active_branch.model_dump(),
+        },
+    )
+
+def handle_close_active_branch(
+    context: ToolExecutionContext,
+    raw_arguments: dict,
+) -> ToolExecutionResult:
+    arguments = CloseActiveBranchArguments.model_validate(
+        raw_arguments
+    )
+
+    active_branch = get_active_branch(
+        context.conversation_id
+    )
+
+    if active_branch is None:
+        return ToolExecutionResult(
+            tool_name="close_active_branch",
+            success=False,
+            message="No active conversation branch was found.",
+        )
+
+    branch_name = active_branch.name
+
+    try:
+        state = close_active_branch(
+            context.conversation_id
+        )
+    except ValueError as error:
+        return ToolExecutionResult(
+            tool_name="close_active_branch",
+            success=False,
+            message=str(error),
+        )
+
+    if state is None:
+        return ToolExecutionResult(
+            tool_name="close_active_branch",
+            success=False,
+            message="The active branch could not be closed.",
+        )
+
+    new_active_branch = get_active_branch(
+        context.conversation_id
+    )
+
+    return ToolExecutionResult(
+        tool_name="close_active_branch",
+        success=True,
+        message=(
+            f"Closed the '{branch_name}' bounded branch and "
+            "activated a new open branch."
+        ),
+        data={
+            "reason": arguments.reason,
+            "closed_branch_id": active_branch.branch_id,
+            "active_branch": (
+                new_active_branch.model_dump()
+                if new_active_branch is not None
+                else None
+            ),
+        },
+    )
+
+CREATE_CONVERSATION_BRANCH_DEFINITION = ToolDefinition(
+    name="create_conversation_branch",
+    description=(
+        "Create and activate a new conversation branch when the "
+        "conversation begins a distinct activity, such as a tour. "
+        "Creating a branch closes the previously active branch."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": (
+                    "A short descriptive name for the branch."
+                ),
+            },
+            "branch_type": {
+                "type": "string",
+                "enum": ["open", "bounded"],
+                "description": (
+                    "Use bounded when the activity begins with a "
+                    "predefined set of subjects. Otherwise use open."
+                ),
+            },
+            "current_subjects": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {
+                            "type": "string",
+                        },
+                        "reference": {
+                            "type": ["string", "null"],
+                        },
+                    },
+                    "required": ["label"],
+                },
+            },
+            "remaining_subjects": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {
+                            "type": "string",
+                        },
+                        "reference": {
+                            "type": ["string", "null"],
+                        },
+                    },
+                    "required": ["label"],
+                },
+            },
+        },
+        "required": [
+            "name",
+            "branch_type",
+        ],
+    },
+)
+
+CLOSE_ACTIVE_BRANCH_DEFINITION = ToolDefinition(
+    name="close_active_branch",
+    description=(
+        "Close the active bounded conversation branch when its "
+        "activity has been completed or the user has clearly asked "
+        "to stop it. A new open branch is activated automatically."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "reason": {
+                "type": ["string", "null"],
+                "description": (
+                    "A brief explanation of why the branch is closing."
+                ),
+            },
+        },
+    },
+)
+
+def register_conversation_tree_tools(
+    registry: ToolRegistry,
+) -> None:
+    registry.register(
+        definition=CREATE_CONVERSATION_BRANCH_DEFINITION,
+        handler=handle_create_conversation_branch,
+    )
+
+    registry.register(
+        definition=CLOSE_ACTIVE_BRANCH_DEFINITION,
+        handler=handle_close_active_branch,
+    )

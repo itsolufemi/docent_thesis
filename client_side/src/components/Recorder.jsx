@@ -27,6 +27,7 @@ export default function Recorder({
   streamRef,
   sendChunkToServer,
   onAudioSegmentStart,
+  onAudioSegmentCandidate,
   onAudioSegmentFinalise,
   onAudioSegmentCancel,
   onVadSpeechStart,
@@ -41,10 +42,6 @@ export default function Recorder({
   ) => {
     switch (message.type) {
       case 'speech_start': {
-        if (segmentActiveRef.current) {
-          return;
-        }
-
         onVadSpeechStart?.();
         await onAudioSegmentStart?.();
 
@@ -96,9 +93,7 @@ export default function Recorder({
           return;
         }
 
-        segmentActiveRef.current = false;
-
-        onAudioSegmentFinalise?.(
+        onAudioSegmentCandidate?.(
           message.silenceDurationMs ??
             DEFAULT_VAD_SILENCE_MS,
         );
@@ -237,7 +232,12 @@ export default function Recorder({
       if (segmentActiveRef.current) {
         segmentActiveRef.current = false;
         onVadSpeechEnd?.(0);
-        onAudioSegmentFinalise?.(0);
+        onAudioSegmentFinalise?.(
+          0,
+          {
+            forcedFinalisation: true,
+          },
+        );
       }
 
       const audioContext =

@@ -10,7 +10,8 @@
     "test:vad": "node --test tests/vad.test.js",
     "test:sentences": "node --test tests/sentenceBuffer.test.js",
     "test:tts-client": "node --test tests/ttsStreamClient.test.js",
-    "test:turn-client": "node --test tests/turnStreamClient.test.js"
+    "test:turn-client": "node --test tests/turnStreamClient.test.js",
+    "test:audio-client": "node --test tests/audioStreamClient.test.js"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",

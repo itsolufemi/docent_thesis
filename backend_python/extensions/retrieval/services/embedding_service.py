@@ -1,6 +1,7 @@
-import httpx
-
 from config import settings
+from conversation_core.services.ollama_http_client import (
+    ollama_http_client,
+)
 from extensions.retrieval.schemas.embedding_schemas import IndexedChunkEmbedding
 from extensions.retrieval.schemas.index_schemas import IndexedRetrievalChunk
 
@@ -11,8 +12,8 @@ def generate_embedding(text: str) -> list[float]:
     if not cleaned_text:
         return []
 
-    response = httpx.post(
-        f"{settings.ollama_base_url}/api/embeddings",
+    response = ollama_http_client.post(
+        "/api/embeddings",
         json={
             "model": settings.ollama_embedding_model,
             "prompt": cleaned_text,

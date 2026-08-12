@@ -6,10 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def _read_bool(
-    name: str,
-    default: bool = False,
-) -> bool:
+def _read_bool(name: str, default: bool = False) -> bool:
     value = _optional_boolean(name)
 
     if value is None:
@@ -90,6 +87,112 @@ class Settings():
         True
     )
 
+    transcription_backend: str = os.getenv(
+        "TRANSCRIPTION_BACKEND",
+        "whisper",
+    ).strip().lower()
+
+    moonshine_language: str = os.getenv(
+        "MOONSHINE_LANGUAGE",
+        "en",
+    )
+
+    moonshine_model_arch_raw: str = os.getenv(
+        "MOONSHINE_MODEL_ARCH",
+        "",
+    ).strip()
+
+    moonshine_model_arch: int | None = (
+        int(moonshine_model_arch_raw)
+        if moonshine_model_arch_raw
+        else None
+    )
+
+    moonshine_update_interval: float = float(
+        os.getenv(
+            "MOONSHINE_UPDATE_INTERVAL",
+            "0.2",
+        )
+    )
+
+    moonshine_save_input_wav_path_raw: str = os.getenv(
+        "MOONSHINE_SAVE_INPUT_WAV_PATH",
+        "",
+    ).strip()
+
+    moonshine_save_input_wav_path: Path | None = (
+        (
+            backend_root
+            / moonshine_save_input_wav_path_raw
+        ).resolve()
+        if moonshine_save_input_wav_path_raw
+        else None
+    )
+
+    warm_up_moonshine_on_startup: bool = _read_bool(
+        "WARM_UP_MOONSHINE_ON_STARTUP",
+        True,
+    )
+
+    warm_up_smart_turn_on_startup: bool = _read_bool(
+        "WARM_UP_SMART_TURN_ON_STARTUP",
+        True,
+    )
+    warm_up_retrieval_on_startup: bool = _read_bool(
+        "WARM_UP_RETRIEVAL_ON_STARTUP",
+        True,
+    )
+    warm_up_llm_on_startup: bool = _read_bool(
+        "WARM_UP_LLM_ON_STARTUP",
+        True,
+    )
+    warm_up_tts_on_startup: bool = _read_bool(
+        "WARM_UP_TTS_ON_STARTUP",
+        True,
+    )
+
+    tts_backend: str = os.getenv(
+        "TTS_BACKEND",
+        "kyutai_pocket",
+    ).strip().lower()
+    tts_model: str = os.getenv(
+        "TTS_MODEL",
+        "english",
+    ).strip()
+    tts_voice: str = os.getenv(
+        "TTS_VOICE",
+        "jane",
+    ).strip()
+    tts_language_code: str = os.getenv(
+        "TTS_LANGUAGE_CODE",
+        "en-GB",
+    ).strip()
+    tts_quantize: bool = _read_bool(
+        "TTS_QUANTIZE",
+        False,
+    )
+
+    smart_turn_enabled: bool = _read_bool(
+        "SMART_TURN_ENABLED",
+        False,
+    )
+    smart_turn_model_path: Path = (
+        backend_root
+        / os.getenv(
+            "SMART_TURN_MODEL_PATH",
+            "models/smart-turn-v3.2-cpu.onnx",
+        )
+    ).resolve()
+    smart_turn_threshold: float = float(
+        os.getenv("SMART_TURN_THRESHOLD", "0.50")
+    )
+    smart_turn_max_audio_seconds: float = float(
+        os.getenv(
+            "SMART_TURN_MAX_AUDIO_SECONDS",
+            "8.0",
+        )
+    )
+
     docent_vector_store_directory: Path = (
         backend_root / "docent" / "data" / "vector_store"
     )
@@ -99,6 +202,19 @@ class Settings():
     docent_vector_embeddings_path: Path = (
         docent_vector_store_directory / "docent_vector_embeddings.npy"
     )
+
+    conversation_logging_enabled: bool = _read_bool(
+        "CONVERSATION_LOGGING_ENABLED",
+        True
+    )
+
+    conversation_log_directory: Path = (
+        backend_root
+        / os.getenv(
+            "CONVERSATION_LOG_DIRECTORY",
+            "runtime_logs/conversations",
+        )
+    ).resolve()
 
     class Config:
         env_file = ".env"

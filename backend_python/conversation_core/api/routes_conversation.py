@@ -8,12 +8,16 @@ from fastapi import (
 from conversation_core.memory.conversation_store import (
     create_conversation,
     get_conversation,
-    set_active_branch_subject,
 )
 from conversation_core.schemas.conversation_schemas import (
     ConversationState,
-    SetCurrentSubjectRequest,
-    SetCurrentSubjectResponse,
+)
+from conversation_core.schemas.introduction_schemas import (
+    IntroductionResponse,
+)
+from conversation_core.services.query_service import (
+    QueryEngine,
+    default_query_engine,
 )
 from conversation_core.schemas.introduction_schemas import (
     IntroductionResponse,
@@ -127,58 +131,6 @@ def create_conversation_router(
         return _generate_introduction_response(
             query_engine=active_query_engine,
             conversation_id=conversation_id,
-        )
-
-    @router.post(
-        "/api/conversations/{conversation_id}/introduction",
-        response_model=IntroductionResponse,
-    )
-    def introduce_conversation(
-        conversation_id: str,
-    ):
-        return _generate_introduction_response(
-            query_engine=active_query_engine,
-            conversation_id=conversation_id,
-        )
-
-    @router.post(
-        "/api/conversations/current/active-branch/subject",
-        response_model=SetCurrentSubjectResponse,
-    )
-    def update_active_branch_subject(
-        request: SetCurrentSubjectRequest,
-        conversation_id: str | None = Cookie(
-            default=None,
-            alias=CONVERSATION_COOKIE_NAME,
-        ),
-    ):
-        if conversation_id is None:
-            raise HTTPException(
-                status_code=404,
-                detail=(
-                    "No active conversation cookie found."
-                ),
-            )
-
-        state = set_active_branch_subject(
-            conversation_id=conversation_id,
-            subject_reference=(
-                request.subject_reference
-            ),
-        )
-
-        if state is None:
-            raise HTTPException(
-                status_code=404,
-                detail=(
-                    "Conversation or active branch "
-                    "not found."
-                ),
-            )
-
-        return SetCurrentSubjectResponse(
-            conversation_id=conversation_id,
-            state=state,
         )
 
     return router

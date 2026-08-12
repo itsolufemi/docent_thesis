@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
 from threading import Lock
 from time import perf_counter
 
 from google.cloud import texttospeech
+
+from conversation_core.services.tts_service import (
+    SynthesisedSpeech,
+)
 
 
 DEFAULT_LANGUAGE_CODE = "en-GB"
@@ -13,18 +16,9 @@ DEFAULT_VOICE_NAME = "en-GB-Chirp3-HD-Aoede"
 DEFAULT_SAMPLE_RATE = 24_000
 
 
-@dataclass(frozen=True)
-class SynthesisedSpeech:
-    audio: bytes
-    text: str
-    voice_name: str
-    language_code: str
-    sample_rate: int
-    generation_seconds: float
-    character_count: int
-
-
 class GoogleTextToSpeechService:
+    provider_name = "google"
+    recommended_prebuffer_ms = 0
     def __init__(
         self,
         *,
@@ -131,6 +125,7 @@ class GoogleTextToSpeechService:
             sample_rate=self.sample_rate,
             generation_seconds=generation_seconds,
             character_count=len(cleaned_text),
+            provider_name=self.provider_name,
         )
 
     def stream_synthesise(
@@ -217,6 +212,54 @@ class GoogleTextToSpeechService:
 
             if audio_content:
                 yield bytes(audio_content)
+
+    def warm_up(self) -> dict:
+        started_at = perf_counter()
+        first_chunk_seconds: float | None = None
+        chunk_count = 0
+        audio_bytes = 0
+
+        for chunk in self.stream_synthesise("Ready."):
+            if chunk_count == 0:
+                first_chunk_seconds = (
+                    perf_counter() - started_at
+                )
+
+            chunk_count += 1
+            audio_bytes += len(chunk)
+
+        if chunk_count == 0:
+            raise RuntimeError(
+                "Google TTS warm-up returned no audio."
+            )
+
+        return {
+            "seconds": round(
+                perf_counter() - started_at,
+                4,
+            ),
+            "first_chunk_seconds": (
+                round(first_chunk_seconds, 4)
+                if first_chunk_seconds is not None
+                else None
+            ),
+            "chunk_count": chunk_count,
+            "audio_bytes": audio_bytes,
+        }
+
+    def close(self) -> None:
+        with self._client_lock:
+            client = self._client
+            self._client = None
+
+        if client is None:
+            return
+
+        transport = getattr(client, "transport", None)
+        close = getattr(transport, "close", None)
+
+        if callable(close):
+            close()
 
 
 google_tts_service = GoogleTextToSpeechService()

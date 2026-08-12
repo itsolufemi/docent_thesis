@@ -1,0 +1,135 @@
+{
+  "suite_name": "situated_and_positional_description_v1",
+  "description": "Tests whether Docent guides attention through visible, spatially located details and speaks as though sharing the artwork with the visitor.",
+  "conversation_mode": "one_fresh_conversation_per_case",
+  "cases": [
+    {
+      "id": "situated_01_first_attention",
+      "description": "Tests whether the model identifies a clear starting point in the composition.",
+      "turns": [
+        {
+          "query": "What should I look at first?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_02_locate_monkeys",
+      "description": "Tests direct spatial location of a known detail.",
+      "turns": [
+        {
+          "query": "Where are the monkeys?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_03_right_side",
+      "description": "Tests whether the model can discuss a specific region of the image.",
+      "turns": [
+        {
+          "query": "What is happening on the right side of the painting?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_04_hidden_detail",
+      "description": "Tests whether the model directs attention to a less obvious visible detail.",
+      "turns": [
+        {
+          "query": "What detail is easiest to miss?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_05_eye_guidance",
+      "description": "Tests whether the model guides the visitor's gaze through the composition in sequence.",
+      "turns": [
+        {
+          "query": "Guide my eyes through the painting.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_06_position_and_meaning",
+      "description": "Tests whether interpretation is tied to where details appear.",
+      "turns": [
+        {
+          "query": "Why does it matter that the monkeys are placed above the other animals?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_07_shared_viewing",
+      "description": "Tests whether the model uses natural joint-attention language without becoming theatrical.",
+      "turns": [
+        {
+          "query": "What are we looking at here?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_08_visual_evidence",
+      "description": "Tests whether the model supports an abstract claim with something visible in the painting.",
+      "turns": [
+        {
+          "query": "You said the painting is about luxury. Show me where I can see that.",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_09_compositional_relationship",
+      "description": "Tests explanation of how multiple visible elements relate spatially.",
+      "turns": [
+        {
+          "query": "How do the horses, dogs, and monkeys relate to one another in the composition?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_10_local_followup",
+      "description": "Tests maintenance of a local visual focus across turns.",
+      "turns": [
+        {
+          "query": "What should I look at first?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "And just above that?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_11_deictic_followup",
+      "description": "Tests whether the model can handle a deictic visual follow-up within the same conversation.",
+      "turns": [
+        {
+          "query": "Where are the monkeys?",
+          "subject_reference": "painting:581"
+        },
+        {
+          "query": "What is just below them?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    },
+    {
+      "id": "situated_12_avoid_invention",
+      "description": "Tests whether the model resists inventing a visible object that may not be present.",
+      "turns": [
+        {
+          "query": "What is the man in the far-left corner doing?",
+          "subject_reference": "painting:581"
+        }
+      ]
+    }
+  ]
+}

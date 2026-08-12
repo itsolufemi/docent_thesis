@@ -1,9 +1,9 @@
 from conversation_core.schemas.conversation_schemas import (
     DialogueTurn,
-    ConversationBranch,
 )
 
 from conversation_core.schemas.prompt_schemas import PromptProfile, PromptSection
+
 
 def format_dialogue_history_for_prompt(
     dialogue_history: list[DialogueTurn],
@@ -13,19 +13,31 @@ def format_dialogue_history_for_prompt(
     if not dialogue_history:
         return "No previous dialogue."
 
-    formatted_turns = []
+    formatted_turns: list[str] = []
 
     for turn in dialogue_history:
-        if turn.role == "user":
-            speaker = user_label
-        elif turn.role == "assistant":
-            speaker = assistant_label
-        else:
-            speaker = "System"
+        turn_lines = [
+            f"Previous subjects: {turn.previous_subject!r}",
+            f"Subjects: {turn.subject!r}",
+            f"References: {turn.reference!r}",
+        ]
 
-        formatted_turns.append(f"{speaker}: {turn.content}")
+        if turn.user is not None:
+            turn_lines.append(
+                f"{user_label}: {turn.user}"
+            )
 
-    return "\n".join(formatted_turns)
+        if turn.assistant is not None:
+            turn_lines.append(
+                f"{assistant_label}: {turn.assistant}"
+            )
+
+        formatted_turns.append(
+            "\n".join(turn_lines)
+        )
+
+    return "\n\n".join(formatted_turns)
+
 
 def format_prompt_sections(
     sections: list[PromptSection],
@@ -45,6 +57,7 @@ def format_prompt_sections(
         )
 
     return "\n\n".join(blocks)
+
 
 def build_prompt(
     user_input: str,
@@ -83,35 +96,3 @@ Recent dialogue:
 
 Respond as {profile.assistant_name}:
 """.strip()
-
-def format_conversation_branch_for_prompt(
-    branch: ConversationBranch | None,
-) -> str:
-    if branch is None:
-        return "No active conversation branch is available."
-
-    previous_labels = [
-        subject.label
-        for subject in branch.previous_subjects
-    ]
-
-    current_labels = [
-        subject.label
-        for subject in branch.current_subjects
-    ]
-
-    remaining_labels = [
-        subject.label
-        for subject in branch.remaining_subjects
-    ]
-
-    return "\n".join(
-        [
-            f"Branch name: {branch.name}",
-            f"Branch type: {branch.branch_type}",
-            f"Branch status: {branch.status}",
-            f"Previous subjects: {previous_labels}",
-            f"Current subjects: {current_labels}",
-            f"Remaining subjects: {remaining_labels}",
-        ]
-    )

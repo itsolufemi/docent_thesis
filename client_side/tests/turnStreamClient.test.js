@@ -12,6 +12,57 @@ globalThis.WebSocket = {
 
 
 test(
+  (
+    'sendClientTelemetry sends a '
+    + 'request-scoped telemetry message'
+  ),
+  () => {
+    const sentMessages = [];
+    const client =
+      new TurnStreamClient();
+
+    client.socket = {
+      readyState: WebSocket.OPEN,
+
+      send(message) {
+        sentMessages.push(
+          JSON.parse(message),
+        );
+      },
+    };
+
+    const payload = {
+      voicePipelinePlayback: {
+        queryToPlaybackSeconds:
+          1.4044,
+      },
+      bufferUnderrunCount: 0,
+    };
+
+    assert.equal(
+      client.sendClientTelemetry(
+        'request-telemetry',
+        payload,
+      ),
+      true,
+    );
+
+    assert.deepEqual(
+      sentMessages,
+      [
+        {
+          type: 'client_telemetry',
+          request_id:
+            'request-telemetry',
+          payload,
+        },
+      ],
+    );
+  },
+);
+
+
+test(
   'cancelTurn sends a request-scoped cancellation message',
   () => {
     const sentMessages = [];
@@ -90,6 +141,38 @@ test(
           },
         },
       ],
+    );
+  },
+);
+
+
+test(
+  'confirmed acoustic turns are included in turn events',
+  () => {
+    const sentMessages = [];
+    const client = new TurnStreamClient();
+
+    client.socket = {
+      readyState: WebSocket.OPEN,
+      send(message) {
+        sentMessages.push(
+          JSON.parse(message),
+        );
+      },
+    };
+
+    client.sendTurnEvent({
+      partialUtterance: 'Tell me about it.',
+      isSpeechActive: false,
+      silenceDurationMs: 500,
+      assistantWasSpeaking: false,
+      turnCompletionConfirmed: true,
+    });
+
+    assert.equal(
+      sentMessages[0].payload
+        .turn_completion_confirmed,
+      true,
     );
   },
 );
