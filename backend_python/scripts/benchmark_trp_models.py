@@ -19,8 +19,8 @@ if str(BACKEND_ROOT) not in sys.path:
 
 
 from config import settings  # noqa: E402
-from conversation_core.services.transcription_service import (  # noqa: E402
-    default_transcription_service,
+from models.whisper_local.whisper_transcription_service import (  # noqa: E402
+    default_local_whisper_transcription_service,
 )
 from conversation_core.services.trp_service import (  # noqa: E402
     build_trp_prompt,
@@ -92,7 +92,7 @@ def measure_transcription(
     runs: int,
 ) -> tuple[str, list[float]]:
     # Load and warm Whisper before the recorded passes.
-    default_transcription_service.transcribe_pcm16(
+    default_local_whisper_transcription_service.transcribe_pcm16(
         stream_pcm,
         sample_rate=TARGET_SAMPLE_RATE,
         channels=1,
@@ -104,7 +104,7 @@ def measure_transcription(
     for run_index in range(runs):
         started_at = perf_counter()
         result = (
-            default_transcription_service
+            default_local_whisper_transcription_service
             .transcribe_pcm16(
                 stream_pcm,
                 sample_rate=(

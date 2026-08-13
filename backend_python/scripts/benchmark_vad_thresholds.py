@@ -28,8 +28,8 @@ from conversation_core.schemas.turn_buffer_schemas import (  # noqa: E402
 from conversation_core.services.google_tts_service import (  # noqa: E402
     google_tts_service,
 )
-from conversation_core.services.transcription_service import (  # noqa: E402
-    default_transcription_service,
+from models.whisper_local.whisper_transcription_service import (  # noqa: E402
+    default_local_whisper_transcription_service,
 )
 from conversation_core.services.trp_service import (  # noqa: E402
     predict_transition_relevance,
@@ -629,7 +629,7 @@ def evaluate_condition(
             perf_counter()
         )
         transcription = (
-            default_transcription_service
+            default_local_whisper_transcription_service
             .transcribe_pcm16(
                 segment["samples"].tobytes(),
                 sample_rate=TARGET_SAMPLE_RATE,
@@ -1024,7 +1024,7 @@ def main() -> None:
         ],
         silence_threshold_ms=600,
     )
-    default_transcription_service.transcribe_pcm16(
+    default_local_whisper_transcription_service.transcribe_pcm16(
         warmup_segments[0][
             "samples"
         ].tobytes(),

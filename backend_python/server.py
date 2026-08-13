@@ -54,11 +54,8 @@ from conversation_core.services.llm_service import (
 from conversation_core.services.ollama_http_client import (
     close_ollama_http_client,
 )
-from conversation_core.services.transcription_service import (
-    default_transcription_service,
-)
-from conversation_core.services.moonshine_transcription_service import (
-    default_moonshine_transcription_service,
+from models.transcription_factory import (
+    default_transcription_stack,
 )
 from docent.api.routes_artworks import router as artworks_router
 from docent.api.routes_docent_index import router as docent_index_router
@@ -128,8 +125,8 @@ async def lifespan(app: FastAPI):
     ):
         warm_up_operations.append(
             (
-                "Moonshine",
-                default_moonshine_transcription_service.warm_up,
+                default_transcription_stack.provider_name,
+                default_transcription_stack.warm_up,
             )
         )
     elif (
@@ -138,8 +135,8 @@ async def lifespan(app: FastAPI):
     ):
         warm_up_operations.append(
             (
-                "Whisper",
-                default_transcription_service.warm_up,
+                default_transcription_stack.provider_name,
+                default_transcription_stack.warm_up,
             )
         )
     elif settings.transcription_backend not in {
@@ -248,7 +245,9 @@ turn_buffer_stream_router = create_turn_buffer_stream_router(
     query_engine=context_resolved_docent_query_engine,
     utterance_classifier=None,
 )
-transcription_router = create_transcription_router()
+transcription_router = create_transcription_router(
+    default_transcription_stack.batch_service
+)
 smart_turn_service = (
     SmartTurnService(
         model_path=settings.smart_turn_model_path,
@@ -262,12 +261,12 @@ smart_turn_service = (
 )
 
 audio_stream_router = create_audio_stream_router(
-    transcription_service=default_transcription_service,
+    transcription_service=(
+        default_transcription_stack.batch_service
+    ),
     smart_turn_service=smart_turn_service,
-    moonshine_transcription_service=(
-        default_moonshine_transcription_service
-        if settings.transcription_backend == "moonshine"
-        else None
+    streaming_transcription_service=(
+        default_transcription_stack.streaming_service
     ),
 )
 

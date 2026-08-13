@@ -13,8 +13,7 @@ from conversation_core.schemas.transcription_schemas import (
     TranscriptionResponse,
 )
 from conversation_core.services.transcription_service import (
-    TranscriptionService,
-    default_transcription_service,
+    BatchTranscriptionService,
 )
 
 
@@ -31,13 +30,10 @@ PERMITTED_AUDIO_TYPES = {
 
 
 def create_transcription_router(
-    transcription_service: TranscriptionService | None = None,
+    transcription_service: BatchTranscriptionService,
 ) -> APIRouter:
     router = APIRouter()
-    active_service = (
-        transcription_service
-        or default_transcription_service
-    )
+    active_service = transcription_service
 
     @router.post(
         "/api/transcription",

@@ -12,8 +12,8 @@ BACKEND_PYTHON_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_PYTHON_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_PYTHON_ROOT))
 
-from conversation_core.services.transcription_service import (
-    TranscriptionService,
+from models.whisper_local.whisper_transcription_service import (
+    LocalWhisperTranscriptionService as TranscriptionService,
 )
 
 
@@ -85,7 +85,7 @@ class TranscriptionServiceTest(unittest.TestCase):
         )
 
     @patch(
-        "conversation_core.services.transcription_service."
+        "models.whisper_local.whisper_transcription_service."
         "WhisperModel"
     )
     def test_model_is_loaded_once_and_reused(

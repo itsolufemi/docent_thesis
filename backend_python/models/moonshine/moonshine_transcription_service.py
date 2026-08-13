@@ -421,6 +421,8 @@ class MoonshineStreamingTranscriptionService:
     resources.
     """
 
+    provider_name = "moonshine"
+
     def __init__(
         self,
         *,

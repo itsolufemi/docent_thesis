@@ -22,13 +22,9 @@ from conversation_core.services.smart_turn_service import (
     SmartTurnService,
 )
 from conversation_core.services.transcription_service import (
-    TranscriptionService,
-    default_transcription_service,
-)
-
-from conversation_core.services.moonshine_transcription_service import (
-    MoonshineStreamingSession,
-    MoonshineStreamingTranscriptionService,
+    BatchTranscriptionService,
+    StreamingTranscriptionService,
+    StreamingTranscriptionSession,
 )
 
 
@@ -41,20 +37,16 @@ logger = logging.getLogger(__name__)
 
 
 def create_audio_stream_router(
-    transcription_service: TranscriptionService | None = None,
+    transcription_service: BatchTranscriptionService | None = None,
     smart_turn_service: SmartTurnService | None = None,
-    moonshine_transcription_service: (
-        MoonshineStreamingTranscriptionService | None
+    streaming_transcription_service: (
+        StreamingTranscriptionService | None
     ) = None,
-) -> APIRouter:    
+) -> APIRouter:
     router = APIRouter()
-    active_transcription_service = (
-        transcription_service
-        or default_transcription_service
-    )
-
-    active_moonshine_service = (
-        moonshine_transcription_service
+    active_transcription_service = transcription_service
+    active_streaming_transcription_service = (
+        streaming_transcription_service
     )
 
     @router.websocket("/api/audio/stream")
@@ -67,8 +59,8 @@ def create_audio_stream_router(
         active_buffer: AudioStreamBuffer | None = None
         active_candidate_id: int | None = None
 
-        active_moonshine_session: (
-            MoonshineStreamingSession | None
+        active_streaming_transcription_session: (
+            StreamingTranscriptionSession | None
         ) = None
 
         known_segment_ids: set[str] = set()
@@ -118,8 +110,8 @@ def create_audio_stream_router(
             *,
             segment_id: str,
             audio_buffer: AudioStreamBuffer,
-            moonshine_session: (
-                MoonshineStreamingSession | None
+            streaming_session: (
+                StreamingTranscriptionSession | None
             ),
             silence_duration_ms: int,
             forced_finalisation: bool,
@@ -130,45 +122,56 @@ def create_audio_stream_router(
             """
             Produce the final transcript for one completed audio segment.
 
-            Moonshine is attempted first when a streaming session exists.
-            The original PCM buffer remains available so Whisper can
-            recover from an empty or failed Moonshine transcription.
+            The selected streaming provider is attempted first when a
+            session exists. The original PCM buffer remains available
+            so the batch provider can recover from an empty or failed
+            streaming transcription.
             """
 
             summary = audio_buffer.summary()
             pcm_bytes = audio_buffer.to_bytes()
 
             transcription = None
-            transcription_backend = "whisper"
+            transcription_backend = (
+                active_transcription_service.provider_name
+                if active_transcription_service is not None
+                else "unavailable"
+            )
 
             transcription_task_started_at = perf_counter()
 
-            moonshine_finish_seconds: float | None = None
-            whisper_transcription_seconds: float | None = None
+            streaming_finish_seconds: float | None = None
+            batch_transcription_seconds: float | None = None
 
-            if moonshine_session is not None:
+            if streaming_session is not None:
                 try:
-                    moonshine_started_at = perf_counter()
+                    streaming_started_at = perf_counter()
 
                     transcription = await run_in_threadpool(
-                        moonshine_session.finish
+                        streaming_session.finish
                     )
 
-                    moonshine_finish_seconds = (
+                    streaming_finish_seconds = (
                         perf_counter()
-                        - moonshine_started_at
+                        - streaming_started_at
                     )
 
                     if transcription.text.strip():
-                        transcription_backend = "moonshine"
+                        transcription_backend = (
+                            active_streaming_transcription_service
+                            .provider_name
+                            if active_streaming_transcription_service
+                            is not None
+                            else "streaming"
+                        )
 
                         logger.info(
-                            "moonshine_transcription_complete %s",
+                            "streaming_transcription_complete %s",
                             json.dumps(
                                 {
                                     "segment_id": segment_id,
                                     "seconds": round(
-                                        moonshine_finish_seconds,
+                                        streaming_finish_seconds,
                                         4,
                                     ),
                                     "character_count": len(
@@ -180,8 +183,9 @@ def create_audio_stream_router(
 
                     else:
                         logger.warning(
-                            "Moonshine returned an empty transcript "
-                            "for segment %s. Falling back to Whisper.",
+                            "The streaming transcription provider "
+                            "returned an empty transcript for segment "
+                            "%s. Falling back to the batch provider.",
                             segment_id,
                         )
 
@@ -192,16 +196,23 @@ def create_audio_stream_router(
 
                 except Exception:
                     logger.exception(
-                        "Moonshine transcription failed for "
-                        "segment %s. Falling back to Whisper.",
+                        "Streaming transcription failed for segment "
+                        "%s. Falling back to the batch provider.",
                         segment_id,
                     )
 
                     transcription = None
 
             if transcription is None:
+                if active_transcription_service is None:
+                    await send_audio_error(
+                        "No batch transcription service is configured.",
+                        segment_id=segment_id,
+                    )
+                    return
+
                 try:
-                    whisper_started_at = perf_counter()
+                    batch_started_at = perf_counter()
 
                     transcription = await run_in_threadpool(
                         (
@@ -213,28 +224,28 @@ def create_audio_stream_router(
                         channels=audio_buffer.channels,
                     )
 
-                    whisper_transcription_seconds = (
+                    batch_transcription_seconds = (
                         perf_counter()
-                        - whisper_started_at
+                        - batch_started_at
                     )
 
                     transcription_backend = (
-                        "whisper_fallback"
-                        if moonshine_session is not None
-                        else "whisper"
+                        f"{active_transcription_service.provider_name}_fallback"
+                        if streaming_session is not None
+                        else active_transcription_service.provider_name
                     )
 
                     logger.info(
-                        "whisper_transcription_complete %s",
+                        "batch_transcription_complete %s",
                         json.dumps(
                             {
                                 "segment_id": segment_id,
                                 "seconds": round(
-                                    whisper_transcription_seconds,
+                                    batch_transcription_seconds,
                                     4,
                                 ),
                                 "fallback": (
-                                    moonshine_session
+                                    streaming_session
                                     is not None
                                 ),
                                 "character_count": len(
@@ -296,17 +307,17 @@ def create_audio_stream_router(
                     4,
                 )
 
-            if moonshine_finish_seconds is not None:
-                timing["moonshine_finish_seconds"] = round(
-                    moonshine_finish_seconds,
+            if streaming_finish_seconds is not None:
+                timing["streaming_finish_seconds"] = round(
+                    streaming_finish_seconds,
                     4,
                 )
 
-            if whisper_transcription_seconds is not None:
+            if batch_transcription_seconds is not None:
                 timing[
-                    "whisper_transcription_seconds"
+                    "batch_transcription_seconds"
                 ] = round(
-                    whisper_transcription_seconds,
+                    batch_transcription_seconds,
                     4,
                 )
 
@@ -345,14 +356,14 @@ def create_audio_stream_router(
                 },
             )
 
-        async def cancel_moonshine_session(
-            session: MoonshineStreamingSession,
+        async def cancel_streaming_session(
+            session: StreamingTranscriptionSession,
         ) -> None:
             """
-            Stop a Moonshine stream whose audio segment was abandoned.
+            Stop a provider stream whose audio segment was abandoned.
 
-            Moonshine stop operations are synchronous, so they run in
-            the threadpool rather than blocking the FastAPI event loop.
+            Provider stop operations are synchronous, so they run in the
+            threadpool rather than blocking the FastAPI event loop.
             """
 
             try:
@@ -365,7 +376,7 @@ def create_audio_stream_router(
 
             except Exception:
                 logger.exception(
-                    "Moonshine session cancellation failed."
+                    "Streaming transcription session cancellation failed."
                 )
         
                 
@@ -501,7 +512,7 @@ def create_audio_stream_router(
             nonlocal active_segment_id
             nonlocal active_buffer
             nonlocal active_candidate_id
-            nonlocal active_moonshine_session
+            nonlocal active_streaming_transcription_session
 
             if (
                 active_buffer is None
@@ -514,23 +525,23 @@ def create_audio_stream_router(
 
             detached_segment_id = active_segment_id
             detached_buffer = active_buffer
-            detached_moonshine_session = (
-                active_moonshine_session
+            detached_streaming_session = (
+                active_streaming_transcription_session
             )
 
             active_segment_id = None
             active_buffer = None
             active_candidate_id = None
-            active_moonshine_session = None
+            active_streaming_transcription_session = None
 
             if not detached_buffer.total_bytes:
                 if (
-                    detached_moonshine_session
+                    detached_streaming_session
                     is not None
                 ):
                     start_background_task(
-                        cancel_moonshine_session(
-                            detached_moonshine_session
+                        cancel_streaming_session(
+                            detached_streaming_session
                         )
                     )
 
@@ -586,8 +597,8 @@ def create_audio_stream_router(
                     turn_completion_confirmed=(
                         smart_turn_service is not None
                     ),
-                    moonshine_session=(
-                        detached_moonshine_session
+                    streaming_session=(
+                        detached_streaming_session
                     ),
                     smart_turn_confirmed_at=(
                         smart_turn_confirmed_at
@@ -637,11 +648,11 @@ def create_audio_stream_router(
                     )
 
                     if (
-                        active_moonshine_session
+                        active_streaming_transcription_session
                         is not None
                     ):
                         try:
-                            active_moonshine_session.add_pcm16(
+                            active_streaming_transcription_session.add_pcm16(
                                 binary_chunk,
                                 sample_rate=(
                                     active_buffer.sample_rate
@@ -653,20 +664,21 @@ def create_audio_stream_router(
 
                         except Exception:
                             logger.exception(
-                                "Moonshine rejected an audio "
-                                "chunk for segment %s. "
-                                "The segment will use Whisper.",
+                                "The streaming transcription provider "
+                                "rejected an audio chunk for segment "
+                                "%s. The segment will use the batch "
+                                "transcription provider.",
                                 active_segment_id,
                             )
 
                             failed_session = (
-                                active_moonshine_session
+                                active_streaming_transcription_session
                             )
 
-                            active_moonshine_session = None
+                            active_streaming_transcription_session = None
 
                             start_background_task(
-                                cancel_moonshine_session(
+                                cancel_streaming_session(
                                     failed_session
                                 )
                             )
@@ -818,22 +830,23 @@ def create_audio_stream_router(
                         ),
                     )
 
-                    active_moonshine_session = None
+                    active_streaming_transcription_session = None
 
-                    if active_moonshine_service is not None:
+                    if active_streaming_transcription_service is not None:
                         try:
-                            active_moonshine_session = (
+                            active_streaming_transcription_session = (
                                 await run_in_threadpool(
-                                    active_moonshine_service
+                                    active_streaming_transcription_service
                                     .create_session
                                 )
                             )
 
                         except Exception:
                             logger.exception(
-                                "Could not create Moonshine "
-                                "session for segment %s. "
-                                "The segment will use Whisper.",
+                                "Could not create a streaming "
+                                "transcription session for segment %s. "
+                                "The segment will use the batch "
+                                "transcription provider.",
                                 segment_id,
                             )
 
@@ -850,10 +863,17 @@ def create_audio_stream_router(
                                 smart_turn_service is not None
                             ),
                             "transcription_backend": (
-                                "moonshine"
-                                if active_moonshine_session
+                                active_streaming_transcription_service
+                                .provider_name
+                                if active_streaming_transcription_session
                                 is not None
-                                else "whisper"
+                                else (
+                                    active_transcription_service
+                                    .provider_name
+                                    if active_transcription_service
+                                    is not None
+                                    else "unavailable"
+                                )
                             ),
                         },
                     )
@@ -1202,22 +1222,22 @@ def create_audio_stream_router(
                         active_segment_id
                     )
 
-                    cancelled_moonshine_session = (
-                        active_moonshine_session
+                    cancelled_streaming_session = (
+                        active_streaming_transcription_session
                     )
 
                     active_segment_id = None
                     active_buffer = None
                     active_candidate_id = None
-                    active_moonshine_session = None
+                    active_streaming_transcription_session = None
 
                     if (
-                        cancelled_moonshine_session
+                        cancelled_streaming_session
                         is not None
                     ):
                         start_background_task(
-                            cancel_moonshine_session(
-                                cancelled_moonshine_session
+                            cancel_streaming_session(
+                                cancelled_streaming_session
                             )
                         )
 
@@ -1238,16 +1258,16 @@ def create_audio_stream_router(
         except WebSocketDisconnect:
             pass
         finally:
-            if active_moonshine_session is not None:
+            if active_streaming_transcription_session is not None:
                 try:
                     await run_in_threadpool(
-                        active_moonshine_session.cancel
+                        active_streaming_transcription_session.cancel
                     )
 
                 except Exception:
                     logger.exception(
                         "Could not cancel the active "
-                        "Moonshine session during "
+                        "streaming transcription session during "
                         "WebSocket shutdown."
                     )
             connection_open = False

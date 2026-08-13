@@ -25,6 +25,8 @@ from conversation_core.services.smart_turn_service import (
 
 
 class FakePCMTranscriptionService:
+    provider_name = "fake_batch"
+
     def __init__(self) -> None:
         self.calls: list[dict] = []
 

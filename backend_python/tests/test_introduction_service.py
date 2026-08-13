@@ -236,7 +236,7 @@ class LifespanTest(unittest.TestCase):
                     True,
                 ),
                 patch(
-                    "server.default_transcription_service."
+                    "server.default_transcription_stack."
                     "warm_up",
                     side_effect=RuntimeError(
                         "warm-up failed"
