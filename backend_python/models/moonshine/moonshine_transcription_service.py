@@ -518,6 +518,28 @@ class MoonshineStreamingTranscriptionService:
         session.start()
         return session
 
+    def transcribe_pcm16(
+        self,
+        pcm_bytes: bytes,
+        *,
+        sample_rate: int,
+        channels: int = 1,
+        language: str | None = "en",
+    ) -> TranscriptionResponse:
+        """Transcribe a completed PCM buffer through one session."""
+        session = self.create_session()
+
+        try:
+            session.add_pcm16(
+                pcm_bytes,
+                sample_rate=sample_rate,
+                channels=channels,
+            )
+            return session.finish()
+        except Exception:
+            session.cancel()
+            raise
+
 
 default_moonshine_transcription_service = (
     MoonshineStreamingTranscriptionService(

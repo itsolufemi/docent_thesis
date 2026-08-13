@@ -87,6 +87,16 @@ class Settings():
         True
     )
 
+    warm_up_qmul_whisper_on_startup: bool = _read_bool(
+        "WARM_UP_QMUL_WHISPER_ON_STARTUP",
+        True,
+    )
+
+    shutdown_qmul_whisper_on_exit: bool = _read_bool(
+        "SHUTDOWN_QMUL_WHISPER_ON_EXIT",
+        False,
+    )
+
     transcription_backend: str = os.getenv(
         "TRANSCRIPTION_BACKEND",
         "whisper",

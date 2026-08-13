@@ -22,7 +22,7 @@ from conversation_core.services.smart_turn_service import (
     SmartTurnService,
 )
 from conversation_core.services.transcription_service import (
-    BatchTranscriptionService,
+    PcmTranscriptionService,
     StreamingTranscriptionService,
     StreamingTranscriptionSession,
 )
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_audio_stream_router(
-    transcription_service: BatchTranscriptionService | None = None,
+    transcription_service: PcmTranscriptionService | None = None,
     smart_turn_service: SmartTurnService | None = None,
     streaming_transcription_service: (
         StreamingTranscriptionService | None

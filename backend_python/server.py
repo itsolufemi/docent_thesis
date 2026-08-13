@@ -139,9 +139,20 @@ async def lifespan(app: FastAPI):
                 default_transcription_stack.warm_up,
             )
         )
+    elif (
+        settings.transcription_backend == "qmul_whisper"
+        and settings.warm_up_qmul_whisper_on_startup
+    ):
+        warm_up_operations.append(
+            (
+                default_transcription_stack.provider_name,
+                default_transcription_stack.warm_up,
+            )
+        )
     elif settings.transcription_backend not in {
         "moonshine",
         "whisper",
+        "qmul_whisper",
     }:
         logger.warning(
             "Unknown transcription backend configured: %s",
@@ -193,6 +204,7 @@ async def lifespan(app: FastAPI):
         )
         yield
     finally:
+        default_transcription_stack.close()
         default_tts_service.close()
         close_ollama_http_client()
 
@@ -257,7 +269,7 @@ smart_turn_service = (
 
 audio_stream_router = create_audio_stream_router(
     transcription_service=(
-        default_transcription_stack.batch_service
+        default_transcription_stack.live_fallback_service
     ),
     smart_turn_service=smart_turn_service,
     streaming_transcription_service=(

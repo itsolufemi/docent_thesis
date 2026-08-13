@@ -2,13 +2,16 @@ import asyncio
 import json
 import os
 import time
+from pathlib import Path
 
 import requests
 import websockets
 from dotenv import load_dotenv
 
 
-load_dotenv()
+load_dotenv(
+    Path(__file__).with_name(".env")
+)
 
 
 # ---------------------------------------------------------------------
