@@ -14,10 +14,6 @@ class ConversationState(BaseModel):
     dialogue_history: list[DialogueTurn] = Field(default_factory=list)
     metadata: dict[str, object] = Field(default_factory=dict)
 
-    metadata: dict[str, object] = Field(
-        default_factory=dict
-    )
-
 
 class StartConversationResponse(BaseModel):
     conversation_id: str

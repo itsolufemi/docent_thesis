@@ -232,11 +232,6 @@ query_router = create_query_router(
 conversation_router = create_conversation_router(
     query_engine=context_resolved_docent_query_engine,
 )
-conversation_router = create_conversation_router(
-    query_engine=(
-        self_routing_docent_query_engine
-    ),
-)
 turn_buffer_router = create_turn_buffer_router(
     query_engine=context_resolved_docent_query_engine,
     utterance_classifier=None,

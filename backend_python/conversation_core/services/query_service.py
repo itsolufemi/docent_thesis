@@ -49,11 +49,6 @@ LLMStreamCallback = Callable[[LLMStreamEvent], None]
 IntroductionResponseGenerator = Callable[[str], str]
 
 
-IntroductionResponseGenerator = Callable[
-    [str],
-    str,
-]
-
 def default_response_generator(
     prompt: str,
     conversation_id: str | None,
@@ -354,93 +349,6 @@ class QueryEngine:
             sources=[],
             debug=debug,
         )
-        self.introduction_provider = (
-            introduction_provider
-        )
-        self.introduction_response_generator = (
-            introduction_response_generator
-            or generate_llm_response
-        )
-        self._introduction_lock = RLock()
-
-    def ensure_introduction(
-        self,
-        *,
-        conversation_id: str,
-    ) -> tuple[str | None, bool]:
-        """
-        Return this conversation's introduction, generating it once.
-
-        This is intentionally a direct, tool-free LLM request. It does
-        not invoke context resolution, retrieval, classification, TRP,
-        or the self-routing response parser.
-        """
-        with self._introduction_lock:
-            existing = get_conversation_introduction(
-                conversation_id
-            )
-
-            if existing is not None:
-                return existing, False
-
-            if get_conversation(conversation_id) is None:
-                return None, False
-
-            definition = (
-                self.introduction_provider()
-                if self.introduction_provider
-                is not None
-                else None
-            )
-
-            if definition is None:
-                return None, False
-
-            try:
-                response = (
-                    self.introduction_response_generator(
-                        definition.prompt
-                    )
-                    .strip()
-                )
-
-                if response.lower().startswith(
-                    ("error:", "ollama error:")
-                ):
-                    raise RuntimeError(response)
-            except Exception:
-                response = (
-                    definition.fallback_text
-                    or ""
-                ).strip()
-
-            if not response:
-                return None, False
-
-            if definition.store_as_dialogue_turn:
-                add_dialogue_turn(
-                    conversation_id=conversation_id,
-                    role="assistant",
-                    content=response,
-                )
-
-            set_conversation_introduction(
-                conversation_id,
-                response,
-            )
-
-            return response, True
-
-    def generate_introduction(
-        self,
-        *,
-        conversation_id: str,
-    ) -> str | None:
-        introduction, _ = self.ensure_introduction(
-            conversation_id=conversation_id
-        )
-        return introduction
-
 
     def generate_response(
         self,
