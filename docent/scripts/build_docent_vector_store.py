@@ -2,10 +2,12 @@ import sys
 from pathlib import Path
 from time import perf_counter
 
-BACKEND_PYTHON_ROOT = Path(__file__).resolve().parents[2]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_PYTHON_ROOT = REPOSITORY_ROOT / "backend_python"
 
-if str(BACKEND_PYTHON_ROOT) not in sys.path:
-    sys.path.insert(0, str(BACKEND_PYTHON_ROOT))
+for import_root in (REPOSITORY_ROOT, BACKEND_PYTHON_ROOT):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
 
 from config import settings
 from docent.services.docent_retrieval_adapter import get_docent_retrieval_chunks

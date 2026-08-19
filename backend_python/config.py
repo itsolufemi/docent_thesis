@@ -46,6 +46,7 @@ def _optional_boolean(
 
 class Settings():
     backend_root: Path = Path(__file__).resolve().parent
+    repository_root: Path = backend_root.parent
 
     backend_host: str = os.getenv("BACKEND_HOST", "127.0.0.1")
     backend_port: int = int(os.getenv("BACKEND_PORT", "8000"))
@@ -204,7 +205,7 @@ class Settings():
     )
 
     docent_vector_store_directory: Path = (
-        backend_root / "docent" / "data" / "vector_store"
+        repository_root / "docent" / "data" / "vector_store"
     )
     docent_vector_metadata_path: Path = (
         docent_vector_store_directory / "docent_vector_index.json"

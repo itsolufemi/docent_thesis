@@ -7,9 +7,11 @@ from unittest.mock import Mock, patch
 
 
 BACKEND_PYTHON_ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = BACKEND_PYTHON_ROOT.parent
 
-if str(BACKEND_PYTHON_ROOT) not in sys.path:
-    sys.path.insert(0, str(BACKEND_PYTHON_ROOT))
+for import_root in (REPOSITORY_ROOT, BACKEND_PYTHON_ROOT):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
 
 from conversation_core.schemas.context_resolution_schemas import (  # noqa: E402
     ContextResolutionAssessment,

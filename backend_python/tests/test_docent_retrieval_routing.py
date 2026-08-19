@@ -5,9 +5,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 BACKEND_PYTHON_ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = BACKEND_PYTHON_ROOT.parent
 
-if str(BACKEND_PYTHON_ROOT) not in sys.path:
-    sys.path.insert(0, str(BACKEND_PYTHON_ROOT))
+for import_root in (REPOSITORY_ROOT, BACKEND_PYTHON_ROOT):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
 
 from conversation_core.schemas.utterance_route_schemas import UtteranceRoute
 from conversation_core.schemas.query_schemas import ResolvedContext
