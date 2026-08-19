@@ -1,1 +1,0 @@
-export const history = []; //to store the list of already viewed art. This is reset when the server is restarted
