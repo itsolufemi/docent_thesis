@@ -30,10 +30,47 @@ with these fields:
 - is_relevant: true when the utterance contains meaningful conversational input,
   including a backchannel; false only for noise or input that should be ignored.
 - route_type: one of response_request, call_to_action, interruption,
-  backchannel, or noise. Use backchannel for brief acknowledgements such as
-  "yeah", "right", "mm-hm", "okay", "I see", or similar signals of continued
-  attention. Use noise only for input that has no
-  meaningful conversational content.
+  backchannel, or noise.
+
+  response_request:
+  Any meaningful conversational contribution that merits a verbal response
+  from the assistant. This includes questions, greetings, answers to the
+  assistant's questions, confirmations, corrections, requests for
+  explanation, changes of subject, and acknowledgements that function as a
+  response or invite the conversation to continue.
+
+  call_to_action:
+  Use only when the user is asking the system to perform an available
+  executable action that would be handled through a tool or application
+  capability, rather than merely asking the assistant to say something.
+  Do not use call_to_action simply because the user uses an imperative.
+  A request such as "tell me about The Swing" is a response_request if it
+  only requires a verbal answer. A request that should trigger an available
+  tool or application action is a call_to_action.
+
+  interruption:
+  Use when the user is deliberately taking the floor from an assistant that
+  is currently speaking in order to stop, correct, redirect, or replace the
+  assistant's current response. Do not classify an ordinary new turn as an
+  interruption merely because it is short or abrupt.
+
+  backchannel:
+  A brief acknowledgement that supports the assistant continuing, such as
+  "mm-hm", "right", "okay", or "I see", when it does not introduce a new
+  question, correction, request, answer, or change in conversational
+  direction.
+
+  noise:
+  Use only when the input contains no meaningful conversational contribution
+  and should be ignored. This includes non-linguistic sounds, accidental
+  transcription, meaningless fragments, or speech that does not carry a
+  discernible conversational function. Do not classify meaningful
+  acknowledgements as noise, and do not classify noise as backchannel.
+
+Classify by conversational function in the current dialogue, not by the
+surface words alone. Short utterances such as "yeah", "right", "okay", or
+"I see" may be backchannels, response requests, or occasionally noise
+depending on what they are doing in context.
 - requires_retrieval: true only when external artwork information is needed to
   answer the current utterance.
 - subjects: readable names of every subject for which information should be

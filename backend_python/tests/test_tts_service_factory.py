@@ -8,13 +8,13 @@ BACKEND_PYTHON_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_PYTHON_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_PYTHON_ROOT))
 
-from conversation_core.services.google_tts_service import (
+from models.google_tts.google_tts_service import (
     GoogleTextToSpeechService,
 )
-from conversation_core.services.pocket_tts_service import (
+from models.pocket_tts.pocket_tts_service import (
     PocketTtsService,
 )
-from conversation_core.services.tts_service_factory import (
+from models.tts_factory import (
     create_tts_service,
 )
 

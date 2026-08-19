@@ -12,7 +12,7 @@ if str(BACKEND_ROOT) not in sys.path:
     )
 
 
-from conversation_core.services.google_tts_service import (  # noqa: E402
+from models.google_tts.google_tts_service import (  # noqa: E402
     DEFAULT_SAMPLE_RATE,
     google_tts_service,
 )

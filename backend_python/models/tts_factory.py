@@ -14,7 +14,7 @@ def create_tts_service(
     ).strip().lower()
 
     if selected_backend == "google":
-        from conversation_core.services.google_tts_service import (
+        from models.google_tts.google_tts_service import (
             google_tts_service,
         )
 
@@ -31,7 +31,7 @@ def create_tts_service(
         "kyutai_pocket",
         "pocket_tts",
     }:
-        from conversation_core.services.pocket_tts_service import (
+        from models.pocket_tts.pocket_tts_service import (
             pocket_tts_service,
         )
 

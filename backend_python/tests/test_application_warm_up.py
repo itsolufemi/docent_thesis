@@ -10,16 +10,16 @@ BACKEND_PYTHON_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_PYTHON_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_PYTHON_ROOT))
 
-from conversation_core.services.google_tts_service import (
+from models.google_tts.google_tts_service import (
     GoogleTextToSpeechService,
 )
 from conversation_core.services.llm_service import (
     generate_llm_response,
     warm_up_main_llm,
 )
-from conversation_core.services.smart_turn_service import (
+from models.smart_turn.smart_turn_model_service import (
     SMART_TURN_SAMPLE_RATE,
-    SmartTurnService,
+    OnnxSmartTurnService,
 )
 from docent.services.docent_vector_retrieval_service import (
     warm_up_docent_retrieval,
@@ -125,7 +125,7 @@ class ApplicationWarmUpTest(unittest.TestCase):
     def test_smart_turn_warm_up_runs_silent_prediction(
         self,
     ) -> None:
-        service = SmartTurnService.__new__(SmartTurnService)
+        service = OnnxSmartTurnService.__new__(OnnxSmartTurnService)
         service.predict = Mock()
 
         duration = service.warm_up()

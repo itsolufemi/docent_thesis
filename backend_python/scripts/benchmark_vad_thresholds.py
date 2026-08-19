@@ -25,7 +25,7 @@ from conversation_core.memory.conversation_store import (  # noqa: E402
 from conversation_core.schemas.turn_buffer_schemas import (  # noqa: E402
     TurnBufferEvent,
 )
-from conversation_core.services.google_tts_service import (  # noqa: E402
+from models.google_tts.google_tts_service import (  # noqa: E402
     google_tts_service,
 )
 from models.whisper_local.whisper_transcription_service import (  # noqa: E402
@@ -41,7 +41,7 @@ from conversation_core.services.turn_buffer_service import (  # noqa: E402
 
 TARGET_SAMPLE_RATE = 16_000
 WORKLET_FRAME_SAMPLES = 128
-SPEECH_THRESHOLD = 0.02
+SPEECH_THRESHOLD = 0.03
 SPEECH_START_DURATION_MS = 40
 PRE_ROLL_DURATION_MS = 250
 FINAL_TRAILING_SILENCE_MS = 700

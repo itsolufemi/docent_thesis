@@ -42,10 +42,10 @@ from conversation_core.api.routes_turn_detection import (
 from conversation_core.api.routes_utterance_router import (
     router as utterance_router,
 )
-from conversation_core.services.smart_turn_service import (
-    SmartTurnService,
+from models.smart_turn.smart_turn_model_service import (
+    OnnxSmartTurnService,
 )
-from conversation_core.services.tts_service_factory import (
+from models.tts_factory import (
     default_tts_service,
 )
 from conversation_core.services.llm_service import (
@@ -256,7 +256,7 @@ transcription_router = create_transcription_router(
     default_transcription_stack.batch_service
 )
 smart_turn_service = (
-    SmartTurnService(
+    OnnxSmartTurnService(
         model_path=settings.smart_turn_model_path,
         threshold=settings.smart_turn_threshold,
         max_audio_seconds=(

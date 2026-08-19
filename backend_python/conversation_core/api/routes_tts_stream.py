@@ -12,9 +12,6 @@ from fastapi.websockets import WebSocketDisconnect
 from conversation_core.services.tts_service import (
     TextToSpeechService,
 )
-from conversation_core.services.tts_service_factory import (
-    default_tts_service,
-)
 
 
 def _next_audio_chunk(
@@ -27,10 +24,10 @@ def _next_audio_chunk(
 
 
 def create_tts_stream_router(
-    tts_service: TextToSpeechService | None = None,
+    tts_service: TextToSpeechService,
 ) -> APIRouter:
     router = APIRouter()
-    active_tts_service = tts_service or default_tts_service
+    active_tts_service = tts_service
 
     @router.websocket("/api/tts/stream")
     async def stream_speech(websocket: WebSocket) -> None:

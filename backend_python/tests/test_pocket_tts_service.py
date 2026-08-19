@@ -14,7 +14,7 @@ BACKEND_PYTHON_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_PYTHON_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_PYTHON_ROOT))
 
-from conversation_core.services.pocket_tts_service import (
+from models.pocket_tts.pocket_tts_service import (
     PocketTtsService,
     _float_audio_to_pcm16,
 )

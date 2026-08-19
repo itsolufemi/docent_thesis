@@ -9,18 +9,13 @@ from conversation_core.schemas.tts_schemas import (
 from conversation_core.services.tts_service import (
     TextToSpeechService,
 )
-from conversation_core.services.tts_service_factory import (
-    default_tts_service,
-)
 
 
 def create_tts_router(
-    tts_service: TextToSpeechService | None = None,
+    tts_service: TextToSpeechService,
 ) -> APIRouter:
     router = APIRouter()
-    active_tts_service = (
-        tts_service or default_tts_service
-    )
+    active_tts_service = tts_service
 
     @router.post(
         "/api/tts/synthesise",
