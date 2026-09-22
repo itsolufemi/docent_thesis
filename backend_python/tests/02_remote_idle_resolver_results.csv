@@ -1,0 +1,181 @@
+session,endpoint_kind,idle_minutes_claimed,position,timestamp,model,endpoint,prompt_chars,prompt_sha256,wall_clock_seconds,request_to_response_headers_seconds,request_to_first_chunk_seconds,request_to_first_content_token_seconds,full_generation_seconds,provider_total_duration,provider_load_duration,provider_prompt_eval_duration,provider_eval_duration,provider_total_duration_seconds,provider_load_duration_seconds,provider_prompt_eval_duration_seconds,provider_eval_duration_seconds,result,error
+1,resolver,,1,2026-09-20T12:25:22.172062+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.452625,0.4525,,,0.452625,328162455,,,,0.328162455,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,,2,2026-09-20T12:25:22.624814+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.484275,0.484198,,,0.484275,317925288,,,,0.317925288,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,,3,2026-09-20T12:25:23.109196+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.434426,0.434358,,,0.434426,286827600,,,,0.2868276,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,,4,2026-09-20T12:25:23.543714+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.358159,0.357958,,,0.358159,297777849,,,,0.297777849,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,,5,2026-09-20T12:25:23.901971+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.436955,0.43688,,,0.436955,379760815,,,,0.379760815,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,,6,2026-09-20T12:25:24.339021+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.434718,0.434618,,,0.434718,332611831,,,,0.332611831,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,,7,2026-09-20T12:25:24.773865+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.407367,0.407308,,,0.407367,308556748,,,,0.308556748,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,,8,2026-09-20T12:25:25.181372+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.3421,0.342025,,,0.3421,284491949,,,,0.284491949,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,,9,2026-09-20T12:25:25.523569+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.380117,0.380047,,,0.380117,285264956,,,,0.285264956,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,,10,2026-09-20T12:25:25.903798+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.40505,0.404942,,,0.40505,300542792,,,,0.300542792,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,6.0,1,2026-09-20T12:35:52.160594+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.653201,0.651756,,,0.653201,368256538,,,,0.368256538,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,6.0,2,2026-09-20T12:35:52.817779+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.577451,0.577348,,,0.577451,480384582,,,,0.480384582,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,6.0,3,2026-09-20T12:35:53.395420+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.433539,0.433458,,,0.433539,342572367,,,,0.342572367,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,6.0,4,2026-09-20T12:35:53.829113+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.43161,0.431493,,,0.43161,342328607,,,,0.342328607,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,6.0,5,2026-09-20T12:35:54.260879+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.406224,0.406149,,,0.406224,348656117,,,,0.348656117,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,6.0,6,2026-09-20T12:35:54.667231+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.439243,0.439182,,,0.439243,387260824,,,,0.387260824,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,6.0,7,2026-09-20T12:35:55.106567+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.464831,0.464753,,,0.464831,355104836,,,,0.355104836,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,6.0,8,2026-09-20T12:35:55.571491+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.413404,0.413324,,,0.413404,342502637,,,,0.342502637,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,6.0,9,2026-09-20T12:35:55.985055+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.393347,0.393268,,,0.393347,341589246,,,,0.341589246,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,6.0,10,2026-09-20T12:35:56.378563+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.4242,0.42412,,,0.4242,358657481,,,,0.358657481,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,10.0,1,2026-09-20T13:06:45.440612+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.856273,0.856167,,,0.856273,434637991,,,,0.434637991,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,10.0,2,2026-09-20T13:06:46.297029+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.406446,0.40637,,,0.406446,327767984,,,,0.327767984,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,10.0,3,2026-09-20T13:06:46.703590+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.615864,0.61579,,,0.615864,441815319,,,,0.441815319,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,10.0,4,2026-09-20T13:06:47.319558+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.480424,0.480318,,,0.480424,425785076,,,,0.425785076,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,10.0,5,2026-09-20T13:06:47.800151+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.530273,0.53018,,,0.530273,468173262,,,,0.468173262,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,10.0,6,2026-09-20T13:06:48.330569+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.511225,0.511156,,,0.511225,426797777,,,,0.426797777,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,10.0,7,2026-09-20T13:06:48.842070+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.409342,0.409294,,,0.409342,311950592,,,,0.311950592,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,10.0,8,2026-09-20T13:06:49.251483+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.40078,0.400721,,,0.40078,347304955,,,,0.347304955,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,10.0,9,2026-09-20T13:06:49.652339+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.525244,0.525164,,,0.525244,393834699,,,,0.393834699,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,10.0,10,2026-09-20T13:06:50.177688+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.407585,0.407518,,,0.407585,281356429,,,,0.281356429,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",

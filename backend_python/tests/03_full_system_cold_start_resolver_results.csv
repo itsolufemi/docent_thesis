@@ -1,0 +1,361 @@
+session,endpoint_kind,idle_minutes_claimed,position,cold_start_mode,controller_pid,ollama_pid,idle_started_at,idle_completed_at,restart_started_at,ollama_ready_at,ollama_ready_seconds,timestamp,model,endpoint,prompt_chars,prompt_sha256,wall_clock_seconds,request_to_response_headers_seconds,request_to_first_chunk_seconds,request_to_first_content_token_seconds,full_generation_seconds,provider_total_duration,provider_load_duration,provider_prompt_eval_duration,provider_eval_duration,provider_total_duration_seconds,provider_load_duration_seconds,provider_prompt_eval_duration_seconds,provider_eval_duration_seconds,result,error
+1,resolver,10.0,1,ollama_process_absent_and_port_closed,20608,19404,2026-09-20T13:11:22.433003+00:00,2026-09-20T13:21:24.021469+00:00,2026-09-20T13:21:24.091084+00:00,2026-09-20T13:21:29.474711+00:00,5.383101,2026-09-20T13:21:30.421819+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,2.436787,2.43663,,,2.436787,314863134,,,,0.314863134,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,10.0,2,ollama_process_absent_and_port_closed,20608,19404,2026-09-20T13:11:22.433003+00:00,2026-09-20T13:21:24.021469+00:00,2026-09-20T13:21:24.091084+00:00,2026-09-20T13:21:29.474711+00:00,5.383101,2026-09-20T13:21:32.858820+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.49304,0.492888,,,0.49304,437309206,,,,0.437309206,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,10.0,3,ollama_process_absent_and_port_closed,20608,19404,2026-09-20T13:11:22.433003+00:00,2026-09-20T13:21:24.021469+00:00,2026-09-20T13:21:24.091084+00:00,2026-09-20T13:21:29.474711+00:00,5.383101,2026-09-20T13:21:33.352049+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.458805,0.458684,,,0.458805,385071517,,,,0.385071517,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,10.0,4,ollama_process_absent_and_port_closed,20608,19404,2026-09-20T13:11:22.433003+00:00,2026-09-20T13:21:24.021469+00:00,2026-09-20T13:21:24.091084+00:00,2026-09-20T13:21:29.474711+00:00,5.383101,2026-09-20T13:21:33.811057+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.371164,0.371077,,,0.371164,314249934,,,,0.314249934,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,10.0,5,ollama_process_absent_and_port_closed,20608,19404,2026-09-20T13:11:22.433003+00:00,2026-09-20T13:21:24.021469+00:00,2026-09-20T13:21:24.091084+00:00,2026-09-20T13:21:29.474711+00:00,5.383101,2026-09-20T13:21:34.182405+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.60648,0.60635,,,0.60648,527983902,,,,0.527983902,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,10.0,6,ollama_process_absent_and_port_closed,20608,19404,2026-09-20T13:11:22.433003+00:00,2026-09-20T13:21:24.021469+00:00,2026-09-20T13:21:24.091084+00:00,2026-09-20T13:21:29.474711+00:00,5.383101,2026-09-20T13:21:34.789071+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.381702,0.381586,,,0.381702,330703307,,,,0.330703307,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,10.0,7,ollama_process_absent_and_port_closed,20608,19404,2026-09-20T13:11:22.433003+00:00,2026-09-20T13:21:24.021469+00:00,2026-09-20T13:21:24.091084+00:00,2026-09-20T13:21:29.474711+00:00,5.383101,2026-09-20T13:21:35.170975+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.323374,0.323316,,,0.323374,269623746,,,,0.269623746,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,10.0,8,ollama_process_absent_and_port_closed,20608,19404,2026-09-20T13:11:22.433003+00:00,2026-09-20T13:21:24.021469+00:00,2026-09-20T13:21:24.091084+00:00,2026-09-20T13:21:29.474711+00:00,5.383101,2026-09-20T13:21:35.494503+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.364307,0.36424,,,0.364307,309078479,,,,0.309078479,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,10.0,9,ollama_process_absent_and_port_closed,20608,19404,2026-09-20T13:11:22.433003+00:00,2026-09-20T13:21:24.021469+00:00,2026-09-20T13:21:24.091084+00:00,2026-09-20T13:21:29.474711+00:00,5.383101,2026-09-20T13:21:35.858912+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.363913,0.363791,,,0.363913,301983873,,,,0.301983873,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+1,resolver,10.0,10,ollama_process_absent_and_port_closed,20608,19404,2026-09-20T13:11:22.433003+00:00,2026-09-20T13:21:24.021469+00:00,2026-09-20T13:21:24.091084+00:00,2026-09-20T13:21:29.474711+00:00,5.383101,2026-09-20T13:21:36.222987+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.378311,0.378218,,,0.378311,325569390,,,,0.32556939,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,5.0,1,ollama_process_absent_and_port_closed,24348,2996,2026-09-20T13:53:28.854141+00:00,2026-09-20T13:58:30.118754+00:00,2026-09-20T13:58:30.209495+00:00,2026-09-20T13:58:33.402187+00:00,3.192211,2026-09-20T13:58:34.206174+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,2.510671,2.510558,,,2.510671,373600795,,,,0.373600795,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,5.0,2,ollama_process_absent_and_port_closed,24348,2996,2026-09-20T13:53:28.854141+00:00,2026-09-20T13:58:30.118754+00:00,2026-09-20T13:58:30.209495+00:00,2026-09-20T13:58:33.402187+00:00,3.192211,2026-09-20T13:58:36.738234+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.826202,0.82616,,,0.826202,687849138,,,,0.687849138,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,5.0,3,ollama_process_absent_and_port_closed,24348,2996,2026-09-20T13:53:28.854141+00:00,2026-09-20T13:58:30.118754+00:00,2026-09-20T13:58:30.209495+00:00,2026-09-20T13:58:33.402187+00:00,3.192211,2026-09-20T13:58:37.564575+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.718323,0.718247,,,0.718323,615847146,,,,0.615847146,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,5.0,4,ollama_process_absent_and_port_closed,24348,2996,2026-09-20T13:53:28.854141+00:00,2026-09-20T13:58:30.118754+00:00,2026-09-20T13:58:30.209495+00:00,2026-09-20T13:58:33.402187+00:00,3.192211,2026-09-20T13:58:38.283008+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.413738,0.41366,,,0.413738,323525041,,,,0.323525041,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,5.0,5,ollama_process_absent_and_port_closed,24348,2996,2026-09-20T13:53:28.854141+00:00,2026-09-20T13:58:30.118754+00:00,2026-09-20T13:58:30.209495+00:00,2026-09-20T13:58:33.402187+00:00,3.192211,2026-09-20T13:58:38.696897+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.404648,0.404565,,,0.404648,294090381,,,,0.294090381,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,5.0,6,ollama_process_absent_and_port_closed,24348,2996,2026-09-20T13:53:28.854141+00:00,2026-09-20T13:58:30.118754+00:00,2026-09-20T13:58:30.209495+00:00,2026-09-20T13:58:33.402187+00:00,3.192211,2026-09-20T13:58:39.101710+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.513591,0.513418,,,0.513591,290120073,,,,0.290120073,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,5.0,7,ollama_process_absent_and_port_closed,24348,2996,2026-09-20T13:53:28.854141+00:00,2026-09-20T13:58:30.118754+00:00,2026-09-20T13:58:30.209495+00:00,2026-09-20T13:58:33.402187+00:00,3.192211,2026-09-20T13:58:39.615463+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.362709,0.362595,,,0.362709,307415828,,,,0.307415828,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,5.0,8,ollama_process_absent_and_port_closed,24348,2996,2026-09-20T13:53:28.854141+00:00,2026-09-20T13:58:30.118754+00:00,2026-09-20T13:58:30.209495+00:00,2026-09-20T13:58:33.402187+00:00,3.192211,2026-09-20T13:58:39.978369+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.424012,0.423939,,,0.424012,353647437,,,,0.353647437,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,5.0,9,ollama_process_absent_and_port_closed,24348,2996,2026-09-20T13:53:28.854141+00:00,2026-09-20T13:58:30.118754+00:00,2026-09-20T13:58:30.209495+00:00,2026-09-20T13:58:33.402187+00:00,3.192211,2026-09-20T13:58:40.402547+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.444759,0.444647,,,0.444759,387796485,,,,0.387796485,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+2,resolver,5.0,10,ollama_process_absent_and_port_closed,24348,2996,2026-09-20T13:53:28.854141+00:00,2026-09-20T13:58:30.118754+00:00,2026-09-20T13:58:30.209495+00:00,2026-09-20T13:58:33.402187+00:00,3.192211,2026-09-20T13:58:40.847517+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.392493,0.392436,,,0.392493,346008335,,,,0.346008335,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,5.0,1,ollama_process_absent_and_port_closed,10672,24916,2026-09-20T13:58:55.364323+00:00,2026-09-20T14:03:57.083626+00:00,2026-09-20T14:03:57.154914+00:00,2026-09-20T14:04:00.344707+00:00,3.189611,2026-09-20T14:04:00.782274+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,2.439357,2.439264,,,2.439357,366348566,,,,0.366348566,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,5.0,2,ollama_process_absent_and_port_closed,10672,24916,2026-09-20T13:58:55.364323+00:00,2026-09-20T14:03:57.083626+00:00,2026-09-20T14:03:57.154914+00:00,2026-09-20T14:04:00.344707+00:00,3.189611,2026-09-20T14:04:03.221875+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.492933,0.492795,,,0.492933,346593210,,,,0.34659321,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,5.0,3,ollama_process_absent_and_port_closed,10672,24916,2026-09-20T13:58:55.364323+00:00,2026-09-20T14:03:57.083626+00:00,2026-09-20T14:03:57.154914+00:00,2026-09-20T14:04:00.344707+00:00,3.189611,2026-09-20T14:04:03.714959+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.409737,0.409686,,,0.409737,309014038,,,,0.309014038,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,5.0,4,ollama_process_absent_and_port_closed,10672,24916,2026-09-20T13:58:55.364323+00:00,2026-09-20T14:03:57.083626+00:00,2026-09-20T14:03:57.154914+00:00,2026-09-20T14:04:00.344707+00:00,3.189611,2026-09-20T14:04:04.124805+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.626125,0.626046,,,0.626125,572427220,,,,0.57242722,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,5.0,5,ollama_process_absent_and_port_closed,10672,24916,2026-09-20T13:58:55.364323+00:00,2026-09-20T14:03:57.083626+00:00,2026-09-20T14:03:57.154914+00:00,2026-09-20T14:04:00.344707+00:00,3.189611,2026-09-20T14:04:04.751051+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.399289,0.399203,,,0.399289,319968538,,,,0.319968538,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,5.0,6,ollama_process_absent_and_port_closed,10672,24916,2026-09-20T13:58:55.364323+00:00,2026-09-20T14:03:57.083626+00:00,2026-09-20T14:03:57.154914+00:00,2026-09-20T14:04:00.344707+00:00,3.189611,2026-09-20T14:04:05.150463+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.407071,0.407013,,,0.407071,344135287,,,,0.344135287,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,5.0,7,ollama_process_absent_and_port_closed,10672,24916,2026-09-20T13:58:55.364323+00:00,2026-09-20T14:03:57.083626+00:00,2026-09-20T14:03:57.154914+00:00,2026-09-20T14:04:00.344707+00:00,3.189611,2026-09-20T14:04:05.557653+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.512501,0.512422,,,0.512501,394209710,,,,0.39420971,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,5.0,8,ollama_process_absent_and_port_closed,10672,24916,2026-09-20T13:58:55.364323+00:00,2026-09-20T14:03:57.083626+00:00,2026-09-20T14:03:57.154914+00:00,2026-09-20T14:04:00.344707+00:00,3.189611,2026-09-20T14:04:06.070284+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.512518,0.512478,,,0.512518,421333204,,,,0.421333204,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,5.0,9,ollama_process_absent_and_port_closed,10672,24916,2026-09-20T13:58:55.364323+00:00,2026-09-20T14:03:57.083626+00:00,2026-09-20T14:03:57.154914+00:00,2026-09-20T14:04:00.344707+00:00,3.189611,2026-09-20T14:04:06.582915+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.408624,0.408583,,,0.408624,316520055,,,,0.316520055,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+3,resolver,5.0,10,ollama_process_absent_and_port_closed,10672,24916,2026-09-20T13:58:55.364323+00:00,2026-09-20T14:03:57.083626+00:00,2026-09-20T14:03:57.154914+00:00,2026-09-20T14:04:00.344707+00:00,3.189611,2026-09-20T14:04:06.991618+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.343093,0.342987,,,0.343093,290423833,,,,0.290423833,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+4,resolver,5.0,1,ollama_process_absent_and_port_closed,25232,15224,2026-09-20T14:04:10.579454+00:00,2026-09-20T14:09:12.417676+00:00,2026-09-20T14:09:12.914716+00:00,2026-09-20T14:09:35.302200+00:00,22.386945,2026-09-20T14:09:36.182202+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,2.464205,2.464042,,,2.464205,369086589,,,,0.369086589,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+4,resolver,5.0,2,ollama_process_absent_and_port_closed,25232,15224,2026-09-20T14:04:10.579454+00:00,2026-09-20T14:09:12.417676+00:00,2026-09-20T14:09:12.914716+00:00,2026-09-20T14:09:35.302200+00:00,22.386945,2026-09-20T14:09:38.650048+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.440433,0.440113,,,0.440433,325187462,,,,0.325187462,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+4,resolver,5.0,3,ollama_process_absent_and_port_closed,25232,15224,2026-09-20T14:04:10.579454+00:00,2026-09-20T14:09:12.417676+00:00,2026-09-20T14:09:12.914716+00:00,2026-09-20T14:09:35.302200+00:00,22.386945,2026-09-20T14:09:39.090643+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.45325,0.453135,,,0.45325,387549745,,,,0.387549745,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+4,resolver,5.0,4,ollama_process_absent_and_port_closed,25232,15224,2026-09-20T14:04:10.579454+00:00,2026-09-20T14:09:12.417676+00:00,2026-09-20T14:09:12.914716+00:00,2026-09-20T14:09:35.302200+00:00,22.386945,2026-09-20T14:09:39.544096+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.462916,0.462786,,,0.462916,348822843,,,,0.348822843,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+4,resolver,5.0,5,ollama_process_absent_and_port_closed,25232,15224,2026-09-20T14:04:10.579454+00:00,2026-09-20T14:09:12.417676+00:00,2026-09-20T14:09:12.914716+00:00,2026-09-20T14:09:35.302200+00:00,22.386945,2026-09-20T14:09:40.007250+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.466505,0.466375,,,0.466505,407273201,,,,0.407273201,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+4,resolver,5.0,6,ollama_process_absent_and_port_closed,25232,15224,2026-09-20T14:04:10.579454+00:00,2026-09-20T14:09:12.417676+00:00,2026-09-20T14:09:12.914716+00:00,2026-09-20T14:09:35.302200+00:00,22.386945,2026-09-20T14:09:40.473988+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.656555,0.656436,,,0.656555,538685021,,,,0.538685021,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+4,resolver,5.0,7,ollama_process_absent_and_port_closed,25232,15224,2026-09-20T14:04:10.579454+00:00,2026-09-20T14:09:12.417676+00:00,2026-09-20T14:09:12.914716+00:00,2026-09-20T14:09:35.302200+00:00,22.386945,2026-09-20T14:09:41.130731+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.602816,0.602725,,,0.602816,540859099,,,,0.540859099,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+4,resolver,5.0,8,ollama_process_absent_and_port_closed,25232,15224,2026-09-20T14:04:10.579454+00:00,2026-09-20T14:09:12.417676+00:00,2026-09-20T14:09:12.914716+00:00,2026-09-20T14:09:35.302200+00:00,22.386945,2026-09-20T14:09:41.733725+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.62527,0.625152,,,0.62527,295904578,,,,0.295904578,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+4,resolver,5.0,9,ollama_process_absent_and_port_closed,25232,15224,2026-09-20T14:04:10.579454+00:00,2026-09-20T14:09:12.417676+00:00,2026-09-20T14:09:12.914716+00:00,2026-09-20T14:09:35.302200+00:00,22.386945,2026-09-20T14:09:42.359229+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.654584,0.654476,,,0.654584,350663877,,,,0.350663877,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+4,resolver,5.0,10,ollama_process_absent_and_port_closed,25232,15224,2026-09-20T14:04:10.579454+00:00,2026-09-20T14:09:12.417676+00:00,2026-09-20T14:09:12.914716+00:00,2026-09-20T14:09:35.302200+00:00,22.386945,2026-09-20T14:09:43.014027+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.351569,0.351486,,,0.351569,292047994,,,,0.292047994,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+5,resolver,5.0,1,ollama_process_absent_and_port_closed,9756,16756,2026-09-20T14:09:53.159512+00:00,2026-09-20T14:14:55.577247+00:00,2026-09-20T14:14:55.695649+00:00,2026-09-20T14:15:03.174757+00:00,7.478355,2026-09-20T14:15:04.037565+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,2.529122,2.528993,,,2.529122,321591854,,,,0.321591854,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+5,resolver,5.0,2,ollama_process_absent_and_port_closed,9756,16756,2026-09-20T14:09:53.159512+00:00,2026-09-20T14:14:55.577247+00:00,2026-09-20T14:14:55.695649+00:00,2026-09-20T14:15:03.174757+00:00,7.478355,2026-09-20T14:15:06.569697+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.406401,0.406263,,,0.406401,319380664,,,,0.319380664,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+5,resolver,5.0,3,ollama_process_absent_and_port_closed,9756,16756,2026-09-20T14:09:53.159512+00:00,2026-09-20T14:14:55.577247+00:00,2026-09-20T14:14:55.695649+00:00,2026-09-20T14:15:03.174757+00:00,7.478355,2026-09-20T14:15:06.976328+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.410464,0.410335,,,0.410464,319102777,,,,0.319102777,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+5,resolver,5.0,4,ollama_process_absent_and_port_closed,9756,16756,2026-09-20T14:09:53.159512+00:00,2026-09-20T14:14:55.577247+00:00,2026-09-20T14:14:55.695649+00:00,2026-09-20T14:15:03.174757+00:00,7.478355,2026-09-20T14:15:07.387032+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.405483,0.405403,,,0.405483,344739949,,,,0.344739949,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+5,resolver,5.0,5,ollama_process_absent_and_port_closed,9756,16756,2026-09-20T14:09:53.159512+00:00,2026-09-20T14:14:55.577247+00:00,2026-09-20T14:14:55.695649+00:00,2026-09-20T14:15:03.174757+00:00,7.478355,2026-09-20T14:15:07.792737+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.410629,0.41059,,,0.410629,285280648,,,,0.285280648,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+5,resolver,5.0,6,ollama_process_absent_and_port_closed,9756,16756,2026-09-20T14:09:53.159512+00:00,2026-09-20T14:14:55.577247+00:00,2026-09-20T14:14:55.695649+00:00,2026-09-20T14:15:03.174757+00:00,7.478355,2026-09-20T14:15:08.203474+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.513129,0.513063,,,0.513129,438086543,,,,0.438086543,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+5,resolver,5.0,7,ollama_process_absent_and_port_closed,9756,16756,2026-09-20T14:09:53.159512+00:00,2026-09-20T14:14:55.577247+00:00,2026-09-20T14:14:55.695649+00:00,2026-09-20T14:15:03.174757+00:00,7.478355,2026-09-20T14:15:08.716714+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.510748,0.510617,,,0.510748,405435714,,,,0.405435714,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+5,resolver,5.0,8,ollama_process_absent_and_port_closed,9756,16756,2026-09-20T14:09:53.159512+00:00,2026-09-20T14:14:55.577247+00:00,2026-09-20T14:14:55.695649+00:00,2026-09-20T14:15:03.174757+00:00,7.478355,2026-09-20T14:15:09.227654+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.388477,0.388386,,,0.388477,313686653,,,,0.313686653,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+5,resolver,5.0,9,ollama_process_absent_and_port_closed,9756,16756,2026-09-20T14:09:53.159512+00:00,2026-09-20T14:14:55.577247+00:00,2026-09-20T14:14:55.695649+00:00,2026-09-20T14:15:03.174757+00:00,7.478355,2026-09-20T14:15:09.616325+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.431663,0.431535,,,0.431663,314940844,,,,0.314940844,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+5,resolver,5.0,10,ollama_process_absent_and_port_closed,9756,16756,2026-09-20T14:09:53.159512+00:00,2026-09-20T14:14:55.577247+00:00,2026-09-20T14:14:55.695649+00:00,2026-09-20T14:15:03.174757+00:00,7.478355,2026-09-20T14:15:10.048200+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.364261,0.364142,,,0.364261,309622460,,,,0.30962246,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+6,resolver,5.0,1,ollama_process_absent_and_port_closed,25788,8828,2026-09-20T14:15:16.991875+00:00,2026-09-20T14:20:19.192641+00:00,2026-09-20T14:20:19.311434+00:00,2026-09-20T14:20:23.138410+00:00,3.826506,2026-09-20T14:20:23.790348+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,2.474031,2.47392,,,2.474031,319434473,,,,0.319434473,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+6,resolver,5.0,2,ollama_process_absent_and_port_closed,25788,8828,2026-09-20T14:15:16.991875+00:00,2026-09-20T14:20:19.192641+00:00,2026-09-20T14:20:19.311434+00:00,2026-09-20T14:20:23.138410+00:00,3.826506,2026-09-20T14:20:26.264609+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.410045,0.409948,,,0.410045,337249863,,,,0.337249863,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+6,resolver,5.0,3,ollama_process_absent_and_port_closed,25788,8828,2026-09-20T14:15:16.991875+00:00,2026-09-20T14:20:19.192641+00:00,2026-09-20T14:20:19.311434+00:00,2026-09-20T14:20:23.138410+00:00,3.826506,2026-09-20T14:20:26.674842+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.514056,0.513952,,,0.514056,380507288,,,,0.380507288,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+6,resolver,5.0,4,ollama_process_absent_and_port_closed,25788,8828,2026-09-20T14:15:16.991875+00:00,2026-09-20T14:20:19.192641+00:00,2026-09-20T14:20:19.311434+00:00,2026-09-20T14:20:23.138410+00:00,3.826506,2026-09-20T14:20:27.189088+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.429488,0.429366,,,0.429488,378501773,,,,0.378501773,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+6,resolver,5.0,5,ollama_process_absent_and_port_closed,25788,8828,2026-09-20T14:15:16.991875+00:00,2026-09-20T14:20:19.192641+00:00,2026-09-20T14:20:19.311434+00:00,2026-09-20T14:20:23.138410+00:00,3.826506,2026-09-20T14:20:27.618788+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.380852,0.380752,,,0.380852,286760520,,,,0.28676052,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+6,resolver,5.0,6,ollama_process_absent_and_port_closed,25788,8828,2026-09-20T14:15:16.991875+00:00,2026-09-20T14:20:19.192641+00:00,2026-09-20T14:20:19.311434+00:00,2026-09-20T14:20:23.138410+00:00,3.826506,2026-09-20T14:20:27.999880+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.414293,0.414212,,,0.414293,313966848,,,,0.313966848,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+6,resolver,5.0,7,ollama_process_absent_and_port_closed,25788,8828,2026-09-20T14:15:16.991875+00:00,2026-09-20T14:20:19.192641+00:00,2026-09-20T14:20:19.311434+00:00,2026-09-20T14:20:23.138410+00:00,3.826506,2026-09-20T14:20:28.414348+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.409654,0.409548,,,0.409654,360023862,,,,0.360023862,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+6,resolver,5.0,8,ollama_process_absent_and_port_closed,25788,8828,2026-09-20T14:15:16.991875+00:00,2026-09-20T14:20:19.192641+00:00,2026-09-20T14:20:19.311434+00:00,2026-09-20T14:20:23.138410+00:00,3.826506,2026-09-20T14:20:28.824195+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.512314,0.512211,,,0.512314,446213574,,,,0.446213574,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+6,resolver,5.0,9,ollama_process_absent_and_port_closed,25788,8828,2026-09-20T14:15:16.991875+00:00,2026-09-20T14:20:19.192641+00:00,2026-09-20T14:20:19.311434+00:00,2026-09-20T14:20:23.138410+00:00,3.826506,2026-09-20T14:20:29.336679+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.718547,0.718423,,,0.718547,589834424,,,,0.589834424,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+6,resolver,5.0,10,ollama_process_absent_and_port_closed,25788,8828,2026-09-20T14:15:16.991875+00:00,2026-09-20T14:20:19.192641+00:00,2026-09-20T14:20:19.311434+00:00,2026-09-20T14:20:23.138410+00:00,3.826506,2026-09-20T14:20:30.055427+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.371987,0.371899,,,0.371987,300249871,,,,0.300249871,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",

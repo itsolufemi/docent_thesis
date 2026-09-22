@@ -1,0 +1,386 @@
+phase,client_mode,run,timestamp,model,endpoint,prompt_chars,prompt_sha256,wall_clock_seconds,request_to_response_headers_seconds,request_to_first_chunk_seconds,request_to_first_content_token_seconds,full_generation_seconds,provider_total_duration,provider_load_duration,provider_prompt_eval_duration,provider_eval_duration,provider_total_duration_seconds,provider_load_duration_seconds,provider_prompt_eval_duration_seconds,provider_eval_duration_seconds,result,error
+warmup,persistent,1,2026-09-20T03:51:53.684025+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,1.099423,1.099332,,,1.099423,842937066,,,,0.842937066,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+warmup,persistent,1,2026-09-20T03:51:54.785355+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.387544,0.193802,0.197373,0.197373,0.387544,322043238,,,,0.322043238,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide for the day. What would you like to see first?",
+warmup,persistent,2,2026-09-20T03:51:55.173182+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.42596,0.425871,,,0.42596,346864191,,,,0.346864191,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+warmup,persistent,2,2026-09-20T03:51:55.599524+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.369692,0.191997,0.192251,0.192251,0.369692,313462553,,,,0.313462553,,,,Hi there! Welcome to the Wallace Collection. I'm Docent—I'll be your guide today. What are you in the mood to see?,
+warmup,persistent,3,2026-09-20T03:51:55.969590+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.649405,0.649361,,,0.649405,593586770,,,,0.59358677,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+warmup,persistent,3,2026-09-20T03:51:56.619192+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.325441,0.164495,0.164611,0.164611,0.325441,280032525,,,,0.280032525,,,,Hi there! Welcome to the Wallace Collection. I'm Docent. What can I help you find today?,
+warmup,persistent,4,2026-09-20T03:51:56.944904+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.386634,0.386555,,,0.386634,337772573,,,,0.337772573,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+warmup,persistent,4,2026-09-20T03:51:57.331878+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.329782,0.197635,0.197797,0.197797,0.329782,279154724,,,,0.279154724,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+warmup,persistent,5,2026-09-20T03:51:57.662028+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.375359,0.375312,,,0.375359,330492397,,,,0.330492397,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+warmup,persistent,5,2026-09-20T03:51:58.037595+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.350723,0.21721,0.217326,0.217326,0.350723,301194719,,,,0.301194719,,,,"Hi there! Welcome to the Wallace Collection. I'm your guide—so, what are we looking at today?",
+measured,persistent,1,2026-09-20T03:51:58.388534+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.337885,0.337811,,,0.337885,290391286,,,,0.290391286,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,1,2026-09-20T03:51:58.726700+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.358441,0.177738,0.177984,0.177984,0.358441,292394995,,,,0.292394995,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide for today. What can I help you find?",
+measured,persistent,2,2026-09-20T03:51:59.085798+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.359671,0.359629,,,0.359671,296594148,,,,0.296594148,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,2,2026-09-20T03:51:59.445674+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.33233,0.186308,0.186544,0.186544,0.33233,284372168,,,,0.284372168,,,,Hi there! Welcome to the Wallace Collection. I'm your guide—how can I help you today?,
+measured,persistent,3,2026-09-20T03:51:59.778485+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.355974,0.355915,,,0.355974,300069578,,,,0.300069578,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,3,2026-09-20T03:52:00.134711+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.35848,0.182356,0.182603,0.182603,0.35848,298691989,,,,0.298691989,,,,Hi there! Welcome to the Wallace Collection. I'm Docent—I'll be your guide for today. What can I help you find?,
+measured,persistent,4,2026-09-20T03:52:00.493678+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.374391,0.374313,,,0.374391,322805851,,,,0.322805851,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,4,2026-09-20T03:52:00.868468+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.338636,0.164893,0.16516,0.16516,0.338636,289971883,,,,0.289971883,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. What are you in the mood to see today?",
+measured,persistent,5,2026-09-20T03:52:01.207607+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.384378,0.384291,,,0.384378,327572324,,,,0.327572324,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,5,2026-09-20T03:52:01.592364+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.308315,0.176871,0.177103,0.177103,0.308315,261969231,,,,0.261969231,,,,Hi there! Welcome to the Wallace Collection. I'm your guide—what can I help you find today?,
+measured,persistent,6,2026-09-20T03:52:01.901104+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.815177,0.815076,,,0.815177,757989144,,,,0.757989144,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,6,2026-09-20T03:52:02.716693+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.408157,0.17483,0.175004,0.175004,0.408157,360853786,,,,0.360853786,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. Is there anything in particular you're looking for, or would you like a suggestion on where to start?",
+measured,persistent,7,2026-09-20T03:52:03.125134+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.421712,0.421396,,,0.421712,361718087,,,,0.361718087,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,7,2026-09-20T03:52:03.547201+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.349213,0.174415,0.174548,0.174548,0.349213,301115932,,,,0.301115932,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. What are you in the mood to look at today?",
+measured,persistent,8,2026-09-20T03:52:03.896957+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.368953,0.36885,,,0.368953,310803670,,,,0.31080367,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,8,2026-09-20T03:52:04.266403+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.313057,0.175711,0.175932,0.175932,0.313057,264171122,,,,0.264171122,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,9,2026-09-20T03:52:04.579940+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.345467,0.345381,,,0.345467,295549138,,,,0.295549138,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,9,2026-09-20T03:52:04.925741+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.463717,0.219949,0.220196,0.220196,0.463717,378468296,,,,0.378468296,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. Is there anything in particular you're looking for today, or would you like a suggestion on where to start?",
+measured,persistent,10,2026-09-20T03:52:05.390025+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.329742,0.329701,,,0.329742,275600781,,,,0.275600781,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,10,2026-09-20T03:52:05.719958+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.337027,0.19237,0.1927,0.1927,0.337027,281123936,,,,0.281123936,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide for today. What can I help you find?",
+measured,persistent,11,2026-09-20T03:52:06.057407+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.468164,0.46809,,,0.468164,418312860,,,,0.41831286,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,11,2026-09-20T03:52:06.526032+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.359575,0.174945,0.175354,0.175354,0.359575,309607149,,,,0.309607149,,,,Hi there! Welcome to the Wallace Collection. I'm Docent—I'll be your guide today. What can I help you find?,
+measured,persistent,12,2026-09-20T03:52:06.886338+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.45628,0.456229,,,0.45628,359164081,,,,0.359164081,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,12,2026-09-20T03:52:07.342871+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.428831,0.283858,0.284034,0.284034,0.428831,374313533,,,,0.374313533,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. Feel free to ask me about any of the pieces you're looking at!",
+measured,persistent,13,2026-09-20T03:52:07.772215+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.689725,0.689654,,,0.689725,637345880,,,,0.63734588,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,13,2026-09-20T03:52:08.462264+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.476502,0.251485,0.25164,0.25164,0.476502,414428260,,,,0.41442826,,,,Hi there! Welcome to the Wallace Collection. I'm Docent—I'll be your guide today. What are you in the mood to see?,
+measured,persistent,14,2026-09-20T03:52:08.939236+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.378508,0.378115,,,0.378508,315838965,,,,0.315838965,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,14,2026-09-20T03:52:09.318300+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.326139,0.169071,0.169205,0.169205,0.326139,274089880,,,,0.27408988,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,15,2026-09-20T03:52:09.644693+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.390411,0.390297,,,0.390411,335834262,,,,0.335834262,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,15,2026-09-20T03:52:10.035559+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.355026,0.185744,0.185991,0.185991,0.355026,302054323,,,,0.302054323,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,16,2026-09-20T03:52:10.391404+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.813927,0.813852,,,0.813927,748389533,,,,0.748389533,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,16,2026-09-20T03:52:11.205703+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.433244,0.251203,0.251311,0.251311,0.433244,305952510,,,,0.30595251,,,,"Hello! You've reached the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,17,2026-09-20T03:52:11.639266+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.366261,0.366184,,,0.366261,287480531,,,,0.287480531,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,17,2026-09-20T03:52:12.005846+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.312181,0.192198,0.192509,0.192509,0.312181,259131677,,,,0.259131677,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,18,2026-09-20T03:52:12.318520+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.517814,0.517764,,,0.517814,447818415,,,,0.447818415,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,18,2026-09-20T03:52:12.836645+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.323783,0.171764,0.171949,0.171949,0.323783,276490702,,,,0.276490702,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,19,2026-09-20T03:52:13.160870+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.456569,0.456469,,,0.456569,404795414,,,,0.404795414,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,19,2026-09-20T03:52:13.617928+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.414317,0.207747,0.207919,0.207919,0.414317,325227427,,,,0.325227427,,,,Hi there! Welcome to the Wallace Collection. I'm Docent—I'll be your guide today. What are you in the mood to look at?,
+measured,persistent,20,2026-09-20T03:52:14.033186+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.62584,0.625766,,,0.62584,569984427,,,,0.569984427,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,20,2026-09-20T03:52:14.659361+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.301905,0.179072,0.179454,0.179454,0.301905,254587623,,,,0.254587623,,,,Hi there! Welcome to the Wallace Collection. I'm Docent. What can I help you find today?,
+measured,persistent,21,2026-09-20T03:52:14.961660+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.543589,0.543469,,,0.543589,455888632,,,,0.455888632,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,21,2026-09-20T03:52:15.505704+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.393018,0.186749,0.186864,0.186864,0.393018,339532474,,,,0.339532474,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide for today. What can I help you find?",
+measured,persistent,22,2026-09-20T03:52:15.899525+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.354027,0.353994,,,0.354027,294061341,,,,0.294061341,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,22,2026-09-20T03:52:16.253889+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.347631,0.172735,0.172958,0.172958,0.347631,294560676,,,,0.294560676,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide for today. What can I help you find?",
+measured,persistent,23,2026-09-20T03:52:16.602020+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.398705,0.398628,,,0.398705,327771665,,,,0.327771665,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,23,2026-09-20T03:52:17.001065+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.365692,0.17669,0.176967,0.176967,0.365692,318515049,,,,0.318515049,,,,Hi there! Welcome to the Wallace Collection. I'm Docent—I'll be your guide today. What can I help you find?,
+measured,persistent,24,2026-09-20T03:52:17.367412+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.371221,0.371147,,,0.371221,311518179,,,,0.311518179,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,24,2026-09-20T03:52:17.738996+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.345383,0.159394,0.159691,0.159691,0.345383,299136320,,,,0.29913632,,,,Hi there! Welcome to the Wallace Collection. I'm Docent—I'll be your guide for today. What can I help you find?,
+measured,persistent,25,2026-09-20T03:52:18.085013+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.367074,0.366994,,,0.367074,313018812,,,,0.313018812,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,25,2026-09-20T03:52:18.452478+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.39457,0.247396,0.247577,0.247577,0.39457,273905010,,,,0.27390501,,,,Hi there! Welcome to the Wallace Collection. I'm Docent. What can I help you find today?,
+measured,persistent,26,2026-09-20T03:52:18.847404+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.390362,0.390252,,,0.390362,344157878,,,,0.344157878,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,26,2026-09-20T03:52:19.238198+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.359546,0.183149,0.183429,0.183429,0.359546,301048948,,,,0.301048948,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide for today. What can I help you find?",
+measured,persistent,27,2026-09-20T03:52:19.598667+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.464533,0.464428,,,0.464533,393697860,,,,0.39369786,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,27,2026-09-20T03:52:20.063702+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.388476,0.188821,0.189015,0.189015,0.388476,332511638,,,,0.332511638,,,,Hi there! Welcome to the Wallace Collection. I'm Docent—I'll be your guide today. What are you in the mood to see?,
+measured,persistent,28,2026-09-20T03:52:20.452719+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.369945,0.369868,,,0.369945,313774603,,,,0.313774603,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,28,2026-09-20T03:52:20.823059+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.336974,0.203849,0.204064,0.204064,0.336974,284346699,,,,0.284346699,,,,Hi there! Welcome to the Wallace Collection. I'm Docent. What can I help you find today?,
+measured,persistent,29,2026-09-20T03:52:21.160488+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.408698,0.408571,,,0.408698,337805897,,,,0.337805897,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,29,2026-09-20T03:52:21.569620+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.39385,0.209467,0.209629,0.209629,0.39385,338804874,,,,0.338804874,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide. Which piece are you looking at, or is there something specific you're after?",
+measured,persistent,30,2026-09-20T03:52:21.964237+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.369824,0.369777,,,0.369824,307828838,,,,0.307828838,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,30,2026-09-20T03:52:22.334332+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.335259,0.194227,0.194363,0.194363,0.335259,278592894,,,,0.278592894,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,31,2026-09-20T03:52:22.669946+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.389181,0.389105,,,0.389181,340791176,,,,0.340791176,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,31,2026-09-20T03:52:23.059444+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.391267,0.200713,0.200949,0.200949,0.391267,328790535,,,,0.328790535,,,,Hi there! Welcome to the Wallace Collection. I'm your guide—feel free to let me know what you're looking at or if there's something specific you'd like to chat about.,
+measured,persistent,32,2026-09-20T03:52:23.451258+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.404389,0.404288,,,0.404389,359522796,,,,0.359522796,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,32,2026-09-20T03:52:23.856063+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.429337,0.193864,0.194131,0.194131,0.429337,371535601,,,,0.371535601,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. Which piece are you looking at, or is there something specific you're interested in finding?",
+measured,persistent,33,2026-09-20T03:52:24.285917+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.36733,0.36725,,,0.36733,310220520,,,,0.31022052,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,33,2026-09-20T03:52:24.653588+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.466091,0.298791,0.298939,0.298939,0.466091,295723354,,,,0.295723354,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide for today. What can I help you find?",
+measured,persistent,34,2026-09-20T03:52:25.120161+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.471864,0.471782,,,0.471864,382147530,,,,0.38214753,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,34,2026-09-20T03:52:25.592479+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.3107,0.165893,0.166201,0.166201,0.3107,264584711,,,,0.264584711,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide for today. What can I help you find?",
+measured,persistent,35,2026-09-20T03:52:25.903552+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.344558,0.344474,,,0.344558,299577441,,,,0.299577441,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,35,2026-09-20T03:52:26.248494+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.403186,0.211138,0.211395,0.211395,0.403186,354741346,,,,0.354741346,,,,Hi there! Welcome to the Wallace Collection. I'm Docent—I'll be your guide today. What are you in the mood to look at?,
+measured,persistent,36,2026-09-20T03:52:26.652023+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.370264,0.370191,,,0.370264,319288278,,,,0.319288278,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,36,2026-09-20T03:52:27.022595+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.410539,0.176699,0.17682,0.17682,0.410539,364247845,,,,0.364247845,,,,Hello! Welcome to the Wallace Collection. I'm Docent—I'll be your guide today. What are you in the mood to see?,
+measured,persistent,37,2026-09-20T03:52:27.433924+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.352696,0.352583,,,0.352696,306286177,,,,0.306286177,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,37,2026-09-20T03:52:27.787100+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.364245,0.172576,0.172819,0.172819,0.364245,312037451,,,,0.312037451,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide for today. Which piece are you looking at, or is there something specific you're interested in?",
+measured,persistent,38,2026-09-20T03:52:28.152047+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.339927,0.339849,,,0.339927,292663389,,,,0.292663389,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,38,2026-09-20T03:52:28.492444+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.36349,0.163852,0.164062,0.164062,0.36349,318923730,,,,0.31892373,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. Which piece are you looking at, or is there something specific you're after today?",
+measured,persistent,39,2026-09-20T03:52:28.856565+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.366425,0.366344,,,0.366425,304905285,,,,0.304905285,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,39,2026-09-20T03:52:29.223356+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.319119,0.197574,0.197878,0.197878,0.319119,273910519,,,,0.273910519,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,40,2026-09-20T03:52:29.542955+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.349193,0.349121,,,0.349193,280858446,,,,0.280858446,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,40,2026-09-20T03:52:29.892480+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.460205,0.226083,0.226463,0.226463,0.460205,416756459,,,,0.416756459,,,,Hi there! Welcome to the Wallace Collection. I'm your guide—feel free to let me know if there's anything in particular you're looking at or if you want a recommendation on where to start.,
+measured,persistent,41,2026-09-20T03:52:30.353442+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.405319,0.40525,,,0.405319,359553194,,,,0.359553194,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,41,2026-09-20T03:52:30.759073+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.360698,0.197807,0.198158,0.198158,0.360698,303379414,,,,0.303379414,,,,"Hi there! Welcome to the Wallace Collection. I'm your guide—whenever you're ready, just let me know what you're looking at or what you're curious about.",
+measured,persistent,42,2026-09-20T03:52:31.120335+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.365554,0.36543,,,0.365554,309780390,,,,0.30978039,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,42,2026-09-20T03:52:31.486369+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.320315,0.182541,0.18269,0.18269,0.320315,269296325,,,,0.269296325,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,43,2026-09-20T03:52:31.806918+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.350734,0.35066,,,0.350734,303674274,,,,0.303674274,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,43,2026-09-20T03:52:32.157942+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.327811,0.170793,0.171024,0.171024,0.327811,282290726,,,,0.282290726,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,44,2026-09-20T03:52:32.486581+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.357948,0.357872,,,0.357948,309580979,,,,0.309580979,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,44,2026-09-20T03:52:32.844899+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.305837,0.162277,0.16251,0.16251,0.305837,255857934,,,,0.255857934,,,,"Hi there! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,45,2026-09-20T03:52:33.151364+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.413874,0.41378,,,0.413874,361562973,,,,0.361562973,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,45,2026-09-20T03:52:33.565824+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.63702,0.436412,0.436752,0.436752,0.63702,569309396,,,,0.569309396,,,,"Hello! Welcome to the Wallace Collection. I'm Docent, your guide. What can I help you find today?",
+measured,persistent,46,2026-09-20T03:52:34.203401+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.342243,0.342164,,,0.342243,292892085,,,,0.292892085,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,46,2026-09-20T03:52:34.545997+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.405801,0.176348,0.176581,0.176581,0.405801,338486710,,,,0.33848671,,,,"Hello! Welcome to the Wallace Collection. I'm here to help you get around the galleries—is there anything in particular you're looking for, or shall we just dive in?",
+measured,persistent,47,2026-09-20T03:52:34.952386+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.489646,0.489573,,,0.489646,420812640,,,,0.42081264,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,47,2026-09-20T03:52:35.442384+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.3936,0.181229,0.181445,0.181445,0.3936,345716192,,,,0.345716192,,,,"Hi there! Welcome to the Wallace Collection. I'm your guide—feel free to let me know which piece you're looking at, or just ask if there's something specific you're interested in.",
+measured,persistent,48,2026-09-20T03:52:35.836254+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,1.48514,1.48506,,,1.48514,1431916915,,,,1.431916915,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,48,2026-09-20T03:52:37.321745+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.818253,0.628435,0.628639,0.628639,0.818253,773898539,,,,0.773898539,,,,"Hi there! Welcome to the Wallace Collection. I'm your guide—whereabouts are you in the galleries, or is there something specific you're looking for?",
+measured,persistent,49,2026-09-20T03:52:38.140398+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.346641,0.346591,,,0.346641,298858571,,,,0.298858571,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,49,2026-09-20T03:52:38.487252+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.612777,0.413493,0.41363,0.41363,0.612777,560314309,,,,0.560314309,,,,"Hi there! Welcome to the Wallace Collection. I'm your guide—whenever you're ready, just let me know which piece you're looking at or what you're interested in.",
+measured,persistent,50,2026-09-20T03:52:39.100442+00:00,gemma4:cloud,/api/generate,3262,709876391bf8f6a6275028deb15893a491dbe739ab625f2bba7ebd8795dea8da,0.361253,0.36118,,,0.361253,311938851,,,,0.311938851,,,,"{
+  ""is_relevant"": true,
+  ""route_type"": ""response_request"",
+  ""requires_retrieval"": false,
+  ""subjects"": []
+}",
+measured,persistent,50,2026-09-20T03:52:39.462002+00:00,gemma4:cloud,/api/chat,4199,57a9ab08c7cf179558cc1e413f051bc272fc260b557add9d5e6fe410cb20f3e8,0.355952,0.185282,0.186186,0.186186,0.355952,306903601,,,,0.306903601,,,,Hello! Welcome to the Wallace Collection. I'm your guide—where would you like to start?,

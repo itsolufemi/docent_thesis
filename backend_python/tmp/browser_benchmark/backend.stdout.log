@@ -1,0 +1,22 @@
+
+Initialising QMUL Whisper...
+QMUL Jupyter server is not running.
+QMUL Jupyter server start requested.
+Waiting for QMUL Jupyter server... pending=spawn
+Waiting for QMUL Jupyter server... pending=spawn
+Waiting for QMUL Jupyter server... pending=spawn
+Waiting for QMUL Jupyter server... pending=spawn
+Waiting for QMUL Jupyter server... pending=spawn
+Waiting for QMUL Jupyter server... pending=spawn
+Waiting for QMUL Jupyter server... pending=spawn
+Waiting for QMUL Jupyter server... pending=spawn
+QMUL Jupyter server ready after 22.24s.
+Whisper service is not running.
+Created QMUL terminal: 1
+Connected to QMUL terminal.
+Whisper start command sent.
+Whisper service is starting.
+QMUL terminal 1 closed.
+Whisper large-v3 ready after 24.00s.
+QMUL Whisper initialisation complete in 52.21s.
+INFO:     127.0.0.1:65392 - "GET /api/health HTTP/1.1" 200 OK

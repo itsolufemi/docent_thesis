@@ -1,0 +1,65 @@
+INFO:     Started server process [38840]
+INFO:     Waiting for application startup.
+INFO:     Smart Turn warm-up completed in 0.186 seconds.
+INFO:     Main LLM warm-up completed in 0.387 seconds.
+INFO:     Docent retrieval warm-up completed in 2.840 seconds.
+INFO:     Selected streaming TTS warm-up completed in 13.141 seconds.
+INFO:     qmul_whisper_large_v3 warm-up completed in 52.728 seconds.
+INFO:     Application warm-up completed in 52.733 seconds: [{'name': 'qmul_whisper_large_v3', 'success': True, 'seconds': 52.7281, 'detail': 52.72685010009445}, {'name': 'Smart Turn', 'success': True, 'seconds': 0.1858, 'detail': 0.18485040008090436}, {'name': 'Docent retrieval', 'success': True, 'seconds': 2.8397, 'detail': {'seconds': 2.8353, 'result_count': 1, 'retrieval_timings': {'total_seconds': 2.8352, 'query_embedding_seconds': 2.7917, 'vector_index_seconds': 0.0324, 'vector_similarity_seconds': 0.0101, 'parent_expansion_seconds': 0.0, 'hybrid_reranking_seconds': 0.0, 'confidence_filter_seconds': 0.0, 'vector_index_rebuilt': False, 'vector_index_source': 'disk'}}}, {'name': 'Main LLM', 'success': True, 'seconds': 0.3868, 'detail': {'seconds': 0.3832, 'response': 'ready'}}, {'name': 'Selected streaming TTS', 'success': True, 'seconds': 13.1408, 'detail': {'provider': 'kyutai_pocket', 'seconds': 13.1395, 'first_chunk_seconds': 12.8853, 'chunk_count': 12, 'audio_bytes': 46080, 'sample_rate': 24000, 'voice': 'jane'}}]
+INFO:     Selected TTS backend: kyutai_pocket
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63876 - "WebSocket /api/tts/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:54173 - "WebSocket /api/audio/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:54228 - "WebSocket /api/tts/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:65124 - "WebSocket /api/audio/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:53342 - "WebSocket /api/tts/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:64975 - "WebSocket /api/audio/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:59884 - "WebSocket /api/tts/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:54460 - "WebSocket /api/audio/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:61613 - "WebSocket /api/tts/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:56938 - "WebSocket /api/audio/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:65385 - "WebSocket /api/tts/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:62417 - "WebSocket /api/audio/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:62304 - "WebSocket /api/tts/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:58306 - "WebSocket /api/audio/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:60229 - "WebSocket /api/tts/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51383 - "WebSocket /api/audio/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:55353 - "WebSocket /api/tts/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:54863 - "WebSocket /api/audio/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
