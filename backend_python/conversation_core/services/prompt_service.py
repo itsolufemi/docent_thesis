@@ -103,15 +103,4 @@ Context:
 
 Recent dialogue:
 {formatted_history}
-
-Dialogue-history metadata:
-Labels such as [potential noise], [backchannel], and [interruption] record how
-an earlier user utterance was classified at the time. Treat them as contextual
-metadata rather than guaranteed facts. Later dialogue may make an earlier
-utterance more meaningful.
-
-{profile.user_name} says:
-{user_input}
-
-Respond as {profile.assistant_name}:
 """.strip()

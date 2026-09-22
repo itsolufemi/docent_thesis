@@ -57,3 +57,6 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+#lib
+_lib/

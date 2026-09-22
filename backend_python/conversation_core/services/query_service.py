@@ -396,9 +396,13 @@ class QueryEngine:
                 include_debug=include_debug,
             )
 
+        response_dialogue_history = [
+            *dialogue_history,
+            exchange,
+        ]
         prompt = self.prompt_builder(
             text,
-            dialogue_history,
+            response_dialogue_history,
             resolved_context,
         )
 
@@ -453,7 +457,7 @@ class QueryEngine:
                     resolved_context.sources
                     or resolved_context.prompt_payload
                 ),
-                dialogue_turns_used=len(dialogue_history),
+                dialogue_turns_used=len(response_dialogue_history),
                 prompt=prompt,
                 retrieval_used=(
                     resolved_context.context_source
@@ -591,17 +595,21 @@ class QueryEngine:
                 include_debug=include_debug,
             )
 
+        response_dialogue_history = [
+            *dialogue_history,
+            exchange,
+        ]
         prompt_started_at = perf_counter()
         prompt = self.prompt_builder(
             text,
-            dialogue_history,
+            response_dialogue_history,
             resolved_context,
         )
         emit_timing(
             "prompt_build_seconds",
             perf_counter() - prompt_started_at,
             prompt_characters=len(prompt),
-            dialogue_turns=len(dialogue_history),
+            dialogue_turns=len(response_dialogue_history),
         )
 
         response_generation_started_at = perf_counter()
@@ -715,7 +723,7 @@ class QueryEngine:
                     resolved_context.sources
                     or resolved_context.prompt_payload
                 ),
-                dialogue_turns_used=len(dialogue_history),
+                dialogue_turns_used=len(response_dialogue_history),
                 prompt=prompt,
                 retrieval_used=(
                     resolved_context.context_source

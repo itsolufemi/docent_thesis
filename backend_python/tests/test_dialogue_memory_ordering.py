@@ -185,6 +185,32 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
         self.assertEqual(turn.reference, ["painting:118"])
         self.assertEqual(turn.route_type, "response_request")
 
+    def test_non_streaming_prompt_receives_current_enriched_turn(self) -> None:
+        text = "Tell me about The Rising of the Sun."
+        prompts = PromptRecorder()
+        engine = QueryEngine(
+            subject_resolver=RecordingResolver(
+                {
+                    text: resolved_context(
+                        subjects=["The Rising of the Sun"],
+                        references=["painting:118"],
+                    )
+                }
+            ),
+            prompt_builder=prompts,
+            response_generator=ResponseRecorder(),
+        )
+
+        engine.generate_response(text)
+
+        self.assertEqual(len(prompts.histories), 1)
+        self.assertEqual(len(prompts.histories[0]), 1)
+        current_turn = prompts.histories[0][0]
+        self.assertEqual(current_turn.user, text)
+        self.assertEqual(current_turn.subject, ["The Rising of the Sun"])
+        self.assertEqual(current_turn.reference, ["painting:118"])
+        self.assertEqual(current_turn.route_type, "response_request")
+
     def test_p03_second_resolver_sees_first_pending_utterance(self) -> None:
         state = create_conversation()
         first_started = Event()
@@ -248,6 +274,7 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
 
     def test_cancelled_stream_preserves_subject_and_marks_interrupted(self) -> None:
         text = "I'm now looking at The Rising of the Sun."
+        prompts = PromptRecorder()
         engine = QueryEngine(
             subject_resolver=RecordingResolver(
                 {
@@ -257,7 +284,7 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
                     )
                 }
             ),
-            prompt_builder=PromptRecorder(),
+            prompt_builder=prompts,
         )
 
         def cancelled_stream(**kwargs):
@@ -282,6 +309,12 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
         self.assertEqual(history[0].reference, ["painting:118"])
         self.assertEqual(history[0].route_type, "response_request")
         self.assertEqual(history[0].assistant, "[interrupted]")
+        self.assertEqual(len(prompts.histories), 1)
+        self.assertEqual(prompts.histories[0][0].user, text)
+        self.assertEqual(
+            prompts.histories[0][0].subject,
+            ["The Rising of the Sun"],
+        )
         self.append_log.assert_called_once()
 
     def test_potential_noise_survives_and_is_visible_to_later_resolution(self) -> None:
@@ -401,7 +434,7 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
             format_dialogue_history_for_prompt(history),
         )
 
-    def test_response_prompt_explains_history_labels_as_metadata(self) -> None:
+    def test_response_prompt_ends_with_current_turn_in_recent_dialogue(self) -> None:
         profile = PromptProfile(
             assistant_name="Docent",
             user_name="Visitor",
@@ -422,13 +455,13 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
             "Visitor [potential noise]: populated fields.",
             prompt,
         )
-        self.assertIn(
-            "Treat them as contextual\nmetadata rather than guaranteed facts.",
-            prompt,
-        )
-        self.assertIn(
-            "Later dialogue may make an earlier\nutterance more meaningful.",
-            prompt,
+        self.assertNotIn("Dialogue-history metadata:", prompt)
+        self.assertNotIn("Visitor says:", prompt)
+        self.assertNotIn("Respond as Docent:", prompt)
+        self.assertTrue(
+            prompt.endswith(
+                "Visitor [potential noise]: populated fields."
+            )
         )
 
 
