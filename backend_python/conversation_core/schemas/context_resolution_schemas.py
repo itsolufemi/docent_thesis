@@ -12,7 +12,7 @@ class ContextResolutionAssessment(BaseModel):
         "call_to_action",
         "interruption",
         "backchannel",
-        "noise",
+        "potential_noise",
     ]
     requires_retrieval: bool
     subjects: list[str] = Field(default_factory=list)

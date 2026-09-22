@@ -30,7 +30,7 @@ with these fields:
 - is_relevant: true when the utterance contains meaningful conversational input,
   including a backchannel; false only for noise or input that should be ignored.
 - route_type: one of response_request, call_to_action, interruption,
-  backchannel, or noise.
+  backchannel, or potential_noise.
 
   response_request:
   Any meaningful conversational contribution that merits a verbal response
@@ -60,7 +60,7 @@ with these fields:
   question, correction, request, answer, or change in conversational
   direction.
 
-  noise:
+  potential_noise:
   Use only when the input contains no meaningful conversational contribution
   and should be ignored. This includes non-linguistic sounds, accidental
   transcription, meaningless fragments, or speech that does not carry a

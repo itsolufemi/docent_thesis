@@ -5,8 +5,11 @@ class DialogueTurn(BaseModel):
     previous_subject: list[str] = Field(default_factory=list)
     subject: list[str] = Field(default_factory=list)
     reference: list[str] = Field(default_factory=list)
+
     user: str | None = None
     assistant: str | None = None
+
+    route_type: str | None = None
 
 
 class ConversationState(BaseModel):

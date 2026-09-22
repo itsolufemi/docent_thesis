@@ -9,7 +9,9 @@ from conversation_core.memory.conversation_store import (
     get_conversation,
     get_conversation_introduction,
     get_recent_conversation_history,
+    mark_dialogue_turn_interrupted,
     set_conversation_introduction,
+    update_dialogue_turn_context,
 )
 from conversation_core.schemas.context_schemas import QueryDebugInfo
 from conversation_core.schemas.conversation_schemas import DialogueTurn
@@ -136,7 +138,7 @@ def should_suppress_response(
 
     return assessment.get("route_type") in {
         "backchannel",
-        "noise",
+        "potential_noise",
     }
 
 
@@ -257,35 +259,6 @@ class QueryEngine:
             dialogue_history,
         )
 
-    def _create_exchange(
-        self,
-        *,
-        conversation_id: str,
-        dialogue_history: list[DialogueTurn],
-        text: str,
-        resolved_context: ResolvedContext,
-    ) -> DialogueTurn:
-        exchange = add_dialogue_turn(
-            conversation_id=conversation_id,
-            user=text,
-            previous_subject=get_latest_subjects(
-                dialogue_history
-            ),
-            subject=get_resolved_subjects(
-                resolved_context
-            ),
-            reference=get_resolved_references(
-                resolved_context
-            ),
-        )
-
-        if exchange is None:
-            raise RuntimeError(
-                "Could not create dialogue exchange."
-            )
-
-        return exchange
-
     def _build_suppressed_result(
         self,
         *,
@@ -366,6 +339,18 @@ class QueryEngine:
             dialogue_history,
         ) = self._prepare_conversation(conversation_id)
 
+        exchange = add_dialogue_turn(
+            conversation_id=conversation_id,
+            user=text,
+            previous_subject=get_latest_subjects(
+                dialogue_history
+            ),
+        )
+        if exchange is None:
+            raise RuntimeError(
+                "Could not create dialogue exchange."
+            )
+
         context_resolution_started_at = perf_counter()
         resolved_context = self.subject_resolver(
             dialogue_history,
@@ -378,6 +363,22 @@ class QueryEngine:
 
         subjects = get_resolved_subjects(resolved_context)
         references = get_resolved_references(resolved_context)
+        assessment = resolved_context.prompt_payload.get(
+            "context_resolution",
+            {},
+        )
+        route_type = (
+            assessment.get("route_type")
+            if isinstance(assessment, dict)
+            else None
+        )
+        update_dialogue_turn_context(
+            conversation_id,
+            exchange,
+            subject=subjects,
+            reference=references,
+            route_type=route_type,
+        )
 
         if should_suppress_response(resolved_context):
             return self._build_suppressed_result(
@@ -399,12 +400,6 @@ class QueryEngine:
             text,
             dialogue_history,
             resolved_context,
-        )
-        exchange = self._create_exchange(
-            conversation_id=conversation_id,
-            dialogue_history=dialogue_history,
-            text=text,
-            resolved_context=resolved_context,
         )
 
         response_generation_started_at = perf_counter()
@@ -519,6 +514,18 @@ class QueryEngine:
             perf_counter() - preparation_started_at,
         )
 
+        exchange = add_dialogue_turn(
+            conversation_id=conversation_id,
+            user=text,
+            previous_subject=get_latest_subjects(
+                dialogue_history
+            ),
+        )
+        if exchange is None:
+            raise RuntimeError(
+                "Could not create dialogue exchange."
+            )
+
         context_resolution_started_at = perf_counter()
         resolved_context = self.subject_resolver(
             dialogue_history,
@@ -544,6 +551,18 @@ class QueryEngine:
             resolved_context.prompt_payload.get(
                 "context_resolution"
             )
+        )
+        route_type = (
+            context_resolution.get("route_type")
+            if isinstance(context_resolution, dict)
+            else None
+        )
+        update_dialogue_turn_context(
+            conversation_id,
+            exchange,
+            subject=subjects,
+            reference=references,
+            route_type=route_type,
         )
         if (
             on_stream_event is not None
@@ -583,13 +602,6 @@ class QueryEngine:
             perf_counter() - prompt_started_at,
             prompt_characters=len(prompt),
             dialogue_turns=len(dialogue_history),
-        )
-
-        exchange = self._create_exchange(
-            conversation_id=conversation_id,
-            dialogue_history=dialogue_history,
-            text=text,
-            resolved_context=resolved_context,
         )
 
         response_generation_started_at = perf_counter()
@@ -651,7 +663,12 @@ class QueryEngine:
             perf_counter() - response_generation_started_at
         )
 
-        if not response_cancelled and response:
+        if response_cancelled:
+            mark_dialogue_turn_interrupted(
+                conversation_id,
+                exchange,
+            )
+        elif response:
             complete_dialogue_turn(
                 conversation_id,
                 exchange,

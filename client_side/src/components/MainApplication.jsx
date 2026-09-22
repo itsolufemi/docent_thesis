@@ -1358,7 +1358,7 @@ export default function MainApplication() {
 
         if (
           routeType === 'backchannel' ||
-          routeType === 'noise'
+          routeType === 'potential_noise'
         ) {
           resumeAssistantAudio();
           restoreAssistantAudio();

@@ -23,9 +23,22 @@ def format_dialogue_history_for_prompt(
         ]
 
         if turn.user is not None:
-            turn_lines.append(
-                f"{user_label}: {turn.user}"
-            )
+            route_labels = {
+                "potential_noise": "potential noise",
+                "backchannel": "backchannel",
+                "interruption": "interruption",
+            }
+            route_label = route_labels.get(turn.route_type)
+
+            if route_label:
+                turn_lines.append(
+                    f"{user_label} [{route_label}]: "
+                    f"{turn.user}"
+                )
+            else:
+                turn_lines.append(
+                    f"{user_label}: {turn.user}"
+                )
 
         if turn.assistant is not None:
             turn_lines.append(
@@ -90,6 +103,12 @@ Context:
 
 Recent dialogue:
 {formatted_history}
+
+Dialogue-history metadata:
+Labels such as [potential noise], [backchannel], and [interruption] record how
+an earlier user utterance was classified at the time. Treat them as contextual
+metadata rather than guaranteed facts. Later dialogue may make an earlier
+utterance more meaningful.
 
 {profile.user_name} says:
 {user_input}

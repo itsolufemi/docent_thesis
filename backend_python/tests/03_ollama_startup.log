@@ -264,3 +264,5 @@ time=2026-09-20T21:41:23.069-04:00 level=INFO source=model_recommendations.go:17
 time=2026-09-21T02:01:07.774-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=4h43m24.562169856s consecutive_failures=0
 time=2026-09-21T08:58:32.140-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=3h44m53.430380795s consecutive_failures=0
 time=2026-09-21T12:43:25.852-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=4h0m25.9527583s consecutive_failures=0
+time=2026-09-21T16:43:52.040-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=4h32m10.637142744s consecutive_failures=0
+time=2026-09-21T21:16:02.952-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=3h17m27.220919202s consecutive_failures=0

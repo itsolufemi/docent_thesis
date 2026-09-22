@@ -90,6 +90,50 @@ def complete_dialogue_turn(
     return turn
 
 
+def update_dialogue_turn_context(
+    conversation_id: str,
+    turn: DialogueTurn,
+    *,
+    subject: list[str],
+    reference: list[str],
+    route_type: str | None,
+) -> DialogueTurn | None:
+    """Enrich an existing user turn after context resolution."""
+    state = get_conversation(conversation_id)
+
+    if state is None or turn not in state.dialogue_history:
+        return None
+
+    turn.subject = list(subject)
+    turn.reference = list(reference)
+    turn.route_type = route_type
+
+    conversations[conversation_id] = state
+
+    return turn
+
+
+def mark_dialogue_turn_interrupted(
+    conversation_id: str,
+    turn: DialogueTurn,
+) -> DialogueTurn | None:
+    """Record that generation for an otherwise valid turn was interrupted."""
+    state = get_conversation(conversation_id)
+
+    if state is None or turn not in state.dialogue_history:
+        return None
+
+    turn.assistant = "[interrupted]"
+    conversations[conversation_id] = state
+
+    append_dialogue_turn_log(
+        conversation_id=conversation_id,
+        turn=turn,
+    )
+
+    return turn
+
+
 def get_recent_conversation_history(
     conversation_id: str,
     limit: int = 6,
