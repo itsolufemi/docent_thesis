@@ -1218,22 +1218,7 @@ export default function MainApplication() {
       return;
     }
 
-    const completedSentences =
-      completedSpokenSentencesRef.current.get(
-        requestId,
-      ) ?? [];
-    const interruptedAssistantText =
-      buildInterruptedAssistantText(
-        completedSentences,
-      );
-
     cancelProgressiveTtsResponse(requestId);
-
-    turnStreamClientRef.current
-      ?.recordAssistantPlaybackInterrupted(
-        requestId,
-        interruptedAssistantText,
-      );
   };
 
   const stopCurrentAssistantResponse =
@@ -1961,6 +1946,7 @@ export default function MainApplication() {
     isSpeechActive,
     silenceDurationMs,
     turnCompletionConfirmed = false,
+    interruptedPlayback = null,
     debug = false,
   }) => {
     const client =
@@ -1979,6 +1965,12 @@ export default function MainApplication() {
               assistantAudioStatusRef.current ===
                 'playing',
             turnCompletionConfirmed,
+            interruptedRequestId:
+              interruptedPlayback?.requestId ??
+              null,
+            interruptedAssistantText:
+              interruptedPlayback
+                ?.assistantText ?? null,
             debug,
           });
 
@@ -3064,12 +3056,39 @@ export default function MainApplication() {
         false;
     }
 
+    const activeResponse =
+      activeProgressiveResponseRef.current;
+    const assistantWasActive = Boolean(
+      activeResponse?.requestId &&
+      (
+        assistantAudioStatusRef.current ===
+          'synthesising' ||
+        assistantAudioStatusRef.current ===
+          'playing' ||
+        assistantPlaybackPausedRef.current
+      )
+    );
+    const interruptedPlayback =
+      assistantWasActive
+        ? {
+            requestId:
+              activeResponse.requestId,
+            assistantText:
+              buildInterruptedAssistantText(
+                completedSpokenSentencesRef.current.get(
+                  activeResponse.requestId,
+                ) ?? [],
+              ),
+          }
+        : null;
+
     try {
       const result = await sendStreamedTurnEvent({
         partialUtterance: cleanedUtterance,
         isSpeechActive: false,
         silenceDurationMs,
         turnCompletionConfirmed,
+        interruptedPlayback,
         debug: true,
       });
 

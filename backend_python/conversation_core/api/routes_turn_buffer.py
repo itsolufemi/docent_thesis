@@ -76,6 +76,12 @@ def create_turn_buffer_router(
             turn_completion_confirmed=(
                 request.turn_completion_confirmed
             ),
+            interrupted_request_id=(
+                request.interrupted_request_id
+            ),
+            interrupted_assistant_text=(
+                request.interrupted_assistant_text
+            ),
         )
 
         return process_conversation_turn(

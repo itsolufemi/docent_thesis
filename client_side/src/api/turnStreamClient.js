@@ -275,6 +275,8 @@ export class TurnStreamClient {
     silenceDurationMs,
     assistantWasSpeaking,
     turnCompletionConfirmed = false,
+    interruptedRequestId = null,
+    interruptedAssistantText = null,
     debug = false,
   }) {
     if (
@@ -304,6 +306,10 @@ export class TurnStreamClient {
             assistantWasSpeaking,
           turn_completion_confirmed:
             turnCompletionConfirmed,
+          interrupted_request_id:
+            interruptedRequestId,
+          interrupted_assistant_text:
+            interruptedAssistantText,
           debug,
         },
       }),

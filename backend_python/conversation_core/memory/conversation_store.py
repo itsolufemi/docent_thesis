@@ -177,6 +177,29 @@ def update_interrupted_assistant_response(
     return None
 
 
+def build_history_with_playback_interruption(
+    dialogue_history: list[DialogueTurn],
+    *,
+    request_id: str | None,
+    assistant_text: str | None,
+) -> list[DialogueTurn]:
+    """Return a provisional history without mutating canonical turns."""
+    history = [
+        turn.model_copy(deep=True)
+        for turn in dialogue_history
+    ]
+
+    if not request_id or not assistant_text:
+        return history
+
+    for turn in reversed(history):
+        if turn.request_id == request_id:
+            turn.assistant = assistant_text
+            break
+
+    return history
+
+
 def get_recent_conversation_history(
     conversation_id: str,
     limit: int = 6,

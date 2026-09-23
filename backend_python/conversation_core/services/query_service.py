@@ -11,6 +11,7 @@ from conversation_core.memory.conversation_store import (
     get_recent_conversation_history,
     mark_dialogue_turn_interrupted,
     set_conversation_introduction,
+    update_interrupted_assistant_response,
     update_dialogue_turn_context,
 )
 from conversation_core.schemas.context_schemas import QueryDebugInfo
@@ -484,6 +485,9 @@ class QueryEngine:
         text: str,
         conversation_id: str | None = None,
         request_id: str | None = None,
+        dialogue_history_override: list[DialogueTurn] | None = None,
+        interrupted_request_id: str | None = None,
+        interrupted_assistant_text: str | None = None,
         subject_reference: str | None = None,
         utterance_route: UtteranceRoute | None = None,
         include_debug: bool = False,
@@ -521,6 +525,12 @@ class QueryEngine:
             perf_counter() - preparation_started_at,
         )
 
+        resolver_history = (
+            dialogue_history_override
+            if dialogue_history_override is not None
+            else dialogue_history
+        )
+
         exchange = add_dialogue_turn(
             conversation_id=conversation_id,
             user=text,
@@ -536,7 +546,7 @@ class QueryEngine:
 
         context_resolution_started_at = perf_counter()
         resolved_context = self.subject_resolver(
-            dialogue_history,
+            resolver_history,
             text,
             utterance_route,
         )
@@ -572,6 +582,21 @@ class QueryEngine:
             reference=references,
             route_type=route_type,
         )
+        should_commit_interruption = bool(
+            interrupted_request_id
+            and interrupted_assistant_text
+            and route_type in {
+                "response_request",
+                "call_to_action",
+                "interruption",
+            }
+        )
+        if should_commit_interruption:
+            update_interrupted_assistant_response(
+                conversation_id,
+                interrupted_request_id,
+                interrupted_assistant_text,
+            )
         if (
             on_stream_event is not None
             and isinstance(context_resolution, dict)
@@ -600,7 +625,7 @@ class QueryEngine:
             )
 
         response_dialogue_history = [
-            *dialogue_history,
+            *resolver_history,
             exchange,
         ]
         prompt_started_at = perf_counter()

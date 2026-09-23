@@ -19,6 +19,8 @@ for import_root in (REPOSITORY_ROOT, BACKEND_ROOT):
 
 
 from conversation_core.memory.conversation_store import (  # noqa: E402
+    add_dialogue_turn,
+    build_history_with_playback_interruption,
     conversations,
     create_conversation,
     get_recent_conversation_history,
@@ -324,6 +326,123 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
             ["The Rising of the Sun"],
         )
         self.assertTrue(self.rewrite_log.called)
+
+    def test_resolver_and_prompt_receive_provisional_interruption(self) -> None:
+        state = create_conversation()
+        previous = add_dialogue_turn(
+            state.conversation_id,
+            request_id="request-a",
+            user="Tell me about Queen Victoria.",
+            assistant="A. B. C.",
+        )
+        text = "by Thomas Sully"
+        resolver = RecordingResolver(
+            {
+                text: resolved_context(
+                    route_type="response_request",
+                    subjects=["Queen Victoria"],
+                )
+            }
+        )
+        prompts = PromptRecorder()
+        override = build_history_with_playback_interruption(
+            get_recent_conversation_history(
+                state.conversation_id
+            ),
+            request_id="request-a",
+            assistant_text="A. [interrupted]",
+        )
+        engine = QueryEngine(
+            subject_resolver=resolver,
+            prompt_builder=prompts,
+        )
+
+        def completed_stream(**kwargs):
+            yield LLMStreamEvent(
+                event_type="content_delta",
+                text="Thomas Sully painted it.",
+            )
+            yield LLMStreamEvent(
+                event_type="response_complete",
+                text="Thomas Sully painted it.",
+                done=True,
+            )
+
+        with patch(
+            "conversation_core.services.query_service.stream_llm_response",
+            side_effect=completed_stream,
+        ):
+            engine.generate_streaming_response(
+                text,
+                conversation_id=state.conversation_id,
+                request_id="request-b",
+                dialogue_history_override=override,
+                interrupted_request_id="request-a",
+                interrupted_assistant_text="A. [interrupted]",
+            )
+
+        self.assertEqual(
+            resolver.snapshots[0][1][-1][3],
+            "A. [interrupted]",
+        )
+        self.assertNotEqual(
+            resolver.snapshots[0][1][-1][3],
+            "A. B. C.",
+        )
+        self.assertEqual(previous.assistant, "A. [interrupted]")
+        self.assertEqual(prompts.histories[0][0].assistant, "A. [interrupted]")
+        self.assertEqual(prompts.histories[0][-1].user, text)
+        rendered_prompt_history = format_dialogue_history_for_prompt(
+            prompts.histories[0]
+        )
+        self.assertIn("Assistant: A. [interrupted]", rendered_prompt_history)
+        self.assertNotIn("Assistant: A. B. C.", rendered_prompt_history)
+
+    def test_backchannel_uses_provisional_interruption_without_committing(self) -> None:
+        state = create_conversation()
+        previous = add_dialogue_turn(
+            state.conversation_id,
+            request_id="request-a",
+            user="Tell me about Queen Victoria.",
+            assistant="A. B. C.",
+        )
+        text = "Mm-hm."
+        resolver = RecordingResolver(
+            {
+                text: resolved_context(
+                    route_type="backchannel",
+                    is_relevant=False,
+                )
+            }
+        )
+        override = build_history_with_playback_interruption(
+            get_recent_conversation_history(
+                state.conversation_id
+            ),
+            request_id="request-a",
+            assistant_text="A. [interrupted]",
+        )
+        engine = QueryEngine(
+            subject_resolver=resolver,
+            prompt_builder=PromptRecorder(),
+            response_generator=ResponseRecorder(),
+        )
+
+        result = engine.generate_streaming_response(
+            text,
+            conversation_id=state.conversation_id,
+            request_id="request-b",
+            dialogue_history_override=override,
+            interrupted_request_id="request-a",
+            interrupted_assistant_text="A. [interrupted]",
+        )
+
+        self.assertEqual(result.response, "")
+        self.assertEqual(
+            resolver.snapshots[0][1][-1][3],
+            "A. [interrupted]",
+        )
+        self.assertEqual(previous.assistant, "A. B. C.")
 
     def test_potential_noise_survives_and_is_visible_to_later_resolution(self) -> None:
         first = "There's a mountain, a few trees and some sparsely."

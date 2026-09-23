@@ -24,6 +24,8 @@ class TurnBufferEvent(BaseModel):
     silence_duration_ms: int = Field(ge=0)
     assistant_was_speaking: bool = False
     turn_completion_confirmed: bool = False
+    interrupted_request_id: str | None = None
+    interrupted_assistant_text: str | None = None
 
 
 class TurnBufferEventRequest(BaseModel):
@@ -32,6 +34,8 @@ class TurnBufferEventRequest(BaseModel):
     silence_duration_ms: int = Field(ge=0)
     assistant_was_speaking: bool = False
     turn_completion_confirmed: bool = False
+    interrupted_request_id: str | None = None
+    interrupted_assistant_text: str | None = None
     debug: bool = False
 
 

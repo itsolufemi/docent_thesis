@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -154,6 +155,36 @@ class AssistantPlaybackInterruptionTest(unittest.TestCase):
         content = self._dialogue_text(state.conversation_id)
         self.assertIn("User [backchannel]:\nMm-hm.", content)
         self.assertIn("Assistant:\nNone", content)
+
+    def test_rewrite_preserves_turn_creation_timestamp(self) -> None:
+        state = create_conversation()
+        turn = add_dialogue_turn(
+            state.conversation_id,
+            request_id="request-a",
+            user="Tell me about Queen Victoria.",
+            assistant="A. B. C.",
+        )
+        turn.created_at = datetime(
+            2020,
+            1,
+            2,
+            3,
+            4,
+            5,
+            tzinfo=timezone.utc,
+        )
+
+        update_interrupted_assistant_response(
+            state.conversation_id,
+            "request-a",
+            "A. [interrupted]",
+        )
+
+        content = self._dialogue_text(state.conversation_id)
+        self.assertIn(
+            "Timestamp: 2020-01-02T03:04:05+00:00",
+            content,
+        )
 
     def test_websocket_interruption_action_updates_existing_turn(self) -> None:
         state = create_conversation()

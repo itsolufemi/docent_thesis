@@ -83,7 +83,7 @@ def _dialogue_turn_entry(
         [
             "",
             "========================================",
-            f"Timestamp: {_utc_timestamp()}",
+            f"Timestamp: {turn.created_at.isoformat()}",
             f"Request ID: {turn.request_id or 'None'}",
             f"Previous subjects: {turn.previous_subject}",
             f"Subjects: {turn.subject}",

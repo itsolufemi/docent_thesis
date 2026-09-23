@@ -12,8 +12,10 @@ from conversation_core.api.routes_query import (
     CONVERSATION_COOKIE_NAME,
 )
 from conversation_core.memory.conversation_store import (
+    build_history_with_playback_interruption,
     create_conversation,
     get_conversation,
+    get_recent_conversation_history,
     update_interrupted_assistant_response,
 )
 from conversation_core.schemas.turn_buffer_schemas import (
@@ -178,6 +180,16 @@ async def process_streamed_turn_event(
                     False,
                 )
             ),
+            interrupted_request_id=(
+                payload.get(
+                    "interrupted_request_id"
+                )
+            ),
+            interrupted_assistant_text=(
+                payload.get(
+                    "interrupted_assistant_text"
+                )
+            ),
         )
 
         turn_result = await asyncio.to_thread(
@@ -194,6 +206,28 @@ async def process_streamed_turn_event(
                 ),
             }
         )
+
+        resolver_history = None
+        if (
+            event.interrupted_request_id
+            and event.interrupted_assistant_text
+        ):
+            recent_history = (
+                get_recent_conversation_history(
+                    conversation_id
+                )
+            )
+            resolver_history = (
+                build_history_with_playback_interruption(
+                    recent_history,
+                    request_id=(
+                        event.interrupted_request_id
+                    ),
+                    assistant_text=(
+                        event.interrupted_assistant_text
+                    ),
+                )
+            )
 
         if not turn_result.should_finalise_turn:
             return
@@ -261,6 +295,15 @@ async def process_streamed_turn_event(
                     text=finalised_utterance,
                     conversation_id=conversation_id,
                     request_id=request_id,
+                    dialogue_history_override=(
+                        resolver_history
+                    ),
+                    interrupted_request_id=(
+                        event.interrupted_request_id
+                    ),
+                    interrupted_assistant_text=(
+                        event.interrupted_assistant_text
+                    ),
                     subject_reference=None,
                     utterance_route=utterance_route,
                     include_debug=bool(

@@ -16,6 +16,9 @@ if str(BACKEND_PYTHON_ROOT) not in sys.path:
 from conversation_core.api.routes_turn_buffer_stream import (
     create_turn_buffer_stream_router,
 )
+from conversation_core.memory.conversation_store import (  # noqa: E402
+    add_dialogue_turn,
+)
 from conversation_core.schemas.query_schemas import QueryResult
 from conversation_core.schemas.llm_stream_schemas import (
     LLMStreamEvent,
@@ -135,6 +138,12 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
                 conversation_id = ready["payload"][
                     "conversation_id"
                 ]
+                previous_turn = add_dialogue_turn(
+                    conversation_id,
+                    request_id="request-a",
+                    user="Tell me about Queen Victoria.",
+                    assistant="A. B. C.",
+                )
 
                 websocket.send_json(
                     {
@@ -147,6 +156,12 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
                             "is_speech_active": False,
                             "silence_duration_ms": 600,
                             "assistant_was_speaking": True,
+                            "interrupted_request_id": (
+                                "request-a"
+                            ),
+                            "interrupted_assistant_text": (
+                                "A. [interrupted]"
+                            ),
                             "debug": True,
                         },
                     }
@@ -188,11 +203,28 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
             text="Wait, when was it painted?",
             conversation_id=conversation_id,
             request_id="request-1",
+            dialogue_history_override=ANY,
+            interrupted_request_id="request-a",
+            interrupted_assistant_text="A. [interrupted]",
             subject_reference=None,
             utterance_route=utterance_route,
             include_debug=True,
             on_stream_event=ANY,
             cancellation_token=ANY,
+        )
+        query_call = (
+            query_engine.generate_streaming_response.call_args
+        )
+        resolver_history = query_call.kwargs[
+            "dialogue_history_override"
+        ]
+        self.assertEqual(
+            resolver_history[-1].assistant,
+            "A. [interrupted]",
+        )
+        self.assertEqual(
+            previous_turn.assistant,
+            "A. B. C.",
         )
         streamed_text = "".join(
             message["payload"]["text"]
@@ -774,6 +806,13 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
                 cancelled_message = (
                     websocket.receive_json()
                 )
+
+                deadline = time.time() + 1
+                while (
+                    not append_telemetry_log.called
+                    and time.time() < deadline
+                ):
+                    time.sleep(0.005)
 
         self.assertEqual(
             cancelled_message["type"],
