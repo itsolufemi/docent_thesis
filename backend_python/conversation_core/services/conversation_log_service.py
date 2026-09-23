@@ -61,6 +61,29 @@ def _append_text(
     if not settings.conversation_logging_enabled:
         return False
 
+    try:
+        with _file_lock:
+            path.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            with path.open(
+                "a",
+                encoding="utf-8",
+                newline="\n",
+            ) as file:
+                file.write(content)
+                file.flush()
+
+        return True
+    except OSError as error:
+        print(
+            f"Conversation logging failed for "
+            f"{path}: {error}"
+        )
+        return False
+
 
 def _dialogue_turn_entry(
     turn: DialogueTurn,
@@ -96,29 +119,6 @@ def _dialogue_turn_entry(
             "",
         ]
     )
-
-    try:
-        with _file_lock:
-            path.parent.mkdir(
-                parents=True,
-                exist_ok=True,
-            )
-
-            with path.open(
-                "a",
-                encoding="utf-8",
-                newline="\n",
-            ) as file:
-                file.write(content)
-                file.flush()
-
-        return True
-    except OSError as error:
-        print(
-            f"Conversation logging failed for "
-            f"{path}: {error}"
-        )
-        return False
 
 
 def append_dialogue_turn_log(

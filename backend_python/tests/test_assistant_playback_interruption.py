@@ -21,6 +21,9 @@ from conversation_core.memory.conversation_store import (
     update_interrupted_assistant_response,
     mark_dialogue_turn_interrupted,
 )
+from conversation_core.services.conversation_log_service import (
+    append_telemetry_log,
+)
 
 
 class AssistantPlaybackInterruptionTest(unittest.TestCase):
@@ -53,6 +56,29 @@ class AssistantPlaybackInterruptionTest(unittest.TestCase):
             / conversation_id
             / "dialogue.txt"
         ).read_text(encoding="utf-8")
+
+    def test_telemetry_append_creates_log_file(self) -> None:
+        conversation_id = "conversation-telemetry"
+
+        append_telemetry_log(
+            conversation_id=conversation_id,
+            request_id="test-request",
+            event_type="test",
+            payload={"value": 1},
+        )
+
+        telemetry_path = (
+            self.log_root
+            / conversation_id
+            / "telemetry.txt"
+        )
+        self.assertTrue(telemetry_path.exists())
+        self.assertIn(
+            '"event_type": "test"',
+            telemetry_path.read_text(
+                encoding="utf-8"
+            ),
+        )
 
     def test_completed_generation_is_corrected_to_heard_sentences(self) -> None:
         state = create_conversation()
