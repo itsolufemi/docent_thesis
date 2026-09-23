@@ -304,12 +304,9 @@ requires_retrieval: {assessment.get('requires_retrieval', False)}
 subjects: {assessment.get('subjects', [])}
 
 If is_relevant is false, produce no visitor-facing response.
-Otherwise, answer the original visitor utterance naturally. Use the retrieved
-evidence when available. The subject list is retrieval and dialogue metadata;
-do not recite or explain it to the visitor.
-
-ORIGINAL VISITOR UTTERANCE
-{user_input}
+Otherwise, answer the final visitor turn in Recent dialogue naturally. Use the
+retrieved evidence when available. The subject list is retrieval and dialogue
+metadata; do not recite or explain it to the visitor.
 """.strip()
 
     return docent_build_prompt(
@@ -318,6 +315,7 @@ ORIGINAL VISITOR UTTERANCE
         artwork=payload.get("artwork"),
         retrieved_documents=payload.get("retrieved_documents", []),
         retrieved_chunks=payload.get("retrieved_chunks", []),
+        response_guidance=routing_guidance,
     )
 
 

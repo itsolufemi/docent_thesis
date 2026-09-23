@@ -16,6 +16,7 @@ class TtsPcmPlayerProcessor
     this.paused = false;
     this.underrunActive = false;
     this.underrunCount = 0;
+    this.activeSentenceKey = null;
 
     this.port.onmessage = (event) => {
       const message = event.data;
@@ -47,7 +48,14 @@ class TtsPcmPlayerProcessor
           samples instanceof Float32Array &&
           samples.length > 0
         ) {
-          this.queue.push(samples);
+          this.queue.push({
+            type: 'audio',
+            samples,
+            requestId:
+              message.requestId ?? null,
+            sentence:
+              message.sentence ?? null,
+          });
           this.queuedSamples +=
             samples.length;
 
@@ -58,6 +66,13 @@ class TtsPcmPlayerProcessor
       }
 
       if (message?.type === 'complete') {
+        this.queue.push({
+          type: 'sentence_complete',
+          requestId:
+            message.requestId ?? null,
+          sentence:
+            message.sentence ?? null,
+        });
         this.streamComplete = true;
         return;
       }
@@ -103,6 +118,7 @@ class TtsPcmPlayerProcessor
     this.paused = false;
     this.underrunActive = false;
     this.underrunCount = 0;
+    this.activeSentenceKey = null;
   }
 
   shouldBeginPlayback() {
@@ -141,13 +157,51 @@ class TtsPcmPlayerProcessor
       outputChannel.length
     ) {
       if (!this.currentChunk) {
-        this.currentChunk =
+        let nextEntry =
           this.queue.shift() ?? null;
+
+        while (
+          nextEntry?.type ===
+          'sentence_complete'
+        ) {
+          this.port.postMessage({
+            type: 'sentence_playback_complete',
+            requestId:
+              nextEntry.requestId,
+            sentence:
+              nextEntry.sentence,
+          });
+          this.activeSentenceKey = null;
+          nextEntry =
+            this.queue.shift() ?? null;
+        }
+
+        this.currentChunk =
+          nextEntry?.samples ?? null;
 
         this.currentOffset = 0;
 
         if (!this.currentChunk) {
           break;
+        }
+
+        const sentenceKey =
+          `${nextEntry.requestId ?? ''}:` +
+          `${nextEntry.sentence ?? ''}`;
+
+        if (
+          sentenceKey !==
+          this.activeSentenceKey
+        ) {
+          this.activeSentenceKey =
+            sentenceKey;
+          this.port.postMessage({
+            type: 'sentence_playback_started',
+            requestId:
+              nextEntry.requestId,
+            sentence:
+              nextEntry.sentence,
+          });
         }
 
         if (!this.playbackStarted) {

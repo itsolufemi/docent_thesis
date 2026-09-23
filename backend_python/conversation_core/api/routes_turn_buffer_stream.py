@@ -14,6 +14,7 @@ from conversation_core.api.routes_query import (
 from conversation_core.memory.conversation_store import (
     create_conversation,
     get_conversation,
+    update_interrupted_assistant_response,
 )
 from conversation_core.schemas.turn_buffer_schemas import (
     TurnBufferEvent,
@@ -259,6 +260,7 @@ async def process_streamed_turn_event(
                     .generate_streaming_response,
                     text=finalised_utterance,
                     conversation_id=conversation_id,
+                    request_id=request_id,
                     subject_reference=None,
                     utterance_route=utterance_route,
                     include_debug=bool(
@@ -619,6 +621,94 @@ def create_turn_buffer_stream_router(
                             }
                         )
 
+                    continue
+
+                if (
+                    message_type
+                    == "assistant_playback_interrupted"
+                ):
+                    request_id_value = message.get(
+                        "request_id"
+                    )
+                    interruption_payload = message.get(
+                        "payload"
+                    )
+                    assistant_text = (
+                        interruption_payload.get(
+                            "assistant_text"
+                        )
+                        if isinstance(
+                            interruption_payload,
+                            dict,
+                        )
+                        else None
+                    )
+                    payload_conversation_id = (
+                        interruption_payload.get(
+                            "conversation_id"
+                        )
+                        if isinstance(
+                            interruption_payload,
+                            dict,
+                        )
+                        else None
+                    )
+
+                    if (
+                        not isinstance(
+                            request_id_value,
+                            str,
+                        )
+                        or not request_id_value
+                        or not isinstance(
+                            assistant_text,
+                            str,
+                        )
+                        or not assistant_text.strip()
+                        or (
+                            payload_conversation_id
+                            not in {None, conversation_id}
+                        )
+                    ):
+                        await send_message(
+                            {
+                                "type": "turn_error",
+                                "request_id": (
+                                    request_id_value
+                                ),
+                                "payload": {
+                                    "detail": (
+                                        "assistant_playback_interrupted "
+                                        "requires the active "
+                                        "conversation_id, a request_id, "
+                                        "and assistant_text."
+                                    ),
+                                },
+                            }
+                        )
+                        continue
+
+                    updated_turn = (
+                        update_interrupted_assistant_response(
+                            conversation_id,
+                            request_id_value,
+                            assistant_text,
+                        )
+                    )
+                    await send_message(
+                        {
+                            "type": (
+                                "assistant_playback_"
+                                "interruption_recorded"
+                            ),
+                            "request_id": request_id_value,
+                            "payload": {
+                                "updated": (
+                                    updated_turn is not None
+                                ),
+                            },
+                        }
+                    )
                     continue
 
                 if message_type != "turn_event":

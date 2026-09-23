@@ -5,7 +5,7 @@ from conversation_core.schemas.conversation_schemas import (
     DialogueTurn,
 )
 from conversation_core.services.conversation_log_service import (
-    append_dialogue_turn_log,
+    rewrite_dialogue_log,
 )
 
 
@@ -40,6 +40,7 @@ def add_dialogue_turn(
     previous_subject: list[str] | None = None,
     subject: list[str] | None = None,
     reference: list[str] | None = None,
+    request_id: str | None = None,
 ) -> DialogueTurn | None:
     """Append one complete or pending user-assistant exchange."""
     state = get_conversation(conversation_id)
@@ -53,16 +54,16 @@ def add_dialogue_turn(
         reference=reference or [],
         user=user,
         assistant=assistant,
+        request_id=request_id,
     )
 
     state.dialogue_history.append(turn)
     conversations[conversation_id] = state
 
-    if assistant is not None or user is None:
-        append_dialogue_turn_log(
-            conversation_id=conversation_id,
-            turn=turn,
-        )
+    rewrite_dialogue_log(
+        conversation_id=conversation_id,
+        dialogue_history=state.dialogue_history,
+    )
 
     return turn
 
@@ -82,9 +83,9 @@ def complete_dialogue_turn(
     turn.assistant = assistant
     conversations[conversation_id] = state
 
-    append_dialogue_turn_log(
+    rewrite_dialogue_log(
         conversation_id=conversation_id,
-        turn=turn,
+        dialogue_history=state.dialogue_history,
     )
 
     return turn
@@ -110,6 +111,11 @@ def update_dialogue_turn_context(
 
     conversations[conversation_id] = state
 
+    rewrite_dialogue_log(
+        conversation_id=conversation_id,
+        dialogue_history=state.dialogue_history,
+    )
+
     return turn
 
 
@@ -123,15 +129,52 @@ def mark_dialogue_turn_interrupted(
     if state is None or turn not in state.dialogue_history:
         return None
 
-    turn.assistant = "[interrupted]"
+    if not (
+        turn.assistant
+        and turn.assistant.rstrip().endswith(
+            "[interrupted]"
+        )
+    ):
+        turn.assistant = "[interrupted]"
     conversations[conversation_id] = state
 
-    append_dialogue_turn_log(
+    rewrite_dialogue_log(
         conversation_id=conversation_id,
-        turn=turn,
+        dialogue_history=state.dialogue_history,
     )
 
     return turn
+
+
+def update_interrupted_assistant_response(
+    conversation_id: str,
+    request_id: str,
+    assistant_text: str,
+) -> DialogueTurn | None:
+    """Correct one generated response to what playback actually delivered."""
+    state = get_conversation(conversation_id)
+
+    if state is None:
+        return None
+
+    corrected_text = assistant_text.strip()
+
+    if not corrected_text:
+        return None
+
+    for turn in reversed(state.dialogue_history):
+        if turn.request_id != request_id:
+            continue
+
+        turn.assistant = corrected_text
+        conversations[conversation_id] = state
+        rewrite_dialogue_log(
+            conversation_id=conversation_id,
+            dialogue_history=state.dialogue_history,
+        )
+        return turn
+
+    return None
 
 
 def get_recent_conversation_history(

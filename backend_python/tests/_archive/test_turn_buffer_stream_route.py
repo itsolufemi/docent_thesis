@@ -187,6 +187,7 @@ class TurnBufferStreamRouteTest(unittest.TestCase):
         query_engine.generate_streaming_response.assert_called_once_with(
             text="Wait, when was it painted?",
             conversation_id=conversation_id,
+            request_id="request-1",
             subject_reference=None,
             utterance_route=utterance_route,
             include_debug=True,

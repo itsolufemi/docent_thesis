@@ -441,7 +441,7 @@ class DocentContextResolverTest(unittest.TestCase):
             [],
         )
 
-    def test_response_prompt_contains_original_utterance_and_resolution(
+    def test_response_prompt_contains_current_turn_once_and_resolution(
         self,
     ) -> None:
         resolved = SimpleNamespace(
@@ -460,14 +460,25 @@ class DocentContextResolverTest(unittest.TestCase):
 
         prompt = docent_build_context_resolved_prompt(
             user_input="Why does it look theatrical?",
-            dialogue_history=[],
+            dialogue_history=[
+                DialogueTurn(
+                    user="Why does it look theatrical?",
+                    subject=["The Arab Tent"],
+                    route_type="response_request",
+                )
+            ],
             resolved_context=resolved,
         )
 
         self.assertIn(
-            "ORIGINAL VISITOR UTTERANCE\nWhy does it look theatrical?",
+            "Visitor: Why does it look theatrical?",
             prompt,
         )
+        self.assertEqual(
+            prompt.count("Why does it look theatrical?"),
+            1,
+        )
+        self.assertIn("CONTEXT RESOLUTION", prompt)
         self.assertIn(
             "subjects: ['The Arab Tent']",
             prompt,

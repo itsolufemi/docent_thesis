@@ -10,6 +10,7 @@ class DialogueTurn(BaseModel):
     assistant: str | None = None
 
     route_type: str | None = None
+    request_id: str | None = None
 
 
 class ConversationState(BaseModel):

@@ -12,6 +12,8 @@ from extensions.retrieval.schemas.document_schemas import RetrievedDocument
 
 
 DOCENT_PROMPT_PROFILE = PromptProfile(
+        assistant_name="Docent",
+        user_name="Visitor",
         assistant_role=(
             "You are Docent, a museum guide for the Wallace Collection."
         ),
@@ -195,11 +197,20 @@ def docent_build_prompt(
     artwork: Artwork | None = None,
     retrieved_documents: list[RetrievedDocument] | None = None,
     retrieved_chunks: list[RetrievedChunk] | None = None,
+    response_guidance: str | None = None,
 ) -> str:
     retrieved_documents = retrieved_documents or []
     retrieved_chunks = retrieved_chunks or []
 
     context_sections: list[PromptSection] = []
+
+    if response_guidance:
+        context_sections.append(
+            PromptSection(
+                title="Response guidance",
+                content=response_guidance,
+            )
+        )
 
     if artwork is not None:
         context_sections.append(

@@ -130,14 +130,14 @@ class ResponseRecorder:
 class DialogueMemoryOrderingTest(unittest.TestCase):
     def setUp(self) -> None:
         conversations.clear()
-        self.log_patch = patch(
+        self.rewrite_log_patch = patch(
             "conversation_core.memory.conversation_store."
-            "append_dialogue_turn_log"
+            "rewrite_dialogue_log"
         )
-        self.append_log = self.log_patch.start()
+        self.rewrite_log = self.rewrite_log_patch.start()
 
     def tearDown(self) -> None:
-        self.log_patch.stop()
+        self.rewrite_log_patch.stop()
         conversations.clear()
 
     def test_context_route_label_is_potential_noise_only(self) -> None:
@@ -201,7 +201,10 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
             response_generator=ResponseRecorder(),
         )
 
-        engine.generate_response(text)
+        engine.generate_response(
+            text,
+            request_id="request-current",
+        )
 
         self.assertEqual(len(prompts.histories), 1)
         self.assertEqual(len(prompts.histories[0]), 1)
@@ -210,6 +213,7 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
         self.assertEqual(current_turn.subject, ["The Rising of the Sun"])
         self.assertEqual(current_turn.reference, ["painting:118"])
         self.assertEqual(current_turn.route_type, "response_request")
+        self.assertEqual(current_turn.request_id, "request-current")
 
     def test_p03_second_resolver_sees_first_pending_utterance(self) -> None:
         state = create_conversation()
@@ -301,13 +305,17 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
             "conversation_core.services.query_service.stream_llm_response",
             side_effect=cancelled_stream,
         ):
-            result = engine.generate_streaming_response(text)
+            result = engine.generate_streaming_response(
+                text,
+                request_id="request-streaming",
+            )
 
         history = get_recent_conversation_history(result.conversation_id)
         self.assertEqual(len(history), 1)
         self.assertEqual(history[0].subject, ["The Rising of the Sun"])
         self.assertEqual(history[0].reference, ["painting:118"])
         self.assertEqual(history[0].route_type, "response_request")
+        self.assertEqual(history[0].request_id, "request-streaming")
         self.assertEqual(history[0].assistant, "[interrupted]")
         self.assertEqual(len(prompts.histories), 1)
         self.assertEqual(prompts.histories[0][0].user, text)
@@ -315,7 +323,7 @@ class DialogueMemoryOrderingTest(unittest.TestCase):
             prompts.histories[0][0].subject,
             ["The Rising of the Sun"],
         )
-        self.append_log.assert_called_once()
+        self.assertTrue(self.rewrite_log.called)
 
     def test_potential_noise_survives_and_is_visible_to_later_resolution(self) -> None:
         first = "There's a mountain, a few trees and some sparsely."

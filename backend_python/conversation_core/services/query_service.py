@@ -327,6 +327,7 @@ class QueryEngine:
         self,
         text: str,
         conversation_id: str | None = None,
+        request_id: str | None = None,
         subject_reference: str | None = None,
         utterance_route: UtteranceRoute | None = None,
         include_debug: bool = False,
@@ -345,6 +346,7 @@ class QueryEngine:
             previous_subject=get_latest_subjects(
                 dialogue_history
             ),
+            request_id=request_id,
         )
         if exchange is None:
             raise RuntimeError(
@@ -481,6 +483,7 @@ class QueryEngine:
         self,
         text: str,
         conversation_id: str | None = None,
+        request_id: str | None = None,
         subject_reference: str | None = None,
         utterance_route: UtteranceRoute | None = None,
         include_debug: bool = False,
@@ -524,6 +527,7 @@ class QueryEngine:
             previous_subject=get_latest_subjects(
                 dialogue_history
             ),
+            request_id=request_id,
         )
         if exchange is None:
             raise RuntimeError(

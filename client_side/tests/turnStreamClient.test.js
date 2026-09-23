@@ -112,6 +112,48 @@ test(
 
 
 test(
+  'playback interruption sends the exact request correction',
+  () => {
+    const sentMessages = [];
+    const client = new TurnStreamClient();
+    client.conversationId = 'conversation-123';
+    client.socket = {
+      readyState: WebSocket.OPEN,
+      send(message) {
+        sentMessages.push(
+          JSON.parse(message),
+        );
+      },
+    };
+
+    assert.equal(
+      client.recordAssistantPlaybackInterrupted(
+        'request-a',
+        'A. [interrupted]',
+      ),
+      true,
+    );
+    assert.deepEqual(
+      sentMessages,
+      [
+        {
+          type:
+            'assistant_playback_interrupted',
+          request_id: 'request-a',
+          payload: {
+            conversation_id:
+              'conversation-123',
+            assistant_text:
+              'A. [interrupted]',
+          },
+        },
+      ],
+    );
+  },
+);
+
+
+test(
   'turn_cancelled is routed to its request callback',
   () => {
     const cancellations = [];

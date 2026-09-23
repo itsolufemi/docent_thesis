@@ -37,6 +37,9 @@ for import_root in (REPOSITORY_ROOT, BACKEND_ROOT):
         sys.path.insert(0, str(import_root))
 
 from config import settings  # noqa: E402
+from conversation_core.schemas.conversation_schemas import (  # noqa: E402
+    DialogueTurn,
+)
 from conversation_core.services.prompt_service import (  # noqa: E402
     format_dialogue_history_for_prompt,
 )
@@ -148,7 +151,9 @@ JSON:
 
     main_prompt = docent_build_prompt(
         user_input=user_input,
-        dialogue_history=[],
+        dialogue_history=[
+            DialogueTurn(user=user_input)
+        ],
         artwork=None,
         retrieved_documents=[],
         retrieved_chunks=[],

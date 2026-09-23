@@ -35,6 +35,7 @@ def create_query_router(
         result = active_query_engine.generate_response(
             text=request.text,
             conversation_id=conversation_id,
+            request_id=request.request_id,
             subject_reference=request.subject_reference,
             include_debug=request.debug,
         )

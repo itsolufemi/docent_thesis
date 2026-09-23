@@ -6,6 +6,7 @@ from conversation_core.schemas.source_schemas import QuerySource
 
 class QueryRequest(BaseModel):
     text: str
+    request_id: str | None = None
     subject_reference: str | None = None
     debug: bool = False
 

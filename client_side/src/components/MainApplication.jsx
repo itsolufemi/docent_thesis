@@ -16,6 +16,9 @@ import {
 import {
   sendCompletedVoiceTelemetry,
 } from '../audio/voiceTelemetry';
+import {
+  buildInterruptedAssistantText,
+} from '../audio/playbackHistory';
 
 const FORCED_FINALISATION_SILENCE_MS = 3000;
 const INITIAL_VAD_SILENCE_MS = 500;
@@ -171,6 +174,10 @@ export default function MainApplication() {
   const responseSentenceBuffersRef =
     useRef(new Map());
   const spokenResponseTextRef =
+    useRef(new Map());
+  const completedSpokenSentencesRef =
+    useRef(new Map());
+  const activeSpokenSentenceRef =
     useRef(new Map());
   const progressiveTtsQueuesRef =
     useRef(new Map());
@@ -1169,6 +1176,12 @@ export default function MainApplication() {
     spokenResponseTextRef.current.delete(
       requestId,
     );
+    completedSpokenSentencesRef.current.delete(
+      requestId,
+    );
+    activeSpokenSentenceRef.current.delete(
+      requestId,
+    );
     responseTimingsRef.current.delete(
       requestId,
     );
@@ -1196,6 +1209,31 @@ export default function MainApplication() {
     if (cancellingActiveResponse) {
       stopAssistantAudio();
     }
+  };
+
+  const interruptProgressiveTtsResponse = (
+    requestId,
+  ) => {
+    if (!requestId) {
+      return;
+    }
+
+    const completedSentences =
+      completedSpokenSentencesRef.current.get(
+        requestId,
+      ) ?? [];
+    const interruptedAssistantText =
+      buildInterruptedAssistantText(
+        completedSentences,
+      );
+
+    cancelProgressiveTtsResponse(requestId);
+
+    turnStreamClientRef.current
+      ?.recordAssistantPlaybackInterrupted(
+        requestId,
+        interruptedAssistantText,
+      );
   };
 
   const stopCurrentAssistantResponse =
@@ -1315,7 +1353,7 @@ export default function MainApplication() {
           if (activeResponse) {
             activeResponse.cancelled = true;
 
-            cancelProgressiveTtsResponse(
+            interruptProgressiveTtsResponse(
               activeResponse.requestId,
             );
           } else {
@@ -1378,7 +1416,7 @@ export default function MainApplication() {
             activeResponse.requestId !== requestId
           ) {
             activeResponse.cancelled = true;
-            cancelProgressiveTtsResponse(
+            interruptProgressiveTtsResponse(
               activeResponse.requestId,
             );
           } else if (
@@ -1477,6 +1515,13 @@ export default function MainApplication() {
         spokenResponseTextRef.current.set(
           requestId,
           '',
+        );
+        completedSpokenSentencesRef.current.set(
+          requestId,
+          [],
+        );
+        activeSpokenSentenceRef.current.delete(
+          requestId,
         );
         progressiveTtsQueuesRef.current.set(
           requestId,
@@ -1987,6 +2032,12 @@ export default function MainApplication() {
       responseTimingsRef.current.delete(
         completedRequestId,
       );
+      completedSpokenSentencesRef.current.delete(
+        completedRequestId,
+      );
+      activeSpokenSentenceRef.current.delete(
+        completedRequestId,
+      );
 
       isPlaying.current = false;
       activeTtsStreamIdRef.current = null;
@@ -2060,6 +2111,45 @@ export default function MainApplication() {
         event,
       ) => {
         switch (event.data?.type) {
+          case 'sentence_playback_started': {
+            const requestId =
+              event.data?.requestId;
+            const sentence =
+              event.data?.sentence?.trim();
+
+            if (requestId && sentence) {
+              activeSpokenSentenceRef.current.set(
+                requestId,
+                sentence,
+              );
+            }
+            break;
+          }
+
+          case 'sentence_playback_complete': {
+            const requestId =
+              event.data?.requestId;
+            const sentence =
+              event.data?.sentence?.trim();
+
+            if (requestId && sentence) {
+              const completed =
+                completedSpokenSentencesRef.current.get(
+                  requestId,
+                ) ?? [];
+
+              completed.push(sentence);
+              completedSpokenSentencesRef.current.set(
+                requestId,
+                completed,
+              );
+              activeSpokenSentenceRef.current.delete(
+                requestId,
+              );
+            }
+            break;
+          }
+
           case 'playback_started': {
             isPlaying.current = true;
 
@@ -2470,6 +2560,8 @@ export default function MainApplication() {
                   {
                     type: 'enqueue',
                     samples,
+                    requestId,
+                    sentence: cleanedText,
                   },
                   [samples.buffer],
                 );
@@ -2546,6 +2638,8 @@ export default function MainApplication() {
 
                 playerNode.port.postMessage({
                   type: 'complete',
+                  requestId,
+                  sentence: cleanedText,
                 });
 
                 resolveOnce(metadata);

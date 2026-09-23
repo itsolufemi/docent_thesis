@@ -34,6 +34,7 @@ export class TurnStreamClient {
     onClose,
   } = {}) {
     this.socket = null;
+    this.conversationId = null;
     this.onReady = onReady;
     this.onTurnEvaluated =
       onTurnEvaluated;
@@ -152,6 +153,8 @@ export class TurnStreamClient {
 
     switch (message.type) {
       case 'turn_stream_ready':
+        this.conversationId =
+          payload.conversation_id ?? null;
         this.onReady?.(payload);
         break;
 
@@ -328,10 +331,41 @@ export class TurnStreamClient {
     return true;
   }
 
+  recordAssistantPlaybackInterrupted(
+    requestId,
+    assistantText,
+  ) {
+    if (
+      !requestId ||
+      !assistantText?.trim() ||
+      !this.socket ||
+      this.socket.readyState !==
+        WebSocket.OPEN
+    ) {
+      return false;
+    }
+
+    this.socket.send(
+      JSON.stringify({
+        type: 'assistant_playback_interrupted',
+        request_id: requestId,
+        payload: {
+          conversation_id:
+            this.conversationId,
+          assistant_text:
+            assistantText.trim(),
+        },
+      }),
+    );
+
+    return true;
+  }
+
   close() {
     const socket = this.socket;
 
     this.socket = null;
+    this.conversationId = null;
 
     if (
       socket &&
