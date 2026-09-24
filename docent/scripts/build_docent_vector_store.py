@@ -4,44 +4,49 @@ from time import perf_counter
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_PYTHON_ROOT = REPOSITORY_ROOT / "backend_python"
+DOCENT_DATA_DIRECTORY = REPOSITORY_ROOT / "docent" / "data"
+DOCENT_ARTWORKS_PATH = DOCENT_DATA_DIRECTORY / "artworks.json"
+DOCENT_VECTOR_STORE_DIRECTORY = (
+    DOCENT_DATA_DIRECTORY / "vector_store"
+)
+DOCENT_VECTOR_METADATA_PATH = (
+    DOCENT_VECTOR_STORE_DIRECTORY
+    / "docent_vector_index.json"
+)
+DOCENT_VECTOR_EMBEDDINGS_PATH = (
+    DOCENT_VECTOR_STORE_DIRECTORY
+    / "docent_vector_embeddings.npy"
+)
 
 for import_root in (REPOSITORY_ROOT, BACKEND_PYTHON_ROOT):
     if str(import_root) not in sys.path:
         sys.path.insert(0, str(import_root))
 
-from config import settings
-from docent.services.docent_retrieval_adapter import get_docent_retrieval_chunks
-from extensions.retrieval.services.embedding_service import embed_indexed_chunks
-from extensions.retrieval.services.index_service import build_retrieval_index
-from extensions.retrieval.services.vector_store_service import save_vector_store
+from conversation_core.rag.build_vector_store import build_vector_store
+from docent.rag.document_builder import build_artwork_document
 
 
 def build_docent_vector_store() -> None:
     started_at = perf_counter()
 
-    print("Loading Docent retrieval chunks...")
-    chunks = get_docent_retrieval_chunks()
-    print(f"Loaded {len(chunks)} retrieval chunks.")
-
-    print("Building retrieval index...")
-    indexed_chunks = build_retrieval_index(chunks)
+    print("Building Docent vector store...")
+    indexed_chunks, chunk_embeddings = build_vector_store(
+        input_path=DOCENT_ARTWORKS_PATH,
+        output_path=DOCENT_VECTOR_STORE_DIRECTORY,
+        document_builder=build_artwork_document,
+        metadata_filename=(
+            DOCENT_VECTOR_METADATA_PATH.name
+        ),
+        embeddings_filename=(
+            DOCENT_VECTOR_EMBEDDINGS_PATH.name
+        ),
+    )
     print(f"Built {len(indexed_chunks)} indexed chunks.")
-
-    print("Generating embeddings. This may take some time...")
-    chunk_embeddings = embed_indexed_chunks(indexed_chunks)
     print(f"Generated {len(chunk_embeddings)} embeddings.")
 
-    print("Saving vector store...")
-    save_vector_store(
-        indexed_chunks=indexed_chunks,
-        chunk_embeddings=chunk_embeddings,
-        metadata_path=settings.docent_vector_metadata_path,
-        embeddings_path=settings.docent_vector_embeddings_path,
-    )
-
     print("Vector store saved successfully.")
-    print("Metadata:", settings.docent_vector_metadata_path)
-    print("Embeddings:", settings.docent_vector_embeddings_path)
+    print("Metadata:", DOCENT_VECTOR_METADATA_PATH)
+    print("Embeddings:", DOCENT_VECTOR_EMBEDDINGS_PATH)
     print("Total time:", round(perf_counter() - started_at, 2), "seconds")
 
 

@@ -204,16 +204,6 @@ class Settings():
         )
     )
 
-    docent_vector_store_directory: Path = (
-        repository_root / "docent" / "data" / "vector_store"
-    )
-    docent_vector_metadata_path: Path = (
-        docent_vector_store_directory / "docent_vector_index.json"
-    )
-    docent_vector_embeddings_path: Path = (
-        docent_vector_store_directory / "docent_vector_embeddings.npy"
-    )
-
     conversation_logging_enabled: bool = _read_bool(
         "CONVERSATION_LOGGING_ENABLED",
         True

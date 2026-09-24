@@ -272,3 +272,15 @@ time=2026-09-22T07:37:10.146-04:00 level=INFO source=model_recommendations.go:17
 time=2026-09-22T11:09:51.544-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=3h51m47.921316647s consecutive_failures=0
 time=2026-09-22T15:01:39.696-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=4h22m32.901593016s consecutive_failures=0
 time=2026-09-22T19:24:12.859-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=3h52m10.882129592s consecutive_failures=0
+time=2026-09-23T00:08:39.551-04:00 level=WARN source=model_recommendations.go:168 msg="model recommendations refresh failed" error="Get \"https://ollama.com/api/experimental/model-recommendations?ts=1790136518\": dial tcp: lookup ollama.com: no such host"
+time=2026-09-23T00:08:39.559-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=5m46.044901971s consecutive_failures=1
+time=2026-09-23T08:14:23.558-04:00 level=WARN source=model_recommendations.go:168 msg="model recommendations refresh failed" error="Get \"https://ollama.com/api/experimental/model-recommendations?ts=1790165660\": context deadline exceeded"
+time=2026-09-23T08:14:23.559-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=15m55.853686544s consecutive_failures=2
+time=2026-09-23T08:35:22.601-04:00 level=WARN source=model_recommendations.go:168 msg="model recommendations refresh failed" error="Get \"https://ollama.com/api/experimental/model-recommendations?ts=1790166919\": context deadline exceeded"
+time=2026-09-23T08:35:22.601-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=50m58.942733558s consecutive_failures=3
+time=2026-09-23T09:42:42.118-04:00 level=WARN source=model_recommendations.go:168 msg="model recommendations refresh failed" error="Get \"https://ollama.com/api/experimental/model-recommendations?ts=1790170961\": dial tcp: lookup ollama.com: no such host"
+time=2026-09-23T09:42:42.118-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=4h11m43.488693762s consecutive_failures=4
+time=2026-09-23T13:54:25.830-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=4h34m21.850770568s consecutive_failures=0
+time=2026-09-23T18:29:06.280-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=4h37m2.5865865s consecutive_failures=0
+time=2026-09-24T13:55:43.025-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=3h35m42.824179608s consecutive_failures=0
+time=2026-09-24T17:31:26.016-04:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=3h25m24.330897224s consecutive_failures=0

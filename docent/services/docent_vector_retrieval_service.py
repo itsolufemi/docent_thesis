@@ -1,6 +1,5 @@
 from time import perf_counter
 
-from config import settings
 from extensions.retrieval.schemas.chunk_schemas import (
     RetrievalTimings,
     VectorRetrievalResult,
@@ -30,6 +29,10 @@ from extensions.retrieval.services.vector_store_service import (
     save_vector_store,
 )
 
+from docent.scripts.build_docent_vector_store import (
+    DOCENT_VECTOR_EMBEDDINGS_PATH,
+    DOCENT_VECTOR_METADATA_PATH,
+)
 from docent.services.docent_retrieval_adapter import get_docent_retrieval_chunks
 
 
@@ -72,14 +75,14 @@ def get_docent_vector_index(
         return _docent_indexed_chunks, _docent_chunk_embeddings
 
     persisted_store_available = (
-        settings.docent_vector_metadata_path.exists()
-        and settings.docent_vector_embeddings_path.exists()
+        DOCENT_VECTOR_METADATA_PATH.exists()
+        and DOCENT_VECTOR_EMBEDDINGS_PATH.exists()
     )
 
     if persisted_store_available and not force_refresh:
         _docent_indexed_chunks, _docent_chunk_embeddings = load_vector_store(
-            metadata_path=settings.docent_vector_metadata_path,
-            embeddings_path=settings.docent_vector_embeddings_path,
+            metadata_path=DOCENT_VECTOR_METADATA_PATH,
+            embeddings_path=DOCENT_VECTOR_EMBEDDINGS_PATH,
         )
         return _docent_indexed_chunks, _docent_chunk_embeddings
 
@@ -90,8 +93,8 @@ def get_docent_vector_index(
     save_vector_store(
         indexed_chunks=_docent_indexed_chunks,
         chunk_embeddings=_docent_chunk_embeddings,
-        metadata_path=settings.docent_vector_metadata_path,
-        embeddings_path=settings.docent_vector_embeddings_path,
+        metadata_path=DOCENT_VECTOR_METADATA_PATH,
+        embeddings_path=DOCENT_VECTOR_EMBEDDINGS_PATH,
     )
 
     return _docent_indexed_chunks, _docent_chunk_embeddings
@@ -131,8 +134,8 @@ def retrieve_docent_chunks_by_vector_similarity(
         and _docent_chunk_embeddings is not None
     )
     persisted_store_available = (
-        settings.docent_vector_metadata_path.exists()
-        and settings.docent_vector_embeddings_path.exists()
+        DOCENT_VECTOR_METADATA_PATH.exists()
+        and DOCENT_VECTOR_EMBEDDINGS_PATH.exists()
     )
 
     if force_refresh:
