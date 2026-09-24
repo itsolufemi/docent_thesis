@@ -29,7 +29,7 @@ from extensions.retrieval.services.vector_store_service import (
     save_vector_store,
 )
 
-from docent.scripts.build_docent_vector_store import (
+from docent.rag.config import (
     DOCENT_VECTOR_EMBEDDINGS_PATH,
     DOCENT_VECTOR_METADATA_PATH,
 )
