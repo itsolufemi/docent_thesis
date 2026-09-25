@@ -14,6 +14,9 @@ from conversation_core.memory.conversation_store import (
     update_interrupted_assistant_response,
     update_dialogue_turn_context,
 )
+from conversation_core.prompts.core_prompt_profile import (
+    DEFAULT_ASSISTANT_ROLE,
+)
 from conversation_core.schemas.context_schemas import QueryDebugInfo
 from conversation_core.schemas.conversation_schemas import DialogueTurn
 from conversation_core.schemas.llm_stream_schemas import LLMStreamEvent
@@ -776,7 +779,7 @@ class QueryEngine:
 DEFAULT_CONVERSATION_PROFILE = PromptProfile(
     assistant_name="Assistant",
     user_name="User",
-    assistant_role="You are a helpful conversational AI assistant.",
+    assistant_role=DEFAULT_ASSISTANT_ROLE,
     behavioural_rules=[
         "Respond naturally.",
         "Use the recent dialogue to understand follow-up questions.",

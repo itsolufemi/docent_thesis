@@ -11,5 +11,5 @@ class PromptSection(BaseModel):
 class PromptProfile(BaseModel):
     assistant_name: str = "Assistant"
     user_name: str = "User"
-    assistant_role: str = "You are a helpful conversational AI assistant."
+    assistant_role: str
     behavioural_rules: list[str] = Field(default_factory=list)
