@@ -23,6 +23,9 @@ from conversation_core.schemas.tool_schemas import (
 from conversation_core.tools.core_tool_registry import (
     core_tool_registry,
 )
+from conversation_core.tools.tool_registry import (
+    ToolRegistry,
+)
 
 LLMTimingCallback = Callable[
     [str, float, dict[str, Any]],
@@ -119,11 +122,15 @@ def generate_llm_response(
     except Exception as error:
         return f"error: {error}"
     
-def build_ollama_tool_definitions() -> list[dict[str, Any]]:
+def build_ollama_tool_definitions(
+    tool_registry: ToolRegistry | None = None,
+) -> list[dict[str, Any]]:
     """
     Convert the application's generic ToolDefinition objects
     into the function-tool format expected by Ollama.
     """
+
+    registry = tool_registry or core_tool_registry
 
     return [
         {
@@ -134,7 +141,7 @@ def build_ollama_tool_definitions() -> list[dict[str, Any]]:
                 "parameters": definition.parameters,
             },
         }
-        for definition in core_tool_registry.get_definitions()
+        for definition in registry.get_definitions()
     ]
 
 def parse_ollama_tool_calls(
@@ -326,6 +333,7 @@ def stream_tool_aware_llm_response(
     max_tool_rounds: int = 5,
     model: str | None = None,
     think: bool | None = None,
+    tool_registry: ToolRegistry | None = None,
 ) -> Iterator[LLMStreamEvent]:
     messages: list[dict[str, Any]] = [
         {
@@ -333,7 +341,10 @@ def stream_tool_aware_llm_response(
             "content": prompt,
         }
     ]
-    tools = build_ollama_tool_definitions()
+    active_tool_registry = tool_registry or core_tool_registry
+    tools = build_ollama_tool_definitions(
+        active_tool_registry
+    )
     execution_context = ToolExecutionContext(
         conversation_id=conversation_id
     )
@@ -529,7 +540,7 @@ def stream_tool_aware_llm_response(
                     )
 
                     execution_result = (
-                        core_tool_registry.execute(
+                        active_tool_registry.execute(
                             tool_call=tool_call,
                             context=execution_context,
                         )

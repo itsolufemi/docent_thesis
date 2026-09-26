@@ -14,6 +14,9 @@ from conversation_core.services.control_signal_parser import (
 from conversation_core.services.llm_service import (
     stream_tool_aware_llm_response,
 )
+from conversation_core.tools.tool_registry import (
+    ToolRegistry,
+)
 
 
 def stream_direct_routed_response(
@@ -25,6 +28,7 @@ def stream_direct_routed_response(
     max_tool_rounds: int = 5,
     model: str | None = None,
     think: bool | None = None,
+    tool_registry: ToolRegistry | None = None,
 ) -> Iterator[LLMStreamEvent]:
     """Filter exceptional controls out of a tool-aware model stream."""
     parser = ControlSignalStreamParser()
@@ -37,6 +41,7 @@ def stream_direct_routed_response(
         max_tool_rounds=max_tool_rounds,
         model=model,
         think=think,
+        tool_registry=tool_registry,
     ):
         if event.event_type == "content_delta":
             safe_text = parser.consume(event.text)
