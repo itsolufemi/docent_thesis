@@ -26,6 +26,9 @@ node_modules/
 # Local Smart Turn benchmark and human-recording archives
 ml_lab/**/*.zip
 
+# Generated Ollama cold-start benchmark log
+backend_python/tests/03_ollama_startup.log
+
 # Expo
 .expo/
 dist/
