@@ -2,10 +2,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from conversation_core.schemas.control_signal_schemas import (
+    ControlSignal,
+)
+
 
 LLMStreamEventType = Literal[
     "response_started",
     "self_routing",
+    "control_signal",
     "content_delta",
     "tool_call",
     "tool_result",
@@ -24,6 +29,7 @@ class LLMStreamEvent(BaseModel):
     tool_name: str | None = None
     tool_result: dict[str, Any] | None = None
     route_assessment: dict[str, Any] | None = None
+    control_signal: ControlSignal | None = None
     timing_name: str | None = None
     timing_seconds: float | None = Field(
         default=None,
