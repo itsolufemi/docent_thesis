@@ -2,6 +2,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from conversation_core.schemas.source_schemas import (
+    QuerySource,
+)
+
 
 class ToolDefinition(BaseModel):
     """
@@ -41,6 +45,13 @@ class ToolExecutionContext(BaseModel):
     conversation_id: str
 
 
+class ToolDialogueStateUpdate(BaseModel):
+    """Domain-neutral dialogue state discovered by a tool."""
+
+    subjects: list[str] = Field(default_factory=list)
+    references: list[str] = Field(default_factory=list)
+
+
 class ToolExecutionResult(BaseModel):
     """
     The normalized result returned after executing a tool.
@@ -53,4 +64,10 @@ class ToolExecutionResult(BaseModel):
 
     data: dict[str, Any] = Field(
         default_factory=dict
+    )
+
+    dialogue_state: ToolDialogueStateUpdate | None = None
+
+    sources: list[QuerySource] = Field(
+        default_factory=list
     )
