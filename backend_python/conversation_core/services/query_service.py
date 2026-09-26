@@ -22,6 +22,9 @@ from conversation_core.schemas.conversation_schemas import DialogueTurn
 from conversation_core.schemas.llm_stream_schemas import LLMStreamEvent
 from conversation_core.schemas.prompt_schemas import PromptProfile
 from conversation_core.schemas.query_schemas import QueryResult, ResolvedContext
+from conversation_core.schemas.tool_schemas import (
+    ToolExecutionResult,
+)
 from conversation_core.schemas.utterance_route_schemas import UtteranceRoute
 from conversation_core.services.cancellation import CancellationToken
 from conversation_core.services.direct_routing_stream_service import (
@@ -701,6 +704,46 @@ class QueryEngine:
         )
 
         response_parts: list[str] = []
+        active_sources = list(resolved_context.sources)
+        control_route_type: str | None = None
+        interruption_committed = False
+
+        def commit_playback_interruption() -> None:
+            nonlocal interruption_committed
+
+            if (
+                interruption_committed
+                or not interrupted_request_id
+                or not interrupted_assistant_text
+            ):
+                return
+
+            update_interrupted_assistant_response(
+                conversation_id,
+                interrupted_request_id,
+                interrupted_assistant_text,
+            )
+            interruption_committed = True
+
+        def extend_unique_strings(
+            existing: list[str],
+            incoming: list[str],
+        ) -> None:
+            seen = {
+                value.casefold()
+                for value in existing
+            }
+
+            for value in incoming:
+                stripped = value.strip()
+                normalised = stripped.casefold()
+
+                if not stripped or normalised in seen:
+                    continue
+
+                seen.add(normalised)
+                existing.append(stripped)
+
         response_cancelled = (
             cancellation_token is not None
             and cancellation_token.is_cancelled
@@ -734,6 +777,9 @@ class QueryEngine:
             for stream_event in stream_events:
                 if stream_event.event_type == "content_delta":
                     if stream_event.text:
+                        if self.direct_routing_enabled:
+                            commit_playback_interruption()
+
                         response_parts.append(stream_event.text)
 
                         if first_spoken_token_seconds is None:
@@ -749,7 +795,72 @@ class QueryEngine:
                 elif stream_event.event_type == "response_cancelled":
                     response_cancelled = True
 
+                elif (
+                    self.direct_routing_enabled
+                    and stream_event.event_type == "tool_call"
+                ):
+                    commit_playback_interruption()
+
+                elif (
+                    self.direct_routing_enabled
+                    and stream_event.event_type == "tool_result"
+                    and stream_event.tool_result is not None
+                ):
+                    tool_result = ToolExecutionResult.model_validate(
+                        stream_event.tool_result
+                    )
+
+                    if tool_result.dialogue_state is not None:
+                        extend_unique_strings(
+                            subjects,
+                            tool_result.dialogue_state.subjects,
+                        )
+                        extend_unique_strings(
+                            references,
+                            tool_result.dialogue_state.references,
+                        )
+
+                    for source in tool_result.sources:
+                        if source not in active_sources:
+                            active_sources.append(source)
+
+                    resolved_context.sources = active_sources
+                    resolved_context.context_source = (
+                        "direct_routing_tool"
+                    )
+                    update_dialogue_turn_context(
+                        conversation_id,
+                        exchange,
+                        subject=subjects,
+                        reference=references,
+                        route_type=None,
+                    )
+
                 elif stream_event.event_type == "control_signal":
+                    if stream_event.control_signal is None:
+                        continue
+
+                    control_route_type = (
+                        stream_event.control_signal.route_type
+                    )
+                    subjects = (
+                        list(exchange.previous_subject)
+                        if control_route_type == "backchannel"
+                        else []
+                    )
+                    references = []
+
+                    update_dialogue_turn_context(
+                        conversation_id,
+                        exchange,
+                        subject=subjects,
+                        reference=references,
+                        route_type=control_route_type,
+                    )
+
+                    if control_route_type == "interruption":
+                        commit_playback_interruption()
+
                     if on_stream_event is not None:
                         on_stream_event(stream_event)
                     break
@@ -791,6 +902,7 @@ class QueryEngine:
             "previous_subject": exchange.previous_subject,
             "subjects": subjects,
             "references": references,
+            "control_route_type": control_route_type,
             "timings": {
                 "total_request_seconds": round(
                     total_request_seconds,
@@ -819,7 +931,7 @@ class QueryEngine:
                 subject_reference=None,
                 context_source=resolved_context.context_source,
                 context_used=bool(
-                    resolved_context.sources
+                    active_sources
                     or resolved_context.prompt_payload
                 ),
                 dialogue_turns_used=len(response_dialogue_history),
@@ -828,8 +940,8 @@ class QueryEngine:
                     resolved_context.context_source
                     not in NON_RETRIEVAL_CONTEXT_SOURCES
                 ),
-                sources_count=len(resolved_context.sources),
-                sources=resolved_context.sources,
+                sources_count=len(active_sources),
+                sources=active_sources,
                 debug_payload=debug_payload,
             )
 
@@ -838,7 +950,7 @@ class QueryEngine:
             response=response,
             conversation_id=conversation_id,
             subject_reference=None,
-            sources=resolved_context.sources,
+            sources=active_sources,
             debug=debug,
         )
 
