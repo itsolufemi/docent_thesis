@@ -386,6 +386,175 @@ class DirectQueryEngineTest(unittest.TestCase):
 
         self.assertEqual(previous.assistant, "A. [interrupted]")
 
+    @patch(
+        "conversation_core.services.query_service."
+        "stream_direct_routed_response"
+    )
+    def test_reference_history_reaches_the_direct_model(self, stream) -> None:
+        add_dialogue_turn(
+            self.state.conversation_id,
+            request_id="request-a",
+            subject=["The Swing"],
+            reference=["painting:581"],
+            user="Tell me about The Swing.",
+            assistant="It was painted by Fragonard.",
+        )
+        tool_result = ToolExecutionResult(
+            tool_name="retrieve_docent_knowledge",
+            success=True,
+            message="Retrieved.",
+            dialogue_state=ToolDialogueStateUpdate(
+                subjects=["The Swing"],
+                references=["painting:581"],
+            ),
+        )
+        stream.return_value = iter(
+            [
+                LLMStreamEvent(event_type="response_started"),
+                LLMStreamEvent(
+                    event_type="tool_call",
+                    tool_calls=[
+                        {
+                            "name": "retrieve_docent_knowledge",
+                            "arguments": {
+                                "subjects": ["The Swing"],
+                            },
+                        }
+                    ],
+                ),
+                LLMStreamEvent(
+                    event_type="tool_result",
+                    tool_name="retrieve_docent_knowledge",
+                    tool_result=tool_result.model_dump(mode="json"),
+                ),
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text="Fragonard painted it.",
+                ),
+                LLMStreamEvent(
+                    event_type="response_complete",
+                    text="Fragonard painted it.",
+                    done=True,
+                ),
+            ]
+        )
+
+        self._engine().generate_streaming_response(
+            "Who painted it?",
+            conversation_id=self.state.conversation_id,
+        )
+
+        prompt = stream.call_args.kwargs["prompt"]
+        self.assertIn("Subjects: ['The Swing']", prompt)
+        self.assertIn("Visitor: Who painted it?", prompt)
+        current = self.state.dialogue_history[-1]
+        self.assertEqual(current.subject, ["The Swing"])
+        self.assertEqual(current.reference, ["painting:581"])
+
+    @patch(
+        "conversation_core.services.query_service."
+        "stream_direct_routed_response"
+    )
+    def test_two_turn_interruption_then_correction(self, stream) -> None:
+        previous = add_dialogue_turn(
+            self.state.conversation_id,
+            request_id="request-a",
+            subject=["The Swing"],
+            user="Tell me about The Swing.",
+            assistant="A. B. C.",
+        )
+        override = build_history_with_playback_interruption(
+            [previous],
+            request_id="request-a",
+            assistant_text="A. [interrupted]",
+        )
+        stream.side_effect = [
+            iter(
+                [
+                    LLMStreamEvent(event_type="response_started"),
+                    LLMStreamEvent(
+                        event_type="control_signal",
+                        control_signal={"route_type": "interruption"},
+                    ),
+                ]
+            ),
+            iter(
+                [
+                    LLMStreamEvent(event_type="response_started"),
+                    LLMStreamEvent(
+                        event_type="content_delta",
+                        text="You mean the other painting.",
+                    ),
+                    LLMStreamEvent(
+                        event_type="response_complete",
+                        text="You mean the other painting.",
+                        done=True,
+                    ),
+                ]
+            ),
+        ]
+        engine = self._engine()
+
+        engine.generate_streaming_response(
+            "Wait.",
+            conversation_id=self.state.conversation_id,
+            dialogue_history_override=override,
+            interrupted_request_id="request-a",
+            interrupted_assistant_text="A. [interrupted]",
+        )
+        result = engine.generate_streaming_response(
+            "No, I meant the other painting.",
+            conversation_id=self.state.conversation_id,
+        )
+
+        second_prompt = stream.call_args_list[1].kwargs["prompt"]
+        self.assertIn("Visitor [interruption]: Wait.", second_prompt)
+        self.assertEqual(previous.assistant, "A. [interrupted]")
+        self.assertEqual(
+            result.response,
+            "You mean the other painting.",
+        )
+        self.assertIsNone(self.state.dialogue_history[-1].route_type)
+
+    @patch(
+        "conversation_core.services.query_service."
+        "stream_direct_routed_response"
+    )
+    def test_unmatched_call_to_action_stays_conversational(
+        self,
+        stream,
+    ) -> None:
+        stream.return_value = iter(
+            [
+                LLMStreamEvent(event_type="response_started"),
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text=(
+                        "I can't move the painting, but I can tell you "
+                        "about it."
+                    ),
+                ),
+                LLMStreamEvent(
+                    event_type="response_complete",
+                    text=(
+                        "I can't move the painting, but I can tell you "
+                        "about it."
+                    ),
+                    done=True,
+                ),
+            ]
+        )
+
+        result = self._engine().generate_streaming_response(
+            "Move that painting to another room.",
+            conversation_id=self.state.conversation_id,
+        )
+
+        self.assertIn("can't move", result.response)
+        current = self.state.dialogue_history[-1]
+        self.assertEqual(current.subject, [])
+        self.assertIsNone(current.route_type)
+
 
 if __name__ == "__main__":
     unittest.main()
