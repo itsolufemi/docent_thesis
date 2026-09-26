@@ -32,6 +32,14 @@ def stream_direct_routed_response(
 ) -> Iterator[LLMStreamEvent]:
     """Filter exceptional controls out of a tool-aware model stream."""
     parser = ControlSignalStreamParser()
+    response_started: LLMStreamEvent | None = None
+
+    def start_response() -> Iterator[LLMStreamEvent]:
+        nonlocal response_started
+
+        if response_started is not None:
+            yield response_started
+            response_started = None
 
     for event in stream_tool_aware_llm_response(
         prompt=prompt,
@@ -43,6 +51,12 @@ def stream_direct_routed_response(
         think=think,
         tool_registry=tool_registry,
     ):
+        if event.event_type == "response_started":
+            # A control-only result must not make the client flush the
+            # assistant response that a backchannel may allow to resume.
+            response_started = event
+            continue
+
         if event.event_type == "content_delta":
             safe_text = parser.consume(event.text)
 
@@ -54,6 +68,7 @@ def stream_direct_routed_response(
                 return
 
             if safe_text:
+                yield from start_response()
                 yield LLMStreamEvent(
                     event_type="content_delta",
                     text=safe_text,
@@ -72,11 +87,13 @@ def stream_direct_routed_response(
                 return
 
             if safe_text:
+                yield from start_response()
                 yield LLMStreamEvent(
                     event_type="content_delta",
                     text=safe_text,
                 )
 
+            yield from start_response()
             yield LLMStreamEvent(
                 event_type="response_complete",
                 text=(
@@ -87,5 +104,8 @@ def stream_direct_routed_response(
                 done=True,
             )
             return
+
+        if event.event_type in {"tool_call", "tool_result"}:
+            yield from start_response()
 
         yield event

@@ -221,6 +221,43 @@ test(
 
 
 test(
+  'control signals use their own callback and never response text',
+  () => {
+    const controls = [];
+    const deltas = [];
+    const client = new TurnStreamClient({
+      onControlSignal(event) {
+        controls.push(event);
+      },
+      onResponseDelta(event) {
+        deltas.push(event);
+      },
+    });
+
+    client.handleMessage(
+      JSON.stringify({
+        type: 'control_signal',
+        request_id: 'request-control',
+        payload: {
+          route_type: 'backchannel',
+        },
+      }),
+    );
+
+    assert.deepEqual(controls, [
+      {
+        requestId: 'request-control',
+        payload: {
+          route_type: 'backchannel',
+        },
+      },
+    ]);
+    assert.deepEqual(deltas, []);
+  },
+);
+
+
+test(
   'turn events carry provisional playback interruption context',
   () => {
     const sentMessages = [];

@@ -69,7 +69,7 @@ from docent.api.routes_artworks import router as artworks_router
 from docent.api.routes_docent_index import router as docent_index_router
 from docent.api.routes_docent_retrieval import router as docent_retrieval_router
 from docent.services.docent_query_service import (
-    context_resolved_docent_query_engine,
+    direct_docent_query_engine,
 )
 from docent.services.docent_vector_retrieval_service import (
     warm_up_docent_retrieval,
@@ -247,17 +247,17 @@ app.add_middleware(
 )
 
 query_router = create_query_router(
-    query_engine=context_resolved_docent_query_engine,
+    query_engine=direct_docent_query_engine,
 )
 conversation_router = create_conversation_router(
-    query_engine=context_resolved_docent_query_engine,
+    query_engine=direct_docent_query_engine,
 )
 turn_buffer_router = create_turn_buffer_router(
-    query_engine=context_resolved_docent_query_engine,
+    query_engine=direct_docent_query_engine,
     utterance_classifier=None,
 )
 turn_buffer_stream_router = create_turn_buffer_stream_router(
-    query_engine=context_resolved_docent_query_engine,
+    query_engine=direct_docent_query_engine,
     utterance_classifier=None,
 )
 transcription_router = create_transcription_router(

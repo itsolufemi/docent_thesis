@@ -21,6 +21,7 @@ export class TurnStreamClient {
     onTurnEvaluated,
     onUtteranceClassified,
     onSelfRouting,
+    onControlSignal,
     onQueryStarted,
     onResponseStarted,
     onResponseFirstDelta,
@@ -42,6 +43,8 @@ export class TurnStreamClient {
       onUtteranceClassified;
     this.onSelfRouting =
       onSelfRouting;
+    this.onControlSignal =
+      onControlSignal;
     this.onQueryStarted =
       onQueryStarted;
     this.onResponseStarted =
@@ -176,6 +179,14 @@ export class TurnStreamClient {
 
       case 'self_routing':
         this.onSelfRouting?.({
+          requestId:
+            message.request_id,
+          payload,
+        });
+        break;
+
+      case 'control_signal':
+        this.onControlSignal?.({
           requestId:
             message.request_id,
           payload,

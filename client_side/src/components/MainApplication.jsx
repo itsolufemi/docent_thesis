@@ -1412,6 +1412,46 @@ export default function MainApplication() {
         }
       },
 
+      onControlSignal: ({
+        requestId,
+        payload,
+      }) => {
+        console.log(
+          'Model control signal:',
+          payload,
+        );
+
+        const routeType = payload.route_type;
+
+        if (
+          routeType === 'backchannel' ||
+          routeType === 'potential_noise'
+        ) {
+          resumeAssistantAudio();
+          restoreAssistantAudio();
+          return;
+        }
+
+        if (routeType === 'interruption') {
+          const activeResponse =
+            activeProgressiveResponseRef.current;
+
+          if (
+            activeResponse?.requestId &&
+            activeResponse.requestId !== requestId
+          ) {
+            activeResponse.cancelled = true;
+            interruptProgressiveTtsResponse(
+              activeResponse.requestId,
+            );
+          } else if (
+            assistantPlaybackPausedRef.current
+          ) {
+            stopAssistantAudio();
+          }
+        }
+      },
+
       onQueryStarted: ({
         requestId,
         payload,

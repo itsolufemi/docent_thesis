@@ -95,6 +95,19 @@ def build_stream_websocket_message(
             },
         }
 
+    if event.event_type == "control_signal":
+        return {
+            "type": "control_signal",
+            "request_id": request_id,
+            "payload": {
+                "route_type": (
+                    event.control_signal.route_type
+                    if event.control_signal is not None
+                    else None
+                ),
+            },
+        }
+
     if event.event_type == "tool_call":
         return {
             "type": "tool_call_started",

@@ -98,11 +98,44 @@ class DirectRoutingStreamServiceTest(unittest.TestCase):
 
         self.assertEqual(
             [event.event_type for event in events],
-            ["response_started", "control_signal"],
+            ["control_signal"],
         )
         self.assertEqual(
             events[-1].control_signal.route_type,
             "backchannel",
+        )
+
+    @patch(
+        "conversation_core.services.direct_routing_stream_service."
+        "stream_tool_aware_llm_response"
+    )
+    def test_control_does_not_start_a_visitor_response(
+        self,
+        stream_llm,
+    ) -> None:
+        stream_llm.return_value = iter(
+            [
+                LLMStreamEvent(event_type="response_started"),
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text=(
+                        '<control>{"route_type":"potential_noise"}'
+                        "</control>"
+                    ),
+                ),
+            ]
+        )
+
+        events = list(
+            stream_direct_routed_response(
+                "prompt",
+                "conversation-control",
+            )
+        )
+
+        self.assertEqual(
+            [event.event_type for event in events],
+            ["control_signal"],
         )
 
     @patch(
