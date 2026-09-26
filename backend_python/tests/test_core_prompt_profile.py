@@ -6,7 +6,9 @@ from pydantic import ValidationError
 
 from conversation_core.prompts.core_prompt_profile import (
     CORE_BEHAVIOURAL_RULES,
+    CORE_CONVERSATIONAL_RULES,
     DEFAULT_ASSISTANT_ROLE,
+    DIRECT_ROUTING_RULES,
 )
 from conversation_core.schemas.prompt_schemas import (
     PromptProfile,
@@ -19,7 +21,14 @@ class CorePromptProfileTest(unittest.TestCase):
             PromptProfile()
 
     def test_core_profile_is_domain_neutral(self) -> None:
-        self.assertEqual(len(CORE_BEHAVIOURAL_RULES), 8)
+        self.assertEqual(len(CORE_CONVERSATIONAL_RULES), 8)
+        self.assertEqual(
+            CORE_BEHAVIOURAL_RULES,
+            [
+                *CORE_CONVERSATIONAL_RULES,
+                *DIRECT_ROUTING_RULES,
+            ],
+        )
         self.assertIn("conversational AI assistant", DEFAULT_ASSISTANT_ROLE)
 
         core_text = " ".join(CORE_BEHAVIOURAL_RULES).lower()
