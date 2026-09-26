@@ -19,6 +19,7 @@ from docent.services.introduction_service import build_docent_introduction
 from docent.services.source_service import (
     build_sources_from_retrieved_chunks,
 )
+from docent.tools import docent_tool_registry
 
 
 CONTEXT_RESOLUTION_INSTRUCTIONS = """
@@ -319,9 +320,31 @@ metadata; do not recite or explain it to the visitor.
     )
 
 
+def docent_build_direct_prompt(
+    user_input: str,
+    dialogue_history: list[DialogueTurn],
+    resolved_context: ResolvedContext,
+) -> str:
+    del resolved_context
+
+    return docent_build_prompt(
+        user_input=user_input,
+        dialogue_history=dialogue_history,
+    )
+
+
 context_resolved_docent_query_engine = QueryEngine(
     subject_resolver=docent_resolve_context,
     prompt_builder=docent_build_context_resolved_prompt,
     self_routing_enabled=False,
+    introduction_provider=build_docent_introduction,
+)
+
+
+direct_docent_query_engine = QueryEngine(
+    subject_resolver=None,
+    prompt_builder=docent_build_direct_prompt,
+    direct_routing_enabled=True,
+    tool_registry=docent_tool_registry,
     introduction_provider=build_docent_introduction,
 )

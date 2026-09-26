@@ -24,12 +24,16 @@ from conversation_core.schemas.prompt_schemas import PromptProfile
 from conversation_core.schemas.query_schemas import QueryResult, ResolvedContext
 from conversation_core.schemas.utterance_route_schemas import UtteranceRoute
 from conversation_core.services.cancellation import CancellationToken
+from conversation_core.services.direct_routing_stream_service import (
+    stream_direct_routed_response,
+)
 from conversation_core.services.introduction_service import IntroductionProvider
 from conversation_core.services.llm_service import generate_llm_response
 from conversation_core.services.plain_llm_stream_service import (
     stream_llm_response,
 )
 from conversation_core.services.prompt_service import build_prompt
+from conversation_core.tools.tool_registry import ToolRegistry
 
 
 NON_RETRIEVAL_CONTEXT_SOURCES = {
@@ -149,21 +153,30 @@ def should_suppress_response(
 class QueryEngine:
     def __init__(
         self,
-        subject_resolver: SubjectResolver,
+        subject_resolver: SubjectResolver | None,
         prompt_builder: PromptBuilder,
         response_generator: ResponseGenerator | None = None,
         self_routing_enabled: bool = False,
+        direct_routing_enabled: bool = False,
+        tool_registry: ToolRegistry | None = None,
         introduction_provider: IntroductionProvider | None = None,
         introduction_response_generator: (
             IntroductionResponseGenerator | None
         ) = None,
     ):
+        if subject_resolver is None and not direct_routing_enabled:
+            raise ValueError(
+                "A subject resolver is required unless direct routing is enabled."
+            )
+
         self.subject_resolver = subject_resolver
         self.prompt_builder = prompt_builder
         self.response_generator = (
             response_generator or default_response_generator
         )
         self.self_routing_enabled = self_routing_enabled
+        self.direct_routing_enabled = direct_routing_enabled
+        self.tool_registry = tool_registry
         self.introduction_provider = introduction_provider
         self.introduction_response_generator = (
             introduction_response_generator
@@ -336,6 +349,16 @@ class QueryEngine:
         utterance_route: UtteranceRoute | None = None,
         include_debug: bool = False,
     ) -> QueryResult:
+        if self.direct_routing_enabled:
+            return self.generate_streaming_response(
+                text=text,
+                conversation_id=conversation_id,
+                request_id=request_id,
+                subject_reference=subject_reference,
+                utterance_route=utterance_route,
+                include_debug=include_debug,
+            )
+
         request_started_at = perf_counter()
         (
             _conversation_state,
@@ -548,16 +571,34 @@ class QueryEngine:
             )
 
         context_resolution_started_at = perf_counter()
-        resolved_context = self.subject_resolver(
-            resolver_history,
-            text,
-            utterance_route,
-        )
-        context_resolution_seconds = (
-            perf_counter() - context_resolution_started_at
-        )
-        subjects = get_resolved_subjects(resolved_context)
-        references = get_resolved_references(resolved_context)
+        if self.direct_routing_enabled:
+            resolved_context = ResolvedContext(
+                context_source="direct_routing",
+                prompt_payload={},
+                sources=[],
+                debug_payload={
+                    "direct_routing_enabled": True,
+                },
+            )
+            context_resolution_seconds = 0.0
+            subjects: list[str] = []
+            references: list[str] = []
+        else:
+            if self.subject_resolver is None:
+                raise RuntimeError(
+                    "The resolver-based path has no subject resolver."
+                )
+
+            resolved_context = self.subject_resolver(
+                resolver_history,
+                text,
+                utterance_route,
+            )
+            context_resolution_seconds = (
+                perf_counter() - context_resolution_started_at
+            )
+            subjects = get_resolved_subjects(resolved_context)
+            references = get_resolved_references(resolved_context)
 
         emit_timing(
             "context_resolution_seconds",
@@ -578,13 +619,14 @@ class QueryEngine:
             if isinstance(context_resolution, dict)
             else None
         )
-        update_dialogue_turn_context(
-            conversation_id,
-            exchange,
-            subject=subjects,
-            reference=references,
-            route_type=route_type,
-        )
+        if not self.direct_routing_enabled:
+            update_dialogue_turn_context(
+                conversation_id,
+                exchange,
+                subject=subjects,
+                reference=references,
+                route_type=route_type,
+            )
         should_commit_interruption = bool(
             interrupted_request_id
             and interrupted_assistant_text
@@ -594,13 +636,18 @@ class QueryEngine:
                 "interruption",
             }
         )
-        if should_commit_interruption:
+        if (
+            should_commit_interruption
+            and not self.direct_routing_enabled
+        ):
             update_interrupted_assistant_response(
                 conversation_id,
                 interrupted_request_id,
                 interrupted_assistant_text,
             )
         if (
+            not self.direct_routing_enabled
+            and
             on_stream_event is not None
             and isinstance(context_resolution, dict)
         ):
@@ -611,7 +658,10 @@ class QueryEngine:
                 )
             )
 
-        if should_suppress_response(resolved_context):
+        if (
+            not self.direct_routing_enabled
+            and should_suppress_response(resolved_context)
+        ):
             return self._build_suppressed_result(
                 text=text,
                 conversation_id=conversation_id,
@@ -666,10 +716,22 @@ class QueryEngine:
                     )
                 )
         else:
-            for stream_event in stream_llm_response(
-                prompt=prompt,
-                cancellation_token=cancellation_token,
-            ):
+            stream_events = (
+                stream_direct_routed_response(
+                    prompt=prompt,
+                    conversation_id=conversation_id,
+                    buffer_for_tool_decision=False,
+                    cancellation_token=cancellation_token,
+                    tool_registry=self.tool_registry,
+                )
+                if self.direct_routing_enabled
+                else stream_llm_response(
+                    prompt=prompt,
+                    cancellation_token=cancellation_token,
+                )
+            )
+
+            for stream_event in stream_events:
                 if stream_event.event_type == "content_delta":
                     if stream_event.text:
                         response_parts.append(stream_event.text)
@@ -686,6 +748,11 @@ class QueryEngine:
 
                 elif stream_event.event_type == "response_cancelled":
                     response_cancelled = True
+
+                elif stream_event.event_type == "control_signal":
+                    if on_stream_event is not None:
+                        on_stream_event(stream_event)
+                    break
 
                 if on_stream_event is not None:
                     on_stream_event(stream_event)
