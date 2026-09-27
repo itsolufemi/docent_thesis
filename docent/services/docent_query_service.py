@@ -1,17 +1,43 @@
 import json
+import logging
+from collections.abc import Callable
 from time import perf_counter
 
+from conversation_core.memory.conversation_store import (
+    get_recent_conversation_history,
+)
 from conversation_core.schemas.context_resolution_schemas import (
     ContextResolutionAssessment,
 )
 from conversation_core.schemas.conversation_schemas import DialogueTurn
-from conversation_core.schemas.query_schemas import ResolvedContext
+from conversation_core.schemas.llm_stream_schemas import LLMStreamEvent
+from conversation_core.schemas.query_schemas import QueryResult, ResolvedContext
+from conversation_core.schemas.utterance_route_schemas import UtteranceRoute
+from conversation_core.services.cancellation import CancellationToken
+from conversation_core.services.conversation_log_service import (
+    append_telemetry_log,
+)
 from conversation_core.services.llm_service import generate_llm_response
 from conversation_core.services.prompt_service import (
     format_dialogue_history_for_prompt,
 )
 from conversation_core.services.query_service import QueryEngine
 from docent.services.docent_prompt_service import docent_build_prompt
+from docent.schemas.preference_schemas import (
+    DocentPreferenceEvidence,
+    DocentPreferenceState,
+)
+from docent.services.docent_preference_analyser import (
+    analyse_docent_preferences,
+)
+from docent.services.docent_preference_service import (
+    update_docent_preferences,
+    use_docent_preference_state,
+)
+from docent.services.docent_preference_store import (
+    DocentPreferenceStore,
+    docent_preference_store,
+)
 from docent.services.docent_vector_retrieval_service import (
     retrieve_docent_chunks_by_vector_similarity,
 )
@@ -20,6 +46,14 @@ from docent.services.source_service import (
     build_sources_from_retrieved_chunks,
 )
 from docent.tools import docent_tool_registry
+
+
+logger = logging.getLogger(__name__)
+PreferenceAnalyser = Callable[
+    [list[DialogueTurn], str, DocentPreferenceState],
+    tuple[DocentPreferenceEvidence, dict],
+]
+LLMStreamCallback = Callable[[LLMStreamEvent], None]
 
 
 CONTEXT_RESOLUTION_INSTRUCTIONS = """
@@ -333,6 +367,171 @@ def docent_build_direct_prompt(
     )
 
 
+class DocentPreferenceQueryService:
+    """Add Docent session preferences around an unchanged query engine."""
+
+    def __init__(
+        self,
+        query_engine: QueryEngine,
+        *,
+        analyser: PreferenceAnalyser = analyse_docent_preferences,
+        preference_store: DocentPreferenceStore = docent_preference_store,
+    ) -> None:
+        self.query_engine = query_engine
+        self.analyser = analyser
+        self.preference_store = preference_store
+
+    def __getattr__(self, name: str):
+        return getattr(self.query_engine, name)
+
+    @staticmethod
+    def _history_before_turn(
+        conversation_id: str | None,
+        override: list[DialogueTurn] | None = None,
+    ) -> list[DialogueTurn]:
+        history = (
+            override
+            if override is not None
+            else (
+                get_recent_conversation_history(conversation_id)
+                if conversation_id is not None
+                else []
+            )
+        )
+        return [turn.model_copy(deep=True) for turn in history]
+
+    def _analyse_after_response(
+        self,
+        *,
+        text: str,
+        conversation_id: str | None,
+        request_id: str | None,
+        dialogue_history: list[DialogueTurn],
+        preference_snapshot: DocentPreferenceState,
+    ) -> None:
+        if conversation_id is None:
+            return
+
+        try:
+            evidence, analysis_debug = self.analyser(
+                dialogue_history,
+                text,
+                preference_snapshot,
+            )
+            before, after = update_docent_preferences(
+                conversation_id,
+                evidence,
+                store=self.preference_store,
+            )
+            payload = {
+                "before": before.model_dump(mode="json"),
+                "evidence": evidence.model_dump(mode="json"),
+                "after": after.model_dump(mode="json"),
+                "technical_depth_changed": (
+                    before.technical_depth != after.technical_depth
+                ),
+                "verbosity_changed": before.verbosity != after.verbosity,
+                "analysis": analysis_debug,
+            }
+            append_telemetry_log(
+                conversation_id=conversation_id,
+                request_id=request_id,
+                event_type="docent_preference_update",
+                payload=payload,
+            )
+            logger.info(
+                "Updated Docent session preferences for conversation %s: %s",
+                conversation_id,
+                payload,
+            )
+        except Exception as error:
+            logger.exception(
+                "Docent preference analysis failed for conversation %s",
+                conversation_id,
+            )
+            append_telemetry_log(
+                conversation_id=conversation_id,
+                request_id=request_id,
+                event_type="docent_preference_analysis_failed",
+                payload={"error": str(error)},
+            )
+
+    def generate_response(
+        self,
+        text: str,
+        conversation_id: str | None = None,
+        request_id: str | None = None,
+        subject_reference: str | None = None,
+        utterance_route: UtteranceRoute | None = None,
+        include_debug: bool = False,
+    ) -> QueryResult:
+        preference_snapshot = self.preference_store.get(conversation_id)
+        dialogue_history = self._history_before_turn(conversation_id)
+
+        with use_docent_preference_state(preference_snapshot):
+            result = self.query_engine.generate_response(
+                text=text,
+                conversation_id=conversation_id,
+                request_id=request_id,
+                subject_reference=subject_reference,
+                utterance_route=utterance_route,
+                include_debug=include_debug,
+            )
+
+        self._analyse_after_response(
+            text=text,
+            conversation_id=result.conversation_id,
+            request_id=request_id,
+            dialogue_history=dialogue_history,
+            preference_snapshot=preference_snapshot,
+        )
+        return result
+
+    def generate_streaming_response(
+        self,
+        text: str,
+        conversation_id: str | None = None,
+        request_id: str | None = None,
+        dialogue_history_override: list[DialogueTurn] | None = None,
+        interrupted_request_id: str | None = None,
+        interrupted_assistant_text: str | None = None,
+        subject_reference: str | None = None,
+        utterance_route: UtteranceRoute | None = None,
+        include_debug: bool = False,
+        on_stream_event: LLMStreamCallback | None = None,
+        cancellation_token: CancellationToken | None = None,
+    ) -> QueryResult:
+        preference_snapshot = self.preference_store.get(conversation_id)
+        dialogue_history = self._history_before_turn(
+            conversation_id,
+            dialogue_history_override,
+        )
+
+        with use_docent_preference_state(preference_snapshot):
+            result = self.query_engine.generate_streaming_response(
+                text=text,
+                conversation_id=conversation_id,
+                request_id=request_id,
+                dialogue_history_override=dialogue_history_override,
+                interrupted_request_id=interrupted_request_id,
+                interrupted_assistant_text=interrupted_assistant_text,
+                subject_reference=subject_reference,
+                utterance_route=utterance_route,
+                include_debug=include_debug,
+                on_stream_event=on_stream_event,
+                cancellation_token=cancellation_token,
+            )
+
+        self._analyse_after_response(
+            text=text,
+            conversation_id=result.conversation_id,
+            request_id=request_id,
+            dialogue_history=dialogue_history,
+            preference_snapshot=preference_snapshot,
+        )
+        return result
+
+
 context_resolved_docent_query_engine = QueryEngine(
     subject_resolver=docent_resolve_context,
     prompt_builder=docent_build_context_resolved_prompt,
@@ -341,10 +540,15 @@ context_resolved_docent_query_engine = QueryEngine(
 )
 
 
-direct_docent_query_engine = QueryEngine(
+direct_docent_core_query_engine = QueryEngine(
     subject_resolver=None,
     prompt_builder=docent_build_direct_prompt,
     direct_routing_enabled=True,
     tool_registry=docent_tool_registry,
     introduction_provider=build_docent_introduction,
+)
+
+
+direct_docent_query_engine = DocentPreferenceQueryService(
+    direct_docent_core_query_engine
 )

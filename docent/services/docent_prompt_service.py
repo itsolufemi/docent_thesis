@@ -9,6 +9,10 @@ from conversation_core.prompts.core_prompt_profile import (
 from conversation_core.services.prompt_service import build_prompt
 
 from docent.schemas.artwork_schemas import Artwork
+from docent.schemas.preference_schemas import DocentPreferenceState
+from docent.services.docent_preference_service import (
+    get_active_docent_preference_state,
+)
 
 from extensions.retrieval.schemas.chunk_schemas import RetrievedChunk
 from extensions.retrieval.schemas.document_schemas import RetrievedDocument
@@ -69,6 +73,36 @@ DOCENT_PROMPT_PROFILE = PromptProfile(
         *DOCENT_BEHAVIOURAL_RULES,
     ],
 )
+
+
+def build_docent_preferences_section(
+    state: DocentPreferenceState,
+) -> PromptSection:
+    interests = "\n".join(
+        f"- {category.replace('_', ' ')}: {weight:.2f}"
+        for category, weight in state.interests.items()
+    )
+    content = f"""
+Interest profile:
+{interests}
+
+Technical depth: {state.technical_depth}
+Verbosity: {state.verbosity}
+
+Use this profile as soft guidance for emphasis and presentation. Follow the
+visitor's explicit current request first, then the supported evidence. Do not
+treat the interest weights as proportions that every response must satisfy,
+and do not force topics or claims that the available evidence does not
+support. Verbosity controls the amount of detail; technical depth controls
+the sophistication of the explanation independently of subject interest.
+Lower-weight interests remain available when the visitor asks about them or
+when they offer a useful avenue for exploration.
+""".strip()
+
+    return PromptSection(
+        title="Visitor preferences this session",
+        content=content,
+    )
 
 def build_artwork_context_section(
     artwork: Artwork,
@@ -174,6 +208,12 @@ def docent_build_prompt(
     retrieved_chunks = retrieved_chunks or []
 
     context_sections: list[PromptSection] = []
+
+    preference_state = get_active_docent_preference_state()
+    if preference_state is not None:
+        context_sections.append(
+            build_docent_preferences_section(preference_state)
+        )
 
     if response_guidance:
         context_sections.append(
