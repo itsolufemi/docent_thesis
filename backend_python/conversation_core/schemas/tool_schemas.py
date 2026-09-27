@@ -66,6 +66,8 @@ class ToolExecutionResult(BaseModel):
         default_factory=dict
     )
 
+    retrieval_used: bool = False
+
     dialogue_state: ToolDialogueStateUpdate | None = None
 
     sources: list[QuerySource] = Field(

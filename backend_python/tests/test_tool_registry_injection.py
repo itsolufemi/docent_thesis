@@ -163,6 +163,7 @@ class ToolRegistryInjectionTest(unittest.TestCase):
         )
         self.assertNotIn("dialogue_state", model_payload)
         self.assertNotIn("sources", model_payload)
+        self.assertNotIn("retrieval_used", model_payload)
 
 
 if __name__ == "__main__":

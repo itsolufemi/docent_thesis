@@ -130,6 +130,7 @@ def retrieve_docent_knowledge(
         tool_name=DOCENT_RETRIEVAL_TOOL.name,
         success=True,
         message="Retrieved relevant Docent knowledge.",
+        retrieval_used=True,
         data={
             "evidence": evidence,
         },

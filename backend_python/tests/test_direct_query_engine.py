@@ -83,6 +83,7 @@ class DirectQueryEngineTest(unittest.TestCase):
             result.debug.context_source,
             "direct_routing",
         )
+        self.assertFalse(result.debug.retrieval_used)
         self.assertEqual(
             self.state.dialogue_history[-1].assistant,
             "Hello there.",
@@ -109,6 +110,7 @@ class DirectQueryEngineTest(unittest.TestCase):
             tool_name="retrieve_docent_knowledge",
             success=True,
             message="Retrieved.",
+            retrieval_used=True,
             dialogue_state=ToolDialogueStateUpdate(
                 subjects=["The Swing"],
                 references=["painting:581"],
@@ -157,11 +159,13 @@ class DirectQueryEngineTest(unittest.TestCase):
         result = self._engine().generate_streaming_response(
             "Who painted The Swing?",
             conversation_id=self.state.conversation_id,
+            include_debug=True,
         )
 
         self.assertEqual(snapshots[0].subject, ["The Swing"])
         self.assertEqual(snapshots[0].reference, ["painting:581"])
         self.assertEqual(result.sources[0].reference, "painting:581")
+        self.assertTrue(result.debug.retrieval_used)
 
     @patch(
         "conversation_core.services.query_service."
@@ -196,6 +200,7 @@ class DirectQueryEngineTest(unittest.TestCase):
             dialogue_history_override=override,
             interrupted_request_id="request-a",
             interrupted_assistant_text="A. [interrupted]",
+            include_debug=True,
         )
 
         current = self.state.dialogue_history[-1]
@@ -203,6 +208,64 @@ class DirectQueryEngineTest(unittest.TestCase):
         self.assertEqual(previous.assistant, "A. B. C.")
         self.assertEqual(current.route_type, "backchannel")
         self.assertEqual(current.subject, ["The Swing"])
+        self.assertFalse(result.debug.retrieval_used)
+
+    @patch(
+        "conversation_core.services.query_service."
+        "stream_direct_routed_response"
+    )
+    def test_zero_result_retrieval_is_still_reported(self, stream) -> None:
+        tool_result = ToolExecutionResult(
+            tool_name="retrieve_docent_knowledge",
+            success=True,
+            message="No accepted evidence.",
+            retrieval_used=True,
+            data={"evidence": []},
+            dialogue_state=ToolDialogueStateUpdate(
+                subjects=["Unknown artwork"],
+                references=[],
+            ),
+            sources=[],
+        )
+        stream.return_value = iter(
+            [
+                LLMStreamEvent(event_type="response_started"),
+                LLMStreamEvent(
+                    event_type="tool_call",
+                    tool_calls=[
+                        {
+                            "name": "retrieve_docent_knowledge",
+                            "arguments": {
+                                "subjects": ["Unknown artwork"],
+                            },
+                        }
+                    ],
+                ),
+                LLMStreamEvent(
+                    event_type="tool_result",
+                    tool_name="retrieve_docent_knowledge",
+                    tool_result=tool_result.model_dump(mode="json"),
+                ),
+                LLMStreamEvent(
+                    event_type="content_delta",
+                    text="I couldn't find supporting information.",
+                ),
+                LLMStreamEvent(
+                    event_type="response_complete",
+                    text="I couldn't find supporting information.",
+                    done=True,
+                ),
+            ]
+        )
+
+        result = self._engine().generate_streaming_response(
+            "Tell me about Unknown artwork.",
+            conversation_id=self.state.conversation_id,
+            include_debug=True,
+        )
+
+        self.assertTrue(result.debug.retrieval_used)
+        self.assertEqual(result.sources, [])
 
     @patch(
         "conversation_core.services.query_service."

@@ -79,6 +79,7 @@ class DocentRetrievalToolTest(unittest.TestCase):
         )
 
         self.assertTrue(result.success)
+        self.assertTrue(result.retrieval_used)
         self.assertEqual(
             retrieve.call_args_list,
             [
@@ -180,6 +181,35 @@ class DocentRetrievalToolTest(unittest.TestCase):
         self.assertNotIn(
             "painting:2",
             result.dialogue_state.references,
+        )
+
+    @patch(
+        "docent.tools.retrieval_tool."
+        "retrieve_docent_chunks_by_vector_similarity"
+    )
+    def test_empty_retrieval_still_reports_retrieval_used(
+        self,
+        retrieve,
+    ) -> None:
+        retrieve.return_value = VectorRetrievalResult(results=[])
+
+        result = docent_tool_registry.execute(
+            tool_call=ToolCall(
+                name="retrieve_docent_knowledge",
+                arguments={"subjects": ["Unknown artwork"]},
+            ),
+            context=ToolExecutionContext(
+                conversation_id="conversation-empty"
+            ),
+        )
+
+        self.assertTrue(result.success)
+        self.assertTrue(result.retrieval_used)
+        self.assertEqual(result.sources, [])
+        self.assertEqual(result.data["evidence"], [])
+        self.assertEqual(
+            result.dialogue_state.references,
+            [],
         )
 
     def test_rejects_empty_subjects(self) -> None:

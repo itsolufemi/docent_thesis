@@ -705,6 +705,7 @@ class QueryEngine:
 
         response_parts: list[str] = []
         active_sources = list(resolved_context.sources)
+        retrieval_used = False
         control_route_type: str | None = None
         interruption_committed = False
 
@@ -809,6 +810,9 @@ class QueryEngine:
                     tool_result = ToolExecutionResult.model_validate(
                         stream_event.tool_result
                     )
+
+                    if tool_result.retrieval_used:
+                        retrieval_used = True
 
                     if tool_result.dialogue_state is not None:
                         extend_unique_strings(
@@ -923,6 +927,14 @@ class QueryEngine:
                 ),
             },
         }
+        debug_retrieval_used = (
+            retrieval_used
+            if self.direct_routing_enabled
+            else (
+                resolved_context.context_source
+                not in NON_RETRIEVAL_CONTEXT_SOURCES
+            )
+        )
 
         debug = None
         if include_debug:
@@ -936,10 +948,7 @@ class QueryEngine:
                 ),
                 dialogue_turns_used=len(response_dialogue_history),
                 prompt=prompt,
-                retrieval_used=(
-                    resolved_context.context_source
-                    not in NON_RETRIEVAL_CONTEXT_SOURCES
-                ),
+                retrieval_used=debug_retrieval_used,
                 sources_count=len(active_sources),
                 sources=active_sources,
                 debug_payload=debug_payload,

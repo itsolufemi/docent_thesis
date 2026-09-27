@@ -30,6 +30,8 @@ class ToolDialogueStateTest(unittest.TestCase):
             ],
         )
 
+        self.assertFalse(result.retrieval_used)
+
         payload = result.model_dump(mode="json")
 
         self.assertEqual(
