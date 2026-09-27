@@ -62,7 +62,6 @@ def retrieve_docent_knowledge(
 
     merged_results = []
     seen_chunk_ids: set[str] = set()
-    references: list[str] = []
 
     for subject in subjects:
         result = retrieve_docent_chunks_by_vector_similarity(
@@ -83,15 +82,22 @@ def retrieve_docent_knowledge(
             seen_chunk_ids.add(chunk.chunk_id)
             merged_results.append(retrieved)
 
-            reference = (
-                chunk.source_reference
-                or chunk.parent_document_id
-            )
-
-            if reference and reference not in references:
-                references.append(reference)
-
+    merged_results.sort(
+        key=lambda item: float(item.score),
+        reverse=True,
+    )
     selected_results = merged_results[:10]
+    references: list[str] = []
+
+    for item in selected_results:
+        reference = (
+            item.chunk.source_reference
+            or item.chunk.parent_document_id
+        )
+
+        if reference and reference not in references:
+            references.append(reference)
+
     evidence = [
         {
             "title": item.chunk.title,

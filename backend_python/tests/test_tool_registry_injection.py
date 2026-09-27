@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import unittest
 
+import json
+
 from unittest.mock import Mock, patch
 
+from conversation_core.schemas.source_schemas import QuerySource
 from conversation_core.schemas.tool_schemas import (
+    ToolDialogueStateUpdate,
     ToolDefinition,
     ToolExecutionResult,
 )
@@ -25,7 +29,24 @@ class ToolRegistryInjectionTest(unittest.TestCase):
                 tool_name="sandbox_lookup",
                 success=True,
                 message="Lookup complete.",
-                data={"answer": "result"},
+                data={
+                    "evidence": [
+                        {
+                            "text": "Evidence only once.",
+                        }
+                    ]
+                },
+                dialogue_state=ToolDialogueStateUpdate(
+                    subjects=["The Swing"],
+                    references=["painting:581"],
+                ),
+                sources=[
+                    QuerySource(
+                        source_type="retrieved_chunk",
+                        reference="painting:581",
+                        snippet="Evidence only once.",
+                    )
+                ],
             )
         )
         self.registry.register(
@@ -106,6 +127,42 @@ class ToolRegistryInjectionTest(unittest.TestCase):
             tool_result.tool_name,
             "sandbox_lookup",
         )
+        self.assertEqual(
+            tool_result.tool_result["dialogue_state"]["subjects"],
+            ["The Swing"],
+        )
+        self.assertEqual(
+            tool_result.tool_result["sources"][0]["snippet"],
+            "Evidence only once.",
+        )
+
+        second_round_messages = (
+            stream_request.call_args_list[1].kwargs["messages"]
+        )
+        model_tool_message = next(
+            message
+            for message in second_round_messages
+            if message["role"] == "tool"
+        )
+        model_payload = json.loads(
+            model_tool_message["content"]
+        )
+        self.assertEqual(
+            model_payload,
+            {
+                "success": True,
+                "message": "Lookup complete.",
+                "data": {
+                    "evidence": [
+                        {
+                            "text": "Evidence only once.",
+                        }
+                    ]
+                },
+            },
+        )
+        self.assertNotIn("dialogue_state", model_payload)
+        self.assertNotIn("sources", model_payload)
 
 
 if __name__ == "__main__":

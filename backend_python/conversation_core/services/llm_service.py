@@ -571,8 +571,10 @@ def stream_tool_aware_llm_response(
                                 tool_call.name
                             ),
                             "content": (
-                                execution_result
-                                .model_dump_json()
+                                json.dumps(
+                                    execution_result.model_payload(),
+                                    ensure_ascii=False,
+                                )
                             ),
                         }
                     )

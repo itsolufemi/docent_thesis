@@ -111,6 +111,77 @@ class DocentRetrievalToolTest(unittest.TestCase):
         self.assertEqual(len(result.data["evidence"]), 2)
         self.assertEqual(len(result.sources), 2)
 
+    @patch(
+        "docent.tools.retrieval_tool."
+        "retrieve_docent_chunks_by_vector_similarity"
+    )
+    def test_globally_ranks_before_truncating_and_deriving_references(
+        self,
+        retrieve,
+    ) -> None:
+        result_sets = []
+
+        for subject_index in range(3):
+            results = []
+
+            for result_index in range(4):
+                item_number = subject_index * 4 + result_index + 1
+                results.append(
+                    RetrievedChunk(
+                        chunk=RetrievalChunk(
+                            chunk_id=f"chunk:{item_number}",
+                            chunk_type="identity",
+                            parent_document_id=f"painting:{item_number}",
+                            title=f"Artwork {item_number}",
+                            text=f"Evidence {item_number}.",
+                            source_reference=f"painting:{item_number}",
+                        ),
+                        score=item_number / 100,
+                    )
+                )
+
+            result_sets.append(
+                VectorRetrievalResult(results=results)
+            )
+
+        retrieve.side_effect = result_sets
+
+        result = docent_tool_registry.execute(
+            tool_call=ToolCall(
+                name="retrieve_docent_knowledge",
+                arguments={
+                    "subjects": ["First", "Second", "Third"],
+                },
+            ),
+            context=ToolExecutionContext(
+                conversation_id="conversation-ranking"
+            ),
+        )
+
+        evidence_scores = [
+            item["score"]
+            for item in result.data["evidence"]
+        ]
+        self.assertEqual(
+            evidence_scores,
+            [value / 100 for value in range(12, 2, -1)],
+        )
+        self.assertEqual(
+            result.dialogue_state.references,
+            [
+                f"painting:{value}"
+                for value in range(12, 2, -1)
+            ],
+        )
+        self.assertNotIn(
+            "painting:1",
+            result.dialogue_state.references,
+        )
+        self.assertNotIn(
+            "painting:2",
+            result.dialogue_state.references,
+        )
+
     def test_rejects_empty_subjects(self) -> None:
         result = docent_tool_registry.execute(
             tool_call=ToolCall(

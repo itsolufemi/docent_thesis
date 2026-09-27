@@ -71,3 +71,11 @@ class ToolExecutionResult(BaseModel):
     sources: list[QuerySource] = Field(
         default_factory=list
     )
+
+    def model_payload(self) -> dict[str, Any]:
+        """Return only the data needed by the model's next round."""
+        return {
+            "success": self.success,
+            "message": self.message,
+            "data": self.data,
+        }
