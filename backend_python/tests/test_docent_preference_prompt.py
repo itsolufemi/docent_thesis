@@ -30,6 +30,33 @@ class DocentPreferencePromptTest(unittest.TestCase):
         self.assertIn("three to six short spoken sentences", prompt)
         self.assertIn("normal museum and art terminology", prompt)
 
+    def test_docent_grounding_uses_retrieval_without_a_knowledge_ceiling(
+        self,
+    ) -> None:
+        prompt = docent_build_prompt("Tell me about this artwork.", [])
+
+        self.assertNotIn(
+            "You know the artwork only through the information provided",
+            prompt,
+        )
+        self.assertNotIn(
+            "do not introduce claims that the available evidence does not support",
+            prompt,
+        )
+        self.assertIn(
+            "primary grounding for factual claims about specific artworks",
+            prompt,
+        )
+        self.assertIn("use your own underlying knowledge", prompt)
+        self.assertIn(
+            "Do not treat retrieved information as the complete boundary",
+            prompt,
+        )
+        self.assertIn("Do not invent artwork-specific facts", prompt)
+        self.assertIn("prefer the retrieved information", prompt)
+        self.assertIn("Clearly qualify interpretation", prompt)
+        self.assertIn("Apply this priority order", prompt)
+
     def test_technique_dominant_state_becomes_actionable_policy(self) -> None:
         state = DocentPreferenceState(
             interests={
@@ -55,6 +82,18 @@ class DocentPreferencePromptTest(unittest.TestCase):
         self.assertIn("specialist technical and art-historical detail", prompt)
         self.assertIn("explicit current question", prompt)
         self.assertIn("relative priorities, not proportions", prompt)
+        self.assertIn(
+            "preferred lens is not well covered by the retrieved information",
+            prompt,
+        )
+        self.assertIn(
+            "use relevant general knowledge where appropriate",
+            prompt,
+        )
+        self.assertIn(
+            "broader model knowledge may be used to explain technique",
+            prompt,
+        )
 
     def test_different_profiles_produce_different_emphasis_context(self) -> None:
         interpretation = DocentPreferenceState(
