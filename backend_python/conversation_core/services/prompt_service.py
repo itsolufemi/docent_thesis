@@ -77,6 +77,7 @@ def build_prompt(
     dialogue_history: list[DialogueTurn],
     profile: PromptProfile,
     context_sections: list[PromptSection] | None = None,
+    content_generation_rules: list[str] | None = None,
 ) -> str:
     context_sections = context_sections or []
 
@@ -88,15 +89,26 @@ def build_prompt(
 
     formatted_context = format_prompt_sections(context_sections)
 
-    rules = "\n".join(
+    behavioural_policy = "\n".join(
         f"- {rule}" for rule in profile.behavioural_rules
+    )
+    selected_content_rules = (
+        content_generation_rules
+        if content_generation_rules is not None
+        else profile.default_content_generation_rules
+    )
+    content_generation_policy = "\n".join(
+        f"- {rule}" for rule in selected_content_rules
     )
 
     return f"""
 {profile.assistant_role}
 
-Behavioural rules:
-{rules or "- Respond appropriately to the user."}
+Behavioural policy:
+{behavioural_policy or "- Respond appropriately to the user."}
+
+Content-generation policy:
+{content_generation_policy or "- Answer the user's current request directly."}
 
 Context:
 {formatted_context}

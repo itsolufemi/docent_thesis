@@ -28,30 +28,28 @@ DOCENT_BEHAVIOURAL_RULES = [
         "You know the artwork only through the information "
         "provided to you."
     ),
+]
+
+
+DOCENT_CONTENT_GENERATION_RULES = [
     (
-        "When discussing an artwork, choose only the two or three "
-        "interpretive points most relevant to the visitor's current "
-        "question. Do not attempt to cover every available fact, "
-        "theme, symbol, historical context, or interpretation in "
-        "one response."
+        "Give the main answer first."
     ),
     (
-        "Give the main answer first. Explain the point of the painting: "
-        "what story it tells and how that story is told. Keep an "
-        "ordinary response to about two to eight short spoken sentences."
+        "Do not attempt to cover every available aspect of an artwork "
+        "in one response. Select the points most relevant to the "
+        "visitor's current request."
     ),
     (
         "Offer further artwork detail when the visitor asks for it "
         "or clearly shows interest in a particular aspect."
     ),
     (
-        "Treat the following as possible interpretive lenses rather "
-        "than a checklist: what is immediately noticeable; how an "
-        "initial reading changes on closer inspection; what is unusual "
-        "or unexpected; what story surrounds the artwork; how the "
-        "artist tells that story; how visual details and symbolism "
-        "relate to its themes; and what cultural or historical themes "
-        "connect it to its period or to modern contexts."
+        "Treat the following as possible lenses rather than a checklist: "
+        "interpretation and meaning; technique and formal qualities; "
+        "historical and social context; subject and narrative; artist "
+        "and oeuvre context; immediate impressions; unusual details; "
+        "symbolism; and wider cultural connections."
     ),
     (
         "When describing an artwork, use clear positional language "
@@ -75,34 +73,144 @@ DOCENT_PROMPT_PROFILE = PromptProfile(
 )
 
 
-def build_docent_preferences_section(
+INTEREST_LABELS = {
+    "interpretation": "interpretation and meaning",
+    "technique": "technique and formal qualities",
+    "historical_social_context": "historical and social context",
+    "narrative": "subject and narrative",
+    "artist_context": "artist and oeuvre context",
+}
+
+
+VERBOSITY_RULES = {
+    "low": (
+        "Keep answers concise, normally around one to three short spoken "
+        "sentences. Usually focus on the principal point or one closely "
+        "related secondary point."
+    ),
+    "medium": (
+        "Use normal conversational detail, normally around three to six "
+        "short spoken sentences. Include a small number of complementary "
+        "aspects when useful."
+    ),
+    "high": (
+        "Give a more developed explanation, normally around six to ten "
+        "spoken sentences when the subject warrants it. Several relevant "
+        "aspects may be connected."
+    ),
+}
+
+
+TECHNICAL_DEPTH_RULES = {
+    "low": (
+        "Prefer everyday language and explain specialist concepts simply."
+    ),
+    "medium": (
+        "Use normal museum and art terminology where helpful, and explain "
+        "unfamiliar terms."
+    ),
+    "high": (
+        "Use more specialist technical and art-historical detail and finer "
+        "distinctions."
+    ),
+}
+
+
+def _ranked_interests(
     state: DocentPreferenceState,
-) -> PromptSection:
-    interests = "\n".join(
-        f"- {category.replace('_', ' ')}: {weight:.2f}"
-        for category, weight in state.interests.items()
+) -> list[tuple[str, float]]:
+    return sorted(
+        state.interests.items(),
+        key=lambda item: (-item[1], item[0]),
     )
-    content = f"""
-Interest profile:
-{interests}
 
-Technical depth: {state.technical_depth}
-Verbosity: {state.verbosity}
 
-Use this profile as soft guidance for emphasis and presentation. Follow the
-visitor's explicit current request first, then the supported evidence. Do not
-treat the interest weights as proportions that every response must satisfy,
-and do not force topics or claims that the available evidence does not
-support. Verbosity controls the amount of detail; technical depth controls
-the sophistication of the explanation independently of subject interest.
-Lower-weight interests remain available when the visitor asks about them or
-when they offer a useful avenue for exploration.
-""".strip()
+def build_docent_content_policy_debug(
+    state: DocentPreferenceState,
+) -> dict:
+    ranked = _ranked_interests(state)
+    dominant_category, dominant_weight = ranked[0]
+    has_clear_priority = dominant_weight - ranked[1][1] > 0.01
 
-    return PromptSection(
-        title="Visitor preferences this session",
-        content=content,
+    return {
+        "dominant_interest": (
+            {
+                "category": dominant_category,
+                "label": INTEREST_LABELS[dominant_category],
+                "weight": round(dominant_weight, 4),
+            }
+            if has_clear_priority
+            else None
+        ),
+        "ordered_interests": [
+            {
+                "category": category,
+                "label": INTEREST_LABELS[category],
+                "weight": round(weight, 4),
+            }
+            for category, weight in ranked
+        ],
+        "verbosity": state.verbosity,
+        "technical_depth": state.technical_depth,
+        "mode": "adaptive" if has_clear_priority else "neutral",
+    }
+
+
+def build_docent_content_generation_policy(
+    state: DocentPreferenceState,
+) -> list[str]:
+    debug = build_docent_content_policy_debug(state)
+    ranked = debug["ordered_interests"]
+    numerical_profile = ", ".join(
+        f"{item['label']} {item['weight']:.2f}"
+        for item in ranked
     )
+
+    adaptive_rules = [
+        (
+            "Always answer the visitor's explicit current question before "
+            "applying inferred preferences, and do not introduce claims "
+            "that the available evidence does not support."
+        )
+    ]
+
+    dominant = debug["dominant_interest"]
+    if dominant is None:
+        adaptive_rules.append(
+            "No interest currently has clear priority. For open-ended "
+            "artwork requests, choose the most useful combination of "
+            "relevant lenses rather than privileging one category."
+        )
+    else:
+        secondary = ranked[1]
+        adaptive_rules.append(
+            f"The visitor's strongest current inferred interest is "
+            f"{dominant['label']} ({dominant['weight']:.2f}). For "
+            "open-ended artwork requests, foreground that lens when it is "
+            f"relevant. Use {secondary['label']} as the next relative "
+            "priority when it is relevant and the requested amount of "
+            "detail permits."
+        )
+
+    adaptive_rules.extend(
+        [
+            (
+                "Interest weights are relative priorities, not proportions "
+                "of a response. Lower-weight interests remain available "
+                "when relevant, explicitly requested, or useful for "
+                "broadening the conversation."
+            ),
+            VERBOSITY_RULES[state.verbosity],
+            TECHNICAL_DEPTH_RULES[state.technical_depth],
+            f"Current relative interest profile: {numerical_profile}.",
+        ]
+    )
+
+    return [
+        *DOCENT_CONTENT_GENERATION_RULES,
+        *adaptive_rules,
+    ]
+
 
 def build_artwork_context_section(
     artwork: Artwork,
@@ -208,12 +316,13 @@ def docent_build_prompt(
     retrieved_chunks = retrieved_chunks or []
 
     context_sections: list[PromptSection] = []
-
-    preference_state = get_active_docent_preference_state()
-    if preference_state is not None:
-        context_sections.append(
-            build_docent_preferences_section(preference_state)
-        )
+    preference_state = (
+        get_active_docent_preference_state()
+        or DocentPreferenceState()
+    )
+    content_generation_rules = (
+        build_docent_content_generation_policy(preference_state)
+    )
 
     if response_guidance:
         context_sections.append(
@@ -245,4 +354,5 @@ def docent_build_prompt(
         dialogue_history=dialogue_history,
         profile=DOCENT_PROMPT_PROFILE,
         context_sections=context_sections,
+        content_generation_rules=content_generation_rules,
     )

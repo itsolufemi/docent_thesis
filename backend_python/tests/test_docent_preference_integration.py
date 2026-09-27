@@ -127,6 +127,11 @@ class DocentPreferenceIntegrationTest(unittest.TestCase):
         self.assertIn("before", payload)
         self.assertIn("evidence", payload)
         self.assertIn("after", payload)
+        self.assertIn("content_policy", payload)
+        self.assertEqual(
+            payload["content_policy"]["dominant_interest"]["category"],
+            "technique",
+        )
 
     @patch("docent.services.docent_query_service.append_telemetry_log")
     def test_new_conversation_is_stored_under_returned_id(self, telemetry) -> None:

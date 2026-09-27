@@ -21,6 +21,7 @@ from conversation_core.schemas.conversation_schemas import (  # noqa: E402
 from docent.services.docent_prompt_service import (  # noqa: E402
     DOCENT_ASSISTANT_ROLE,
     DOCENT_BEHAVIOURAL_RULES,
+    DOCENT_CONTENT_GENERATION_RULES,
     DOCENT_PROMPT_PROFILE,
     docent_build_prompt,
 )
@@ -61,16 +62,24 @@ class DocentPromptProfileTest(unittest.TestCase):
         self.assertIn(DOCENT_ASSISTANT_ROLE, prompt)
         self.assertIn(CORE_BEHAVIOURAL_RULES[0], prompt)
         self.assertIn(DOCENT_BEHAVIOURAL_RULES[0], prompt)
+        self.assertIn(DOCENT_CONTENT_GENERATION_RULES[0], prompt)
         self.assertLess(
             prompt.index(CORE_BEHAVIOURAL_RULES[0]),
             prompt.index(DOCENT_BEHAVIOURAL_RULES[0]),
         )
+        self.assertIn("Behavioural policy:", prompt)
+        self.assertIn("Content-generation policy:", prompt)
         self.assertIn(
             "Response guidance:\nUse the supplied evidence.",
             prompt,
         )
         self.assertIn("Recent dialogue:", prompt)
         self.assertIn("Visitor: Tell me more.", prompt)
+
+    def test_fixed_story_and_length_rules_are_removed(self) -> None:
+        content_policy = " ".join(DOCENT_CONTENT_GENERATION_RULES)
+        self.assertNotIn("what story it tells", content_policy)
+        self.assertNotIn("two to eight", content_policy)
 
 
 if __name__ == "__main__":

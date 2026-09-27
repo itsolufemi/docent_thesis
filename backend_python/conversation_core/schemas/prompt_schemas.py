@@ -13,3 +13,11 @@ class PromptProfile(BaseModel):
     user_name: str = "User"
     assistant_role: str
     behavioural_rules: list[str] = Field(default_factory=list)
+    default_content_generation_rules: list[str] = Field(
+        default_factory=lambda: [
+            (
+                "Answer the user's current request directly using the "
+                "relevant information available to you."
+            )
+        ]
+    )

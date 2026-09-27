@@ -22,7 +22,10 @@ from conversation_core.services.prompt_service import (
     format_dialogue_history_for_prompt,
 )
 from conversation_core.services.query_service import QueryEngine
-from docent.services.docent_prompt_service import docent_build_prompt
+from docent.services.docent_prompt_service import (
+    build_docent_content_policy_debug,
+    docent_build_prompt,
+)
 from docent.schemas.preference_schemas import (
     DocentPreferenceEvidence,
     DocentPreferenceState,
@@ -427,6 +430,9 @@ class DocentPreferenceQueryService:
                 "before": before.model_dump(mode="json"),
                 "evidence": evidence.model_dump(mode="json"),
                 "after": after.model_dump(mode="json"),
+                "content_policy": build_docent_content_policy_debug(
+                    preference_snapshot
+                ),
                 "technical_depth_changed": (
                     before.technical_depth != after.technical_depth
                 ),

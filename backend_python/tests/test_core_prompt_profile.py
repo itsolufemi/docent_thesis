@@ -13,6 +13,7 @@ from conversation_core.prompts.core_prompt_profile import (
 from conversation_core.schemas.prompt_schemas import (
     PromptProfile,
 )
+from conversation_core.services.prompt_service import build_prompt
 
 
 class CorePromptProfileTest(unittest.TestCase):
@@ -57,6 +58,28 @@ class CorePromptProfileTest(unittest.TestCase):
             "shortest natural repair response possible",
             core_text,
         )
+
+    def test_content_policy_uses_profile_default_or_application_override(
+        self,
+    ) -> None:
+        profile = PromptProfile(
+            assistant_role="You are a test assistant.",
+            behavioural_rules=["Behave consistently."],
+            default_content_generation_rules=["Use the default policy."],
+        )
+        default_prompt = build_prompt("Hello", [], profile)
+        override_prompt = build_prompt(
+            "Hello",
+            [],
+            profile,
+            content_generation_rules=["Use the application policy."],
+        )
+
+        self.assertIn("Behavioural policy:", default_prompt)
+        self.assertIn("Content-generation policy:", default_prompt)
+        self.assertIn("Use the default policy.", default_prompt)
+        self.assertNotIn("Use the default policy.", override_prompt)
+        self.assertIn("Use the application policy.", override_prompt)
 
 
 if __name__ == "__main__":
