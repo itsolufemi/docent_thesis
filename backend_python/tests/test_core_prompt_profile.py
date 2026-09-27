@@ -22,7 +22,7 @@ class CorePromptProfileTest(unittest.TestCase):
             PromptProfile()
 
     def test_core_profile_is_domain_neutral(self) -> None:
-        self.assertEqual(len(CORE_CONVERSATIONAL_RULES), 8)
+        self.assertEqual(len(CORE_CONVERSATIONAL_RULES), 9)
         self.assertEqual(
             CORE_BEHAVIOURAL_RULES,
             [
@@ -56,6 +56,10 @@ class CorePromptProfileTest(unittest.TestCase):
         )
         self.assertIn(
             "shortest natural repair response possible",
+            core_text,
+        )
+        self.assertIn(
+            "around four to six short spoken sentences",
             core_text,
         )
 

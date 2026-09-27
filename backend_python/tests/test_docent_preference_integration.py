@@ -128,6 +128,11 @@ class DocentPreferenceIntegrationTest(unittest.TestCase):
         self.assertIn("evidence", payload)
         self.assertIn("after", payload)
         self.assertIn("content_policy", payload)
+        self.assertNotIn("technical_depth_changed", payload)
+        self.assertNotIn("verbosity_changed", payload)
+        for state_key in ("before", "after"):
+            self.assertEqual(set(payload[state_key]), {"interests"})
+        self.assertEqual(set(payload["evidence"]), {"interest_signals"})
         self.assertEqual(
             payload["content_policy"]["dominant_interest"]["category"],
             "technique",

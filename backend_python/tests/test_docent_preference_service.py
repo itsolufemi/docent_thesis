@@ -25,12 +25,14 @@ from docent.services.docent_preference_store import (  # noqa: E402
 
 
 class DocentPreferenceServiceTest(unittest.TestCase):
-    def test_defaults_are_uniform_and_medium(self) -> None:
+    def test_defaults_are_uniform_and_interest_only(self) -> None:
         state = DocentPreferenceState()
         self.assertEqual(set(state.interests.values()), {0.2})
         self.assertAlmostEqual(sum(state.interests.values()), 1.0)
-        self.assertEqual(state.technical_depth, "medium")
-        self.assertEqual(state.verbosity, "medium")
+        self.assertEqual(
+            state.model_dump(mode="json"),
+            {"interests": state.interests},
+        )
 
     def test_strong_technique_signal_updates_and_normalises(self) -> None:
         updated = apply_docent_preference_evidence(
@@ -82,7 +84,7 @@ class DocentPreferenceServiceTest(unittest.TestCase):
         self.assertAlmostEqual(sum(state.interests.values()), 1.0)
         self.assertTrue(all(value >= 0 for value in state.interests.values()))
 
-    def test_empty_evidence_is_unchanged_and_controls_are_independent(self) -> None:
+    def test_empty_evidence_is_unchanged(self) -> None:
         state = DocentPreferenceState()
         self.assertEqual(
             apply_docent_preference_evidence(
@@ -91,25 +93,20 @@ class DocentPreferenceServiceTest(unittest.TestCase):
             ),
             state,
         )
-        updated = apply_docent_preference_evidence(
-            state,
-            DocentPreferenceEvidence(
-                technical_depth_signal="low",
-                verbosity_signal="high",
-            ),
-        )
-        self.assertEqual(updated.interests, state.interests)
-        self.assertEqual(updated.technical_depth, "low")
-        self.assertEqual(updated.verbosity, "high")
 
     def test_store_isolates_conversations_and_returns_copies(self) -> None:
         store = DocentPreferenceStore()
         evidence = DocentPreferenceEvidence(
-            verbosity_signal="low"
+            interest_signals=[
+                DocentInterestSignal(
+                    category="technique",
+                    strength="strong",
+                )
+            ]
         )
         update_docent_preferences("a", evidence, store=store)
-        self.assertEqual(store.get("a").verbosity, "low")
-        self.assertEqual(store.get("b").verbosity, "medium")
+        self.assertGreater(store.get("a").interests["technique"], 0.2)
+        self.assertEqual(store.get("b").interests["technique"], 0.2)
 
         retrieved = store.get("a")
         retrieved.interests["technique"] = 99

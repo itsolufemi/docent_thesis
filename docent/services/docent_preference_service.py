@@ -46,21 +46,9 @@ def apply_docent_preference_evidence(
         category: value / total
         for category, value in interests.items()
     }
-    technical_depth = (
-        state.technical_depth
-        if evidence.technical_depth_signal == "unchanged"
-        else evidence.technical_depth_signal
-    )
-    verbosity = (
-        state.verbosity
-        if evidence.verbosity_signal == "unchanged"
-        else evidence.verbosity_signal
-    )
 
     return DocentPreferenceState(
         interests=normalised,
-        technical_depth=technical_depth,
-        verbosity=verbosity,
     )
 
 

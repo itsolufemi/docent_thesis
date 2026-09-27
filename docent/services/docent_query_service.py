@@ -433,10 +433,6 @@ class DocentPreferenceQueryService:
                 "content_policy": build_docent_content_policy_debug(
                     preference_snapshot
                 ),
-                "technical_depth_changed": (
-                    before.technical_depth != after.technical_depth
-                ),
-                "verbosity_changed": before.verbosity != after.verbosity,
                 "analysis": analysis_debug,
             }
             append_telemetry_log(

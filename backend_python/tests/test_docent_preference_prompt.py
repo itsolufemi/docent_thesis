@@ -15,7 +15,6 @@ from docent.services.docent_preference_service import (  # noqa: E402
     use_docent_preference_state,
 )
 from docent.services.docent_prompt_service import (  # noqa: E402
-    build_docent_content_generation_policy,
     build_docent_content_policy_debug,
     docent_build_prompt,
 )
@@ -27,8 +26,7 @@ class DocentPreferencePromptTest(unittest.TestCase):
         self.assertNotIn("Visitor preferences this session", prompt)
         self.assertIn("Content-generation policy:", prompt)
         self.assertIn("No interest currently has clear priority", prompt)
-        self.assertIn("three to six short spoken sentences", prompt)
-        self.assertIn("normal museum and art terminology", prompt)
+        self.assertIn("four to six short spoken sentences", prompt)
 
     def test_docent_grounding_uses_retrieval_without_a_knowledge_ceiling(
         self,
@@ -66,8 +64,6 @@ class DocentPreferencePromptTest(unittest.TestCase):
                 "narrative": 0.2,
                 "artist_context": 0.1,
             },
-            technical_depth="high",
-            verbosity="low",
         )
         with use_docent_preference_state(state):
             prompt = docent_build_prompt("How was it painted?", [])
@@ -78,8 +74,6 @@ class DocentPreferencePromptTest(unittest.TestCase):
             prompt,
         )
         self.assertIn("foreground that lens", prompt)
-        self.assertIn("one to three short spoken sentences", prompt)
-        self.assertIn("specialist technical and art-historical detail", prompt)
         self.assertIn("explicit current question", prompt)
         self.assertIn("relative priorities, not proportions", prompt)
         self.assertIn(
@@ -129,41 +123,6 @@ class DocentPreferencePromptTest(unittest.TestCase):
         )
         self.assertNotEqual(interpretation_prompt, technique_prompt)
 
-    def test_verbosity_levels_generate_distinct_length_policies(self) -> None:
-        low = build_docent_content_generation_policy(
-            DocentPreferenceState(verbosity="low")
-        )
-        high = build_docent_content_generation_policy(
-            DocentPreferenceState(verbosity="high")
-        )
-        self.assertIn("one to three", " ".join(low))
-        self.assertIn("six to ten", " ".join(high))
-
-    def test_technical_depth_is_independent_of_interest(self) -> None:
-        interests = {
-            "interpretation": 0.1,
-            "technique": 0.6,
-            "historical_social_context": 0.1,
-            "narrative": 0.1,
-            "artist_context": 0.1,
-        }
-        low = " ".join(build_docent_content_generation_policy(
-            DocentPreferenceState(
-                interests=interests,
-                technical_depth="low",
-            )
-        ))
-        high = " ".join(build_docent_content_generation_policy(
-            DocentPreferenceState(
-                interests=interests,
-                technical_depth="high",
-            )
-        ))
-        self.assertIn("technique and formal qualities", low)
-        self.assertIn("everyday language", low)
-        self.assertIn("technique and formal qualities", high)
-        self.assertIn("specialist technical", high)
-
     def test_policy_debug_exposes_three_stage_diagnostics(self) -> None:
         debug = build_docent_content_policy_debug(
             DocentPreferenceState(
@@ -178,8 +137,10 @@ class DocentPreferencePromptTest(unittest.TestCase):
         )
         self.assertEqual(debug["dominant_interest"]["category"], "technique")
         self.assertEqual(debug["mode"], "adaptive")
-        self.assertEqual(debug["verbosity"], "medium")
-        self.assertEqual(debug["technical_depth"], "medium")
+        self.assertEqual(
+            set(debug),
+            {"dominant_interest", "ordered_interests", "mode"},
+        )
 
     def test_observed_dialogue_progression_changes_open_ended_policy(
         self,

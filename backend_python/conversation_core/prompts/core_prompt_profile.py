@@ -82,6 +82,11 @@ CORE_CONVERSATIONAL_RULES = [
         "the conversation."
     ),
     (
+        "Keep an ordinary response to around four to six short spoken "
+        "sentences. Use fewer when a brief answer is sufficient, and more "
+        "when the user's question genuinely requires additional explanation."
+    ),
+    (
         "When the user indicates that an explanation was unclear, "
         "incomplete, mistaken, or unhelpful, identify the specific "
         "problem and change the explanation rather than repeating "

@@ -7,8 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from docent.config.preference_config import (
     DEFAULT_INTERESTS,
-    DEFAULT_TECHNICAL_DEPTH,
-    DEFAULT_VERBOSITY,
 )
 
 
@@ -19,13 +17,6 @@ DocentInterestCategory = Literal[
     "narrative",
     "artist_context",
 ]
-DocentPreferenceLevel = Literal["low", "medium", "high"]
-DocentPreferenceLevelSignal = Literal[
-    "unchanged",
-    "low",
-    "medium",
-    "high",
-]
 DocentInterestStrength = Literal["weak", "medium", "strong"]
 
 
@@ -35,10 +26,6 @@ class DocentPreferenceState(BaseModel):
     interests: dict[DocentInterestCategory, float] = Field(
         default_factory=lambda: dict(DEFAULT_INTERESTS)
     )
-    technical_depth: DocentPreferenceLevel = (
-        DEFAULT_TECHNICAL_DEPTH
-    )
-    verbosity: DocentPreferenceLevel = DEFAULT_VERBOSITY
 
     @model_validator(mode="after")
     def validate_interest_distribution(self) -> DocentPreferenceState:
@@ -78,12 +65,6 @@ class DocentPreferenceEvidence(BaseModel):
     interest_signals: list[DocentInterestSignal] = Field(
         default_factory=list
     )
-    technical_depth_signal: DocentPreferenceLevelSignal = "unchanged"
-    verbosity_signal: DocentPreferenceLevelSignal = "unchanged"
 
     def is_empty(self) -> bool:
-        return (
-            not self.interest_signals
-            and self.technical_depth_signal == "unchanged"
-            and self.verbosity_signal == "unchanged"
-        )
+        return not self.interest_signals

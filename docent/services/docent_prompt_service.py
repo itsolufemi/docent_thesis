@@ -104,40 +104,6 @@ INTEREST_LABELS = {
 }
 
 
-VERBOSITY_RULES = {
-    "low": (
-        "Keep answers concise, normally around one to three short spoken "
-        "sentences. Usually focus on the principal point or one closely "
-        "related secondary point."
-    ),
-    "medium": (
-        "Use normal conversational detail, normally around three to six "
-        "short spoken sentences. Include a small number of complementary "
-        "aspects when useful."
-    ),
-    "high": (
-        "Give a more developed explanation, normally around six to ten "
-        "spoken sentences when the subject warrants it. Several relevant "
-        "aspects may be connected."
-    ),
-}
-
-
-TECHNICAL_DEPTH_RULES = {
-    "low": (
-        "Prefer everyday language and explain specialist concepts simply."
-    ),
-    "medium": (
-        "Use normal museum and art terminology where helpful, and explain "
-        "unfamiliar terms."
-    ),
-    "high": (
-        "Use more specialist technical and art-historical detail and finer "
-        "distinctions."
-    ),
-}
-
-
 def _ranked_interests(
     state: DocentPreferenceState,
 ) -> list[tuple[str, float]]:
@@ -172,8 +138,6 @@ def build_docent_content_policy_debug(
             }
             for category, weight in ranked
         ],
-        "verbosity": state.verbosity,
-        "technical_depth": state.technical_depth,
         "mode": "adaptive" if has_clear_priority else "neutral",
     }
 
@@ -239,8 +203,6 @@ def build_docent_content_generation_policy(
                 "when relevant, explicitly requested, or useful for "
                 "broadening the conversation."
             ),
-            VERBOSITY_RULES[state.verbosity],
-            TECHNICAL_DEPTH_RULES[state.technical_depth],
             f"Current relative interest profile: {numerical_profile}.",
         ]
     )

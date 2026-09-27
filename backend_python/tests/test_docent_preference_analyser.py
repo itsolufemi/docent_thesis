@@ -40,44 +40,34 @@ class DocentPreferenceAnalyserTest(unittest.TestCase):
                         "interest_signals": [
                             {"category": category, "strength": "strong"}
                         ],
-                        "technical_depth_signal": "unchanged",
-                        "verbosity_signal": "unchanged",
                     }
                 )
                 self.assertEqual(evidence.interest_signals[0].category, category)
                 self.assertIsNone(debug["validation_error"])
 
-    def test_technique_interest_does_not_imply_technical_depth(self) -> None:
+    def test_technique_interest_is_parsed_without_secondary_signals(self) -> None:
         (evidence, _), _ = self.analyse(
             {
                 "interest_signals": [
                     {"category": "technique", "strength": "strong"}
                 ],
-                "technical_depth_signal": "unchanged",
-                "verbosity_signal": "unchanged",
             },
             "How did the artist make those brush marks?",
         )
-        self.assertEqual(evidence.technical_depth_signal, "unchanged")
-
-    def test_depth_and_verbosity_signals_are_independent(self) -> None:
-        (evidence, _), _ = self.analyse(
+        self.assertEqual(len(evidence.interest_signals), 1)
+        self.assertEqual(
+            evidence.model_dump(mode="json"),
             {
-                "interest_signals": [],
-                "technical_depth_signal": "low",
-                "verbosity_signal": "low",
+                "interest_signals": [
+                    {"category": "technique", "strength": "strong"}
+                ]
             },
-            "Can you explain more simply and briefly?",
         )
-        self.assertEqual(evidence.technical_depth_signal, "low")
-        self.assertEqual(evidence.verbosity_signal, "low")
 
     def test_context_is_present_for_contextual_follow_up(self) -> None:
         (_, _), prompt = self.analyse(
             {
                 "interest_signals": [],
-                "technical_depth_signal": "unchanged",
-                "verbosity_signal": "unchanged",
             },
             "Yes, tell me more.",
         )

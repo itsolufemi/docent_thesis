@@ -32,12 +32,6 @@ and strength: weak, medium, or strong. Use an empty list when there is no
 meaningful evidence. Do not infer technical expertise merely from interest in
 technique.
 
-technical_depth_signal must be unchanged, low, medium, or high. Change it only
-when the visitor indicates how technically or simply they want an explanation.
-
-verbosity_signal must be unchanged, low, medium, or high. Change it only when
-the visitor indicates how brief or detailed they want responses to be.
-
 Contextual acknowledgements such as "Yes, tell me more" may provide interest
 evidence when the preceding dialogue offered a specific facet. Ordinary
 backchannels provide no evidence. Existing preference weights are context,
@@ -47,9 +41,7 @@ Return this exact shape and no markdown:
 {
   "interest_signals": [
     {"category": "technique", "strength": "strong"}
-  ],
-  "technical_depth_signal": "unchanged",
-  "verbosity_signal": "unchanged"
+  ]
 }
 """.strip()
 

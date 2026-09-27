@@ -9,9 +9,6 @@ DEFAULT_INTERESTS = {
     "artist_context": 0.20,
 }
 
-DEFAULT_TECHNICAL_DEPTH = "medium"
-DEFAULT_VERBOSITY = "medium"
-
 # Experimental tuning value. A strong signal adds this amount to its
 # category before all interest weights are renormalised.
 INTEREST_UPDATE_RATE = 0.25
