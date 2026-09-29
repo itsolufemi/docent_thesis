@@ -108,6 +108,9 @@ def retrieve_docent_chunks_by_vector_similarity(
     use_hybrid_scoring: bool = True,
     apply_confidence_gate: bool = True,
     min_confidence_score: float = DEFAULT_MIN_RETRIEVAL_CONFIDENCE,
+    allowed_references: set[str] | None = None,
+    excluded_references: set[str] | None = None,
+    allowed_chunk_types: set[str] | None = None,
 ) -> VectorRetrievalResult:
     total_started_at = perf_counter()
     timings = RetrievalTimings()
@@ -151,6 +154,43 @@ def retrieve_docent_chunks_by_vector_similarity(
     indexed_chunks, chunk_embeddings = get_docent_vector_index(
         force_refresh=force_refresh,
     )
+    allowed = set(allowed_references or [])
+    excluded = set(excluded_references or [])
+    chunk_types = set(allowed_chunk_types or [])
+
+    if allowed or excluded or chunk_types:
+        indexed_chunks = [
+            indexed_chunk
+            for indexed_chunk in indexed_chunks
+            if (
+                (
+                    not allowed
+                    or (
+                        indexed_chunk.chunk.source_reference
+                        or indexed_chunk.chunk.parent_document_id
+                    ) in allowed
+                )
+                and (
+                    (
+                        indexed_chunk.chunk.source_reference
+                        or indexed_chunk.chunk.parent_document_id
+                    ) not in excluded
+                )
+                and (
+                    not chunk_types
+                    or indexed_chunk.chunk.chunk_type in chunk_types
+                )
+            )
+        ]
+        permitted_chunk_ids = {
+            indexed_chunk.chunk.chunk_id
+            for indexed_chunk in indexed_chunks
+        }
+        chunk_embeddings = [
+            chunk_embedding
+            for chunk_embedding in chunk_embeddings
+            if chunk_embedding.chunk_id in permitted_chunk_ids
+        ]
     timings.vector_index_seconds = round(
         perf_counter() - vector_index_started_at,
         4,

@@ -22,6 +22,7 @@ from docent.services.docent_prompt_service import (  # noqa: E402
     DOCENT_ASSISTANT_ROLE,
     DOCENT_BEHAVIOURAL_RULES,
     DOCENT_CONTENT_GENERATION_RULES,
+    DOCENT_DISCOVERY_POLICY_RULES,
     DOCENT_PROMPT_PROFILE,
     docent_build_prompt,
 )
@@ -69,6 +70,16 @@ class DocentPromptProfileTest(unittest.TestCase):
         )
         self.assertIn("Behavioural policy:", prompt)
         self.assertIn("Content-generation policy:", prompt)
+        self.assertIn("Discovery policy:", prompt)
+        self.assertIn(DOCENT_DISCOVERY_POLICY_RULES[0], prompt)
+        self.assertLess(
+            prompt.index("Content-generation policy:"),
+            prompt.index("Discovery policy:"),
+        )
+        self.assertLess(
+            prompt.index("Discovery policy:"),
+            prompt.index("Context:"),
+        )
         self.assertIn(
             "Response guidance:\nUse the supplied evidence.",
             prompt,
@@ -80,6 +91,25 @@ class DocentPromptProfileTest(unittest.TestCase):
         content_policy = " ".join(DOCENT_CONTENT_GENERATION_RULES)
         self.assertNotIn("what story it tells", content_policy)
         self.assertNotIn("two to eight", content_policy)
+
+    def test_discovery_policy_requires_answer_first_and_evidence_before_offer(
+        self,
+    ) -> None:
+        policy = " ".join(DOCENT_DISCOVERY_POLICY_RULES)
+        self.assertIn(
+            "Answer the visitor's explicit request before pursuing a discovery",
+            policy,
+        )
+        self.assertIn(
+            "at least one complete visitor-facing sentence",
+            policy,
+        )
+        self.assertIn("before mentioning it", policy)
+        self.assertIn("Never mention or tease", policy)
+        self.assertIn("at most one selective discovery", policy)
+        self.assertIn("do not force a discovery suggestion", policy)
+        self.assertIn("Do not run discovery on a routine first request", policy)
+        self.assertIn("ignore or decline", policy)
 
 
 if __name__ == "__main__":

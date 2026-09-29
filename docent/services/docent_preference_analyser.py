@@ -29,8 +29,7 @@ Interest categories:
 
 For each evidenced interest, add an object to interest_signals with category
 and strength: weak, medium, or strong. Use an empty list when there is no
-meaningful evidence. Do not infer technical expertise merely from interest in
-technique.
+meaningful evidence.
 
 Contextual acknowledgements such as "Yes, tell me more" may provide interest
 evidence when the preceding dialogue offered a specific facet. Ordinary

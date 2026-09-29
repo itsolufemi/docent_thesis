@@ -78,8 +78,10 @@ def build_prompt(
     profile: PromptProfile,
     context_sections: list[PromptSection] | None = None,
     content_generation_rules: list[str] | None = None,
+    additional_policy_sections: list[PromptSection] | None = None,
 ) -> str:
     context_sections = context_sections or []
+    additional_policy_sections = additional_policy_sections or []
 
     formatted_history = format_dialogue_history_for_prompt(
         dialogue_history=dialogue_history,
@@ -100,6 +102,11 @@ def build_prompt(
     content_generation_policy = "\n".join(
         f"- {rule}" for rule in selected_content_rules
     )
+    additional_policies = (
+        f"\n\n{format_prompt_sections(additional_policy_sections)}"
+        if additional_policy_sections
+        else ""
+    )
 
     return f"""
 {profile.assistant_role}
@@ -108,7 +115,7 @@ Behavioural policy:
 {behavioural_policy or "- Respond appropriately to the user."}
 
 Content-generation policy:
-{content_generation_policy or "- Answer the user's current request directly."}
+{content_generation_policy or "- Answer the user's current request directly."}{additional_policies}
 
 Context:
 {formatted_context}
