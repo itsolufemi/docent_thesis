@@ -97,7 +97,7 @@ class DiagnosticSummaryServiceTest(unittest.TestCase):
         self.assertNotIn("retrieved_chunks", summary)
         self.assertNotIn("Full retrieved artwork text.", str(summary))
 
-    def test_turn_telemetry_uses_summary_not_response_or_prompt(self) -> None:
+    def test_turn_telemetry_uses_summary_not_response_prompt_or_timings(self) -> None:
         result = QueryResult(
             request="Tell me about it.",
             response="A substantial answer.",
@@ -128,6 +128,7 @@ class DiagnosticSummaryServiceTest(unittest.TestCase):
         self.assertTrue(summary["retrieval_used"])
         self.assertNotIn("response", summary)
         self.assertNotIn("prompt", summary)
+        self.assertNotIn("timings", summary)
 
     @patch(
         "docent.services.docent_query_service.verbose_diagnostics_enabled",
