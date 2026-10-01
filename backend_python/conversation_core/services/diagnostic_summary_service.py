@@ -66,7 +66,6 @@ def build_query_result_telemetry_summary(
                 "context_source": debug.context_source,
                 "retrieval_used": debug.retrieval_used,
                 "dialogue_turns_used": debug.dialogue_turns_used,
-                "timings": debug.debug_payload.get("timings", {}),
             }
         )
 
