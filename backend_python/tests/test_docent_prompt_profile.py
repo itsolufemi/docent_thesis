@@ -92,22 +92,22 @@ class DocentPromptProfileTest(unittest.TestCase):
         self.assertNotIn("what story it tells", content_policy)
         self.assertNotIn("two to eight", content_policy)
 
-    def test_discovery_policy_requires_answer_first_and_evidence_before_offer(
+    def test_discovery_policy_supports_optional_response_conditioned_search(
         self,
     ) -> None:
         policy = " ".join(DOCENT_DISCOVERY_POLICY_RULES)
-        self.assertIn(
-            "answer the visitor's explicit request before pursuing an optional discovery",
-            policy,
-        )
-        self.assertIn(
-            "at least one complete visitor-facing answer sentence",
-            policy,
-        )
+        self.assertIn("finish the full primary answer", policy)
+        self.assertIn("scope='current_artwork'", policy)
+        self.assertIn("scope='collection'", policy)
+        self.assertIn("answer you just gave", policy)
+        self.assertIn("Do not merely search the artwork title", policy)
         self.assertIn("Never mention or tease", policy)
-        self.assertIn("at most one selective discovery", policy)
-        self.assertIn("do not force a discovery suggestion", policy)
-        self.assertIn("Do not run discovery on a routine first request", policy)
+        self.assertIn("at most one short, natural continuation", policy)
+        self.assertIn("end without further text", policy)
+        self.assertIn("do not subsequently recommend another artwork", policy)
+        self.assertIn("Never append competing suggestions", policy)
+        self.assertIn("Discovery is optional", policy)
+        self.assertIn("Do not emit a diagnostic classification", policy)
         self.assertIn("delegates the choice", policy)
         self.assertIn("select one concrete artwork", policy)
         self.assertIn("rather than offering categories", policy)

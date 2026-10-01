@@ -103,6 +103,43 @@ def _tool_execution_summary(
     }
 
 
+def _discovery_cycle_summary(
+    *,
+    arguments: dict,
+    result: dict,
+    primary_text_to_call_seconds: float | None,
+    tool_call_to_result_seconds: float,
+) -> dict[str, object]:
+    candidates = (
+        (result.get("data") or {}).get("candidates")
+        or []
+    )
+    return {
+        "discovery_called": True,
+        "query": arguments.get("query"),
+        "scope": arguments.get("scope"),
+        "candidates_returned": [
+            {
+                "reference": candidate.get("reference"),
+                "title": candidate.get("title"),
+                "semantic_score": candidate.get("semantic_score"),
+            }
+            for candidate in candidates
+        ],
+        "continuation_generated": False,
+        "timings": {
+            "primary_text_to_discovery_call_seconds": (
+                primary_text_to_call_seconds
+            ),
+            "discovery_call_to_result_seconds": round(
+                tool_call_to_result_seconds,
+                4,
+            ),
+            "discovery_result_to_continuation_seconds": None,
+        },
+    }
+
+
 def _conversation_cookie_header(
     conversation_id: str,
 ) -> tuple[bytes, bytes]:
@@ -399,6 +436,8 @@ async def process_streamed_turn_event(
         cancellation_event_sent = False
         query_timing_events: list[dict] = []
         pending_tool_calls: list[dict] = []
+        discovery_cycles: list[dict] = []
+        last_content_at: float | None = None
         query_task = asyncio.create_task(
             run_query()
         )
@@ -425,7 +464,19 @@ async def process_streamed_turn_event(
                     continue
 
                 if stream_event.event_type == "tool_call":
-                    pending_tool_calls.extend(stream_event.tool_calls)
+                    called_at = perf_counter()
+                    for tool_call in stream_event.tool_calls:
+                        pending_tool_calls.append(
+                            {
+                                "call": tool_call,
+                                "called_at": called_at,
+                                "primary_text_to_call_seconds": (
+                                    round(called_at - last_content_at, 4)
+                                    if last_content_at is not None
+                                    else None
+                                ),
+                            }
+                        )
 
                 if (
                     stream_event.event_type == "tool_result"
@@ -437,10 +488,13 @@ async def process_streamed_turn_event(
                         or str(result_payload.get("tool_name", ""))
                     )
                     arguments: dict = {}
+                    matched_call: dict | None = None
                     for index in range(len(pending_tool_calls) - 1, -1, -1):
                         pending = pending_tool_calls[index]
-                        if pending.get("name") == tool_name:
-                            arguments = dict(pending.get("arguments") or {})
+                        call = pending.get("call") or {}
+                        if call.get("name") == tool_name:
+                            matched_call = pending
+                            arguments = dict(call.get("arguments") or {})
                             pending_tool_calls.pop(index)
                             break
 
@@ -454,6 +508,38 @@ async def process_streamed_turn_event(
                             result=result_payload,
                         ),
                     )
+
+                    if (
+                        tool_name == "discover_docent_knowledge"
+                        and matched_call is not None
+                    ):
+                        result_at = perf_counter()
+                        cycle = _discovery_cycle_summary(
+                            arguments=arguments,
+                            result=result_payload,
+                            primary_text_to_call_seconds=matched_call.get(
+                                "primary_text_to_call_seconds"
+                            ),
+                            tool_call_to_result_seconds=(
+                                result_at - matched_call["called_at"]
+                            ),
+                        )
+                        cycle["_result_at"] = result_at
+                        discovery_cycles.append(cycle)
+
+                if stream_event.event_type == "content_delta":
+                    content_at = perf_counter()
+                    for cycle in reversed(discovery_cycles):
+                        if not cycle["continuation_generated"]:
+                            cycle["continuation_generated"] = True
+                            cycle["timings"][
+                                "discovery_result_to_continuation_seconds"
+                            ] = round(
+                                content_at - cycle["_result_at"],
+                                4,
+                            )
+                            break
+                    last_content_at = content_at
 
                 if (
                     stream_event.event_type
@@ -506,6 +592,15 @@ async def process_streamed_turn_event(
             if not query_task.done():
                 query_task.cancel()
 
+        for cycle in discovery_cycles:
+            cycle.pop("_result_at", None)
+            append_telemetry_log(
+                conversation_id=conversation_id,
+                request_id=request_id,
+                event_type="docent_discovery_cycle",
+                payload=cycle,
+            )
+
         if cancellation_token.is_cancelled:
             if not cancellation_event_sent:
                 await send_message(
@@ -521,6 +616,7 @@ async def process_streamed_turn_event(
                 request_id=request_id,
                 event_type="backend_turn_cancelled",
                 payload={
+                    "discovery_called": bool(discovery_cycles),
                     "turn_evaluation": _turn_evaluation_summary(
                         turn_result
                     ),
@@ -538,6 +634,7 @@ async def process_streamed_turn_event(
             request_id=request_id,
             event_type="backend_turn_complete",
             payload={
+                "discovery_called": bool(discovery_cycles),
                 "turn_evaluation": _turn_evaluation_summary(
                     turn_result
                 ),

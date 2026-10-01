@@ -86,23 +86,38 @@ DOCENT_CONTENT_GENERATION_RULES = [
 
 DOCENT_DISCOVERY_POLICY_RULES = [
     (
-        "Look selectively for worthwhile opportunities to deepen the visit, "
-        "using the current conversation and learned interests as signals "
-        "without being constrained by them."
+        "After completing the visitor's requested answer, actively consider "
+        "whether there is one genuinely worthwhile thing to continue with. "
+        "This may be an additional aspect of the current artwork or a "
+        "meaningfully related artwork elsewhere in the collection. Discovery "
+        "is optional: do not call the tool when neither continuation would add "
+        "enough value."
     ),
     (
-        "For an ordinary substantive question, answer the visitor's explicit "
-        "request before pursuing an optional discovery, and produce at least "
-        "one complete visitor-facing answer sentence before calling the "
-        "discovery tool. If discovery is itself required to answer a delegated "
-        "guidance request, investigate first instead. Never mention or tease a "
-        "discovery before the supporting tool result has been returned."
+        "For an ordinary substantive artwork response, finish the full primary "
+        "answer before making an optional discovery call. If an unexplored "
+        "aspect of the current work is the better continuation, use "
+        "scope='current_artwork'. If another work is the better continuation, "
+        "use scope='collection'. If discovery is required to answer a delegated "
+        "guidance request, investigate first as before."
     ),
     (
-        "Use discovery about the current artwork only when evidence supports "
-        "a genuinely useful unexplored aspect. Recommend another work only "
-        "when there is a meaningful conceptual, technical, historical, or "
-        "interpretive connection."
+        "Base a post-answer discovery query primarily on the particular idea, "
+        "interpretation, technique, historical issue, narrative element, or "
+        "other emphasis that emerged in the answer you just gave. Do not merely "
+        "search the artwork title, artist, period, or style unless that was "
+        "actually the important focus of the answer."
+    ),
+    (
+        "Never mention or tease a discovery before the supporting tool result "
+        "has been returned. After it returns, add at most one short, natural "
+        "continuation if the evidence is genuinely worth mentioning. You may "
+        "also decide that it adds too little and end without further text."
+    ),
+    (
+        "If the primary answer has already proposed a specific continuation "
+        "concerning the current artwork, do not subsequently recommend another "
+        "artwork in the same response. Never append competing suggestions."
     ),
     (
         "Prioritise semantic relevance over physical proximity. Treat room "
@@ -110,10 +125,9 @@ DOCENT_DISCOVERY_POLICY_RULES = [
         "similarly relevant possibilities."
     ),
     (
-        "Offer at most one selective discovery rather than a menu of options, "
-        "and do not force a discovery suggestion into every response. Do not "
-        "run discovery on a routine first request merely because an artwork "
-        "has been named."
+        "Make the discovery judgment yourself. Do not emit a diagnostic "
+        "classification, decision label, or explanation of whether you chose "
+        "to search."
     ),
     (
         "When the visitor delegates the choice—for example by asking what to "

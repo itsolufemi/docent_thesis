@@ -12,6 +12,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from conversation_core.schemas.context_schemas import QueryDebugInfo
 from conversation_core.api.routes_turn_buffer_stream import (
+    _discovery_cycle_summary,
     _tool_execution_summary,
 )
 from conversation_core.schemas.query_schemas import QueryResult
@@ -169,6 +170,45 @@ class DiagnosticSummaryServiceTest(unittest.TestCase):
         self.assertEqual(summary["arguments"]["scope"], "collection")
         self.assertEqual(summary["sources_count"], 1)
         self.assertEqual(summary["discovery"], discovery)
+
+    def test_discovery_cycle_telemetry_is_compact_and_response_aware(
+        self,
+    ) -> None:
+        summary = _discovery_cycle_summary(
+            arguments={
+                "query": "disguising violence through elegance",
+                "scope": "collection",
+            },
+            result={
+                "data": {
+                    "candidates": [
+                        {
+                            "reference": "painting:117",
+                            "title": "The Rape of Europa",
+                            "semantic_score": 0.6037,
+                            "evidence": [{"text": "Large evidence text."}],
+                        }
+                    ]
+                }
+            },
+            primary_text_to_call_seconds=0.04,
+            tool_call_to_result_seconds=0.31,
+        )
+
+        self.assertTrue(summary["discovery_called"])
+        self.assertEqual(summary["scope"], "collection")
+        self.assertFalse(summary["continuation_generated"])
+        self.assertEqual(
+            summary["candidates_returned"],
+            [
+                {
+                    "reference": "painting:117",
+                    "title": "The Rape of Europa",
+                    "semantic_score": 0.6037,
+                }
+            ],
+        )
+        self.assertNotIn("evidence", str(summary))
 
     @patch(
         "docent.services.docent_query_service.verbose_diagnostics_enabled",
