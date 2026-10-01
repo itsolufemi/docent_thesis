@@ -221,10 +221,10 @@ def append_telemetry_log(
         json.dumps(
             record,
             ensure_ascii=False,
-            separators=(",", ": "),
+            indent=2,
             default=str,
         )
-        + "\n"
+        + "\n\n"
     )
 
     _append_text(
