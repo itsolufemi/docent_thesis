@@ -19,7 +19,7 @@ from docent.services.docent_vector_retrieval_service import (
 )
 
 
-DiscoveryScope = Literal["current_artwork", "collection", "both"]
+DiscoveryScope = Literal["current_artwork", "collection"]
 
 
 def _painting_index(reference: str, metadata: dict) -> int | None:
@@ -78,67 +78,6 @@ def discover_docent_candidates(
     current_reference: str | None,
     excluded_references: set[str] | None = None,
 ) -> dict:
-    if scope == "both":
-        current_lane = discover_docent_candidates(
-            query=query,
-            scope="current_artwork",
-            current_reference=current_reference,
-        )
-        collection_lane = discover_docent_candidates(
-            query=query,
-            scope="collection",
-            current_reference=current_reference,
-            excluded_references=excluded_references,
-        )
-        current_candidates = current_lane["candidates"]
-        collection_candidates = collection_lane["candidates"]
-        current_telemetry = current_lane["telemetry"]
-        collection_telemetry = collection_lane["telemetry"]
-        telemetry = DiscoveryTelemetry(
-            query=query,
-            scope="both",
-            current_reference=current_reference,
-            excluded_references=collection_telemetry[
-                "excluded_references"
-            ],
-            allowed_chunk_types=sorted(
-                set(current_telemetry["allowed_chunk_types"])
-                | set(collection_telemetry["allowed_chunk_types"])
-            ),
-            threshold=DISCOVERY_MIN_CONFIDENCE,
-            retrieval_limit=DISCOVERY_RETRIEVAL_LIMIT,
-            retrieval_performed=bool(
-                current_lane["retrieval_performed"]
-                or collection_lane["retrieval_performed"]
-            ),
-            raw_candidate_count=(
-                current_telemetry["raw_candidate_count"]
-                + collection_telemetry["raw_candidate_count"]
-            ),
-            lanes={
-                "current_artwork": current_telemetry,
-                "collection": collection_telemetry,
-            },
-            candidates_prepared={
-                "current_artwork": len(current_candidates),
-                "collection": len(collection_candidates),
-            },
-        )
-        return {
-            "query": query,
-            "scope": scope,
-            "current_reference": current_reference,
-            "candidates": [],
-            "current_artwork_candidates": current_candidates,
-            "collection_candidates": collection_candidates,
-            "retrieval_performed": telemetry.retrieval_performed,
-            "retrieval_timings": {
-                "current_artwork": current_lane["retrieval_timings"],
-                "collection": collection_lane["retrieval_timings"],
-            },
-            "telemetry": telemetry.model_dump(mode="json"),
-        }
-
     allowed_references = (
         {current_reference}
         if scope == "current_artwork" and current_reference
@@ -171,8 +110,6 @@ def discover_docent_candidates(
             "scope": scope,
             "current_reference": None,
             "candidates": [],
-            "current_artwork_candidates": [],
-            "collection_candidates": [],
             "retrieval_performed": False,
             "retrieval_timings": None,
             "telemetry": telemetry.model_dump(mode="json"),
@@ -316,12 +253,6 @@ def discover_docent_candidates(
         "scope": scope,
         "current_reference": current_reference,
         "candidates": model_candidates,
-        "current_artwork_candidates": (
-            model_candidates if scope == "current_artwork" else []
-        ),
-        "collection_candidates": (
-            model_candidates if scope == "collection" else []
-        ),
         "retrieval_performed": True,
         "retrieval_timings": retrieval.timings.model_dump(mode="json"),
         "telemetry": telemetry.model_dump(mode="json"),

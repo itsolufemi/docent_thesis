@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -17,7 +16,7 @@ class DiscoveryRankedCandidate(BaseModel):
 
 class DiscoveryTelemetry(BaseModel):
     query: str
-    scope: Literal["current_artwork", "collection", "both"]
+    scope: Literal["current_artwork", "collection"]
     current_reference: str | None = None
     excluded_references: list[str] = Field(default_factory=list)
     allowed_chunk_types: list[str] = Field(default_factory=list)
@@ -32,30 +31,3 @@ class DiscoveryTelemetry(BaseModel):
         default_factory=list
     )
     retrieval_timings: dict | None = None
-    lanes: dict[str, dict[str, Any]] = Field(default_factory=dict)
-    discovery_trigger_phase: Literal["post_response", "reactive"] | None = None
-    prepared_reused: bool = False
-    request_id: str | None = None
-    candidates_prepared: dict[str, int] = Field(default_factory=dict)
-
-
-class PreparedDiscoveryState(BaseModel):
-    conversation_id: str
-    query: str
-    source_response_text: str = ""
-    current_reference: str | None = None
-    current_artwork_candidates: list[dict[str, Any]] = Field(
-        default_factory=list
-    )
-    collection_candidates: list[dict[str, Any]] = Field(
-        default_factory=list
-    )
-    surfaced_reference: str | None = None
-    discovery_trigger_phase: Literal["post_response", "reactive"] = (
-        "reactive"
-    )
-    prepared_reused: bool = False
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-    request_id: str | None = None

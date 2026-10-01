@@ -328,7 +328,6 @@ def stream_tool_aware_llm_response(
     prompt: str,
     conversation_id: str,
     *,
-    request_id: str | None = None,
     buffer_for_tool_decision: bool,
     cancellation_token: CancellationToken | None = None,
     max_tool_rounds: int = 5,
@@ -346,10 +345,10 @@ def stream_tool_aware_llm_response(
     tools = build_ollama_tool_definitions(
         active_tool_registry
     )
+    execution_context = ToolExecutionContext(
+        conversation_id=conversation_id
+    )
     tool_has_executed = False
-    emitted_response_parts: list[str] = []
-    last_content_emitted_at: float | None = None
-    last_tool_result_at: float | None = None
 
     if (
         cancellation_token is not None
@@ -429,17 +428,12 @@ def stream_tool_aware_llm_response(
                     response_message.get("content")
                     or ""
                 )
-                first_content_after_tool = False
 
                 if (
                     content_delta
                     and not first_content_chunk_received
                 ):
                     first_content_chunk_received = True
-                    first_content_after_tool = (
-                        last_tool_result_at is not None
-                        and bool(emitted_response_parts)
-                    )
                     yield LLMStreamEvent(
                         event_type="timing",
                         timing_name=(
@@ -453,20 +447,6 @@ def stream_tool_aware_llm_response(
                             "round": round_number,
                         },
                     )
-                    if last_tool_result_at is not None:
-                        yield LLMStreamEvent(
-                            event_type="timing",
-                            timing_name=(
-                                "tool_result_to_first_content_seconds"
-                            ),
-                            timing_seconds=round(
-                                perf_counter() - last_tool_result_at,
-                                4,
-                            ),
-                            timing_payload={
-                                "round": round_number,
-                            },
-                        )
                 raw_tool_calls = (
                     response_message.get(
                         "tool_calls"
@@ -480,16 +460,9 @@ def stream_tool_aware_llm_response(
                     )
 
                     if not buffer_current_round:
-                        emitted_delta = (
-                            f"\n\n{content_delta}"
-                            if first_content_after_tool
-                            else content_delta
-                        )
-                        emitted_response_parts.append(emitted_delta)
-                        last_content_emitted_at = perf_counter()
                         yield LLMStreamEvent(
                             event_type="content_delta",
-                            text=emitted_delta,
+                            text=content_delta,
                         )
 
                 if raw_tool_calls:
@@ -557,22 +530,6 @@ def stream_tool_aware_llm_response(
                         )
                         return
 
-                    if last_content_emitted_at is not None:
-                        yield LLMStreamEvent(
-                            event_type="timing",
-                            timing_name=(
-                                "last_content_to_tool_call_seconds"
-                            ),
-                            timing_seconds=round(
-                                perf_counter() - last_content_emitted_at,
-                                4,
-                            ),
-                            timing_payload={
-                                "round": round_number,
-                                "tool_name": tool_call.name,
-                            },
-                        )
-
                     yield LLMStreamEvent(
                         event_type="tool_call",
                         tool_calls=[
@@ -582,21 +539,11 @@ def stream_tool_aware_llm_response(
                         ],
                     )
 
-                    tool_execution_started_at = perf_counter()
                     execution_result = (
                         active_tool_registry.execute(
                             tool_call=tool_call,
-                            context=ToolExecutionContext(
-                                conversation_id=conversation_id,
-                                request_id=request_id,
-                                visitor_facing_text=(
-                                    "".join(emitted_response_parts).strip()
-                                ),
-                            ),
+                            context=execution_context,
                         )
-                    )
-                    tool_execution_seconds = (
-                        perf_counter() - tool_execution_started_at
                     )
 
                     if (
@@ -637,19 +584,6 @@ def stream_tool_aware_llm_response(
                         tool_name=tool_call.name,
                         tool_result=result_payload,
                     )
-                    yield LLMStreamEvent(
-                        event_type="timing",
-                        timing_name="tool_execution_seconds",
-                        timing_seconds=round(
-                            tool_execution_seconds,
-                            4,
-                        ),
-                        timing_payload={
-                            "round": round_number,
-                            "tool_name": tool_call.name,
-                        },
-                    )
-                    last_tool_result_at = perf_counter()
 
                 tool_has_executed = True
                 continue
@@ -658,8 +592,6 @@ def stream_tool_aware_llm_response(
                 complete_round_content
                 and buffer_current_round
             ):
-                emitted_response_parts.append(complete_round_content)
-                last_content_emitted_at = perf_counter()
                 yield LLMStreamEvent(
                     event_type="content_delta",
                     text=complete_round_content,
@@ -667,7 +599,7 @@ def stream_tool_aware_llm_response(
 
             yield LLMStreamEvent(
                 event_type="response_complete",
-                text="".join(emitted_response_parts).strip(),
+                text=complete_round_content,
                 done=True,
             )
             return
@@ -692,10 +624,9 @@ def stream_tool_aware_llm_response(
             event_type="content_delta",
             text=limit_message,
         )
-        emitted_response_parts.append(limit_message)
         yield LLMStreamEvent(
             event_type="response_complete",
-            text="".join(emitted_response_parts).strip(),
+            text=limit_message,
             done=True,
         )
     except httpx.ConnectError:
@@ -724,10 +655,9 @@ def stream_tool_aware_llm_response(
         event_type="content_delta",
         text=error_message,
     )
-    emitted_response_parts.append(error_message)
     yield LLMStreamEvent(
         event_type="response_complete",
-        text="".join(emitted_response_parts).strip(),
+        text=error_message,
         done=True,
     )
 
