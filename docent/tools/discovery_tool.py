@@ -111,6 +111,11 @@ def discover_docent_knowledge(
                 "room_name": candidate["room_name"],
                 "room_distance": candidate["room_distance"],
                 "discovery_scope": validated.scope,
+                "chunk_ids": [
+                    evidence["chunk_id"]
+                    for evidence in candidate["evidence"]
+                    if evidence.get("chunk_id")
+                ],
             },
         )
         for candidate in candidates

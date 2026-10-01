@@ -124,17 +124,15 @@ class DocentPreferenceIntegrationTest(unittest.TestCase):
         )
         self.assertEqual(telemetry.call_count, 2)
         payload = telemetry.call_args.kwargs["payload"]
-        self.assertIn("before", payload)
-        self.assertIn("evidence", payload)
-        self.assertIn("after", payload)
-        self.assertIn("content_policy", payload)
+        self.assertIn("before_interests", payload)
+        self.assertIn("interest_signals", payload)
+        self.assertIn("after_interests", payload)
+        self.assertIn("content_policy_mode", payload)
+        self.assertNotIn("analysis", payload)
         self.assertNotIn("technical_depth_changed", payload)
         self.assertNotIn("verbosity_changed", payload)
-        for state_key in ("before", "after"):
-            self.assertEqual(set(payload[state_key]), {"interests"})
-        self.assertEqual(set(payload["evidence"]), {"interest_signals"})
         self.assertEqual(
-            payload["content_policy"]["dominant_interest"]["category"],
+            payload["dominant_interest"]["category"],
             "technique",
         )
 

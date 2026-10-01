@@ -17,6 +17,9 @@ from conversation_core.services.cancellation import CancellationToken
 from conversation_core.services.conversation_log_service import (
     append_telemetry_log,
 )
+from conversation_core.services.diagnostic_summary_service import (
+    verbose_diagnostics_enabled,
+)
 from conversation_core.services.llm_service import generate_llm_response
 from conversation_core.services.prompt_service import (
     format_dialogue_history_for_prompt,
@@ -32,6 +35,10 @@ from docent.schemas.preference_schemas import (
 )
 from docent.services.docent_preference_analyser import (
     analyse_docent_preferences,
+)
+from docent.services.docent_diagnostic_service import (
+    build_preference_telemetry_summary,
+    build_retrieval_debug_summary,
 )
 from docent.services.docent_preference_service import (
     update_docent_preferences,
@@ -216,13 +223,17 @@ JSON:
 
     debug = {
         "context_resolution": assessment.model_dump(mode="json"),
-        "context_resolution_raw": raw_response,
-        "context_resolution_validation_error": validation_error,
         "context_resolution_model_seconds": round(
             perf_counter() - started_at,
             4,
         ),
     }
+    if validation_error is not None:
+        debug["context_resolution_raw"] = raw_response
+        debug["context_resolution_validation_error"] = validation_error
+
+    if validation_error is None and verbose_diagnostics_enabled():
+        debug["context_resolution_raw"] = raw_response
 
     return assessment, debug
 
@@ -320,8 +331,11 @@ def docent_resolve_context(
         },
         debug_payload={
             **resolution_debug,
-            "subject_retrievals": subject_retrievals,
-            "retrieved_chunk_count": len(retrieved_chunks),
+            "retrieval": build_retrieval_debug_summary(
+                subjects=assessment.subjects,
+                retrieved_chunks=retrieved_chunks,
+                subject_retrievals=subject_retrievals,
+            ),
         },
     )
 
@@ -426,15 +440,16 @@ class DocentPreferenceQueryService:
                 evidence,
                 store=self.preference_store,
             )
-            payload = {
-                "before": before.model_dump(mode="json"),
-                "evidence": evidence.model_dump(mode="json"),
-                "after": after.model_dump(mode="json"),
-                "content_policy": build_docent_content_policy_debug(
-                    preference_snapshot
-                ),
-                "analysis": analysis_debug,
-            }
+            content_policy = build_docent_content_policy_debug(
+                preference_snapshot
+            )
+            payload = build_preference_telemetry_summary(
+                before=before,
+                evidence=evidence,
+                after=after,
+                content_policy=content_policy,
+                analysis=analysis_debug,
+            )
             append_telemetry_log(
                 conversation_id=conversation_id,
                 request_id=request_id,

@@ -121,7 +121,11 @@ def retrieve_docent_knowledge(
             url=item.chunk.url,
             score=item.score,
             snippet=item.chunk.text,
-            metadata=item.chunk.metadata,
+            metadata={
+                **item.chunk.metadata,
+                "chunk_id": item.chunk.chunk_id,
+                "chunk_type": item.chunk.chunk_type,
+            },
         )
         for item in selected_results
     ]

@@ -20,6 +20,7 @@ from conversation_core.memory.conversation_store import (
 )
 from conversation_core.schemas.turn_buffer_schemas import (
     TurnBufferEvent,
+    TurnBufferResult,
 )
 from conversation_core.schemas.llm_stream_schemas import (
     LLMStreamEvent,
@@ -41,12 +42,48 @@ from conversation_core.services.turn_buffer_service import (
 from conversation_core.services.conversation_log_service import (
     append_telemetry_log,
 )
+from conversation_core.services.diagnostic_summary_service import (
+    build_query_result_telemetry_summary,
+)
 
 
 UtteranceClassifier = Callable[
     [str, bool],
     UtteranceRoute,
 ]
+
+
+def _turn_evaluation_summary(
+    result: TurnBufferResult,
+) -> dict[str, object]:
+    return {
+        "decision": result.decision,
+        "should_finalise_turn": result.should_finalise_turn,
+        "reason": result.reason,
+        "silence_duration_ms": result.state.silence_duration_ms,
+        "last_trp_probability": result.state.last_trp_probability,
+        "is_speech_active": result.state.is_speech_active,
+    }
+
+
+def _utterance_route_summary(
+    route: UtteranceRoute | None,
+) -> dict[str, object] | None:
+    if route is None:
+        return None
+
+    return {
+        "route_type": route.route_type,
+        "floor_intent": route.floor_intent,
+        "requires_retrieval": route.requires_retrieval,
+        "proposed_action": route.proposed_action,
+        "candidate_subjects": route.candidate_subjects,
+        "is_relevant": route.is_relevant,
+        "should_ignore": route.should_ignore,
+        "confidence": route.confidence,
+        "reason": route.reason,
+        "routing_seconds": route.routing_seconds,
+    }
 
 
 def _conversation_cookie_header(
@@ -430,22 +467,13 @@ async def process_streamed_turn_event(
                 request_id=request_id,
                 event_type="backend_turn_cancelled",
                 payload={
-                    "utterance": finalised_utterance,
-                    "turn_evaluation": (
-                        turn_result.model_dump(
-                            mode="json"
-                        )
+                    "turn_evaluation": _turn_evaluation_summary(
+                        turn_result
                     ),
-                    "utterance_route": (
-                        utterance_route.model_dump(
-                            mode="json"
-                        )
-                        if utterance_route is not None
-                        else None
+                    "utterance_route": _utterance_route_summary(
+                        utterance_route
                     ),
-                    "stream_timings": (
-                        query_timing_events
-                    ),
+                    "stream_timings": query_timing_events,
                 },
             )
 
@@ -456,26 +484,15 @@ async def process_streamed_turn_event(
             request_id=request_id,
             event_type="backend_turn_complete",
             payload={
-                "utterance": finalised_utterance,
-                "turn_evaluation": (
-                    turn_result.model_dump(
-                        mode="json"
-                    )
+                "turn_evaluation": _turn_evaluation_summary(
+                    turn_result
                 ),
-                "utterance_route": (
-                    utterance_route.model_dump(
-                        mode="json"
-                    )
-                    if utterance_route is not None
-                    else None
+                "utterance_route": _utterance_route_summary(
+                    utterance_route
                 ),
-                "stream_timings": (
-                    query_timing_events
-                ),
-                "query_result": (
-                    query_result.model_dump(
-                        mode="json"
-                    )
+                "stream_timings": query_timing_events,
+                "query_result": build_query_result_telemetry_summary(
+                    query_result
                 ),
             },
         )

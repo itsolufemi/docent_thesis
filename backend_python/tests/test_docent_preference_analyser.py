@@ -43,7 +43,8 @@ class DocentPreferenceAnalyserTest(unittest.TestCase):
                     }
                 )
                 self.assertEqual(evidence.interest_signals[0].category, category)
-                self.assertIsNone(debug["validation_error"])
+                self.assertNotIn("validation_error", debug)
+                self.assertNotIn("raw_response", debug)
 
     def test_technique_interest_is_parsed_without_secondary_signals(self) -> None:
         (evidence, _), _ = self.analyse(

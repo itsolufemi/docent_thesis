@@ -209,6 +209,11 @@ class Settings():
         True
     )
 
+    diagnostic_detail: str = os.getenv(
+        "DIAGNOSTIC_DETAIL",
+        "compact",
+    ).strip().lower()
+
     conversation_log_directory: Path = (
         backend_root
         / os.getenv(

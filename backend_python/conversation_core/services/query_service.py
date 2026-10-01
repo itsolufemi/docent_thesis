@@ -30,6 +30,10 @@ from conversation_core.services.cancellation import CancellationToken
 from conversation_core.services.direct_routing_stream_service import (
     stream_direct_routed_response,
 )
+from conversation_core.services.diagnostic_summary_service import (
+    compact_sources,
+    diagnostic_prompt,
+)
 from conversation_core.services.introduction_service import IntroductionProvider
 from conversation_core.services.llm_service import generate_llm_response
 from conversation_core.services.plain_llm_stream_service import (
@@ -490,13 +494,13 @@ class QueryEngine:
                     or resolved_context.prompt_payload
                 ),
                 dialogue_turns_used=len(response_dialogue_history),
-                prompt=prompt,
+                prompt=diagnostic_prompt(prompt),
                 retrieval_used=(
                     resolved_context.context_source
                     not in NON_RETRIEVAL_CONTEXT_SOURCES
                 ),
                 sources_count=len(resolved_context.sources),
-                sources=resolved_context.sources,
+                sources=compact_sources(resolved_context.sources),
                 debug_payload=debug_payload,
             )
 
@@ -947,10 +951,10 @@ class QueryEngine:
                     or resolved_context.prompt_payload
                 ),
                 dialogue_turns_used=len(response_dialogue_history),
-                prompt=prompt,
+                prompt=diagnostic_prompt(prompt),
                 retrieval_used=debug_retrieval_used,
                 sources_count=len(active_sources),
-                sources=active_sources,
+                sources=compact_sources(active_sources),
                 debug_payload=debug_payload,
             )
 

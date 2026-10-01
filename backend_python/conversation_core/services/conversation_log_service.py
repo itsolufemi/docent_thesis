@@ -102,23 +102,38 @@ def _dialogue_turn_entry(
         else "User"
     )
 
-    return "\n".join(
+    lines = [
+        "",
+        "========================================",
+        (
+            f"{turn.created_at.isoformat()} | "
+            f"{turn.request_id or 'no request ID'}"
+        ),
+        "",
+        f"{user_label}:",
+        turn.user or "None",
+    ]
+
+    if turn.subject:
+        subject_label = "Subject" if len(turn.subject) == 1 else "Subjects"
+        lines.extend(
+            [
+                "",
+                f"{subject_label}: {', '.join(turn.subject)}",
+            ]
+        )
+
+    lines.extend(
         [
             "",
-            "========================================",
-            f"Timestamp: {turn.created_at.isoformat()}",
-            f"Request ID: {turn.request_id or 'None'}",
-            f"Previous subjects: {turn.previous_subject}",
-            f"Subjects: {turn.subject}",
-            f"References: {turn.reference}",
-            f"{user_label}:",
-            turn.user or "None",
             "Assistant:",
             turn.assistant or "None",
             "========================================",
             "",
         ]
     )
+
+    return "\n".join(lines)
 
 
 def append_dialogue_turn_log(
@@ -206,10 +221,10 @@ def append_telemetry_log(
         json.dumps(
             record,
             ensure_ascii=False,
-            indent=2,
+            separators=(",", ": "),
             default=str,
         )
-        + "\n\n"
+        + "\n"
     )
 
     _append_text(

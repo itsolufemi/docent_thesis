@@ -5,6 +5,9 @@ import json
 from time import perf_counter
 
 from conversation_core.schemas.conversation_schemas import DialogueTurn
+from conversation_core.services.diagnostic_summary_service import (
+    verbose_diagnostics_enabled,
+)
 from conversation_core.services.llm_service import generate_llm_response
 from conversation_core.services.prompt_service import (
     format_dialogue_history_for_prompt,
@@ -122,11 +125,16 @@ def analyse_docent_preferences(
         validation_error = str(error)
         evidence = DocentPreferenceEvidence()
 
-    return evidence, {
+    debug = {
         "analysis_seconds": round(
             perf_counter() - started_at,
             4,
         ),
-        "raw_response": raw_response,
-        "validation_error": validation_error,
     }
+    if validation_error is not None:
+        debug["raw_response"] = raw_response
+        debug["validation_error"] = validation_error
+    elif verbose_diagnostics_enabled():
+        debug["raw_response"] = raw_response
+
+    return evidence, debug

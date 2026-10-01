@@ -208,9 +208,11 @@ class AssistantPlaybackInterruptionTest(unittest.TestCase):
 
         content = self._dialogue_text(state.conversation_id)
         self.assertIn(
-            "Timestamp: 2020-01-02T03:04:05+00:00",
+            "2020-01-02T03:04:05+00:00 | request-a",
             content,
         )
+        self.assertNotIn("Previous subjects:", content)
+        self.assertNotIn("References:", content)
 
     def test_websocket_interruption_action_updates_existing_turn(self) -> None:
         state = create_conversation()
