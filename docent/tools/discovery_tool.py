@@ -87,6 +87,12 @@ def discover_docent_knowledge(
             else None
         ),
     )
+    discovery_telemetry = dict(discovery.get("telemetry") or {})
+    model_discovery = {
+        key: value
+        for key, value in discovery.items()
+        if key != "telemetry"
+    }
     candidates = discovery["candidates"]
     sources = [
         QuerySource(
@@ -131,9 +137,10 @@ def discover_docent_knowledge(
             else "No sufficiently strong discovery evidence was found."
         ),
         retrieval_used=retrieval_performed,
-        data=discovery,
+        data=model_discovery,
         dialogue_state=None,
         sources=sources,
+        telemetry=discovery_telemetry,
     )
 
 

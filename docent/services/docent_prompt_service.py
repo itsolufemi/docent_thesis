@@ -91,12 +91,12 @@ DOCENT_DISCOVERY_POLICY_RULES = [
         "without being constrained by them."
     ),
     (
-        "Answer the visitor's explicit request before pursuing a discovery. "
-        "Do not call the discovery tool before producing at least one complete "
-        "visitor-facing sentence that directly answers the request. If a "
-        "possible discovery then requires additional evidence, investigate it "
-        "with the appropriate tool before mentioning it. Never mention or "
-        "tease a discovery before the supporting tool result has been returned."
+        "For an ordinary substantive question, answer the visitor's explicit "
+        "request before pursuing an optional discovery, and produce at least "
+        "one complete visitor-facing answer sentence before calling the "
+        "discovery tool. If discovery is itself required to answer a delegated "
+        "guidance request, investigate first instead. Never mention or tease a "
+        "discovery before the supporting tool result has been returned."
     ),
     (
         "Use discovery about the current artwork only when evidence supports "
@@ -114,6 +114,14 @@ DOCENT_DISCOVERY_POLICY_RULES = [
         "and do not force a discovery suggestion into every response. Do not "
         "run discovery on a routine first request merely because an artwork "
         "has been named."
+    ),
+    (
+        "When the visitor delegates the choice—for example by asking what to "
+        "see next, asking you to choose, accepting any option, or naming only "
+        "a broad style, period, or theme—actively use collection discovery and "
+        "select one concrete artwork when adequate evidence exists. State that "
+        "single choice decisively rather than offering categories, presenting "
+        "a menu, or asking the visitor to choose for you."
     ),
     (
         "If the visitor follows a suggestion, support that direction. If they "

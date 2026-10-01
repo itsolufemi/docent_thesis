@@ -173,7 +173,8 @@ class DocentDiscoveryServiceTest(unittest.TestCase):
         kwargs = retrieve.call_args.kwargs
         self.assertFalse(kwargs["use_hybrid_scoring"])
         self.assertFalse(kwargs["expand_parent_documents"])
-        self.assertEqual(kwargs["min_confidence_score"], 0.58)
+        self.assertEqual(kwargs["min_confidence_score"], 0.49)
+        self.assertFalse(kwargs["apply_confidence_gate"])
         self.assertEqual(
             kwargs["allowed_chunk_types"],
             {"description"},
@@ -188,6 +189,26 @@ class DocentDiscoveryServiceTest(unittest.TestCase):
         )
         self.assertEqual(len(result["candidates"][1]["evidence"]), 2)
         self.assertEqual(result["candidates"][0]["room_distance"], 1)
+        telemetry = result["telemetry"]
+        self.assertEqual(telemetry["threshold"], 0.49)
+        self.assertEqual(
+            [
+                candidate["reference"]
+                for candidate in telemetry["raw_candidates"]
+            ],
+            ["painting:1", "painting:2"],
+        )
+        self.assertEqual(
+            [candidate["rank"] for candidate in telemetry["raw_candidates"]],
+            [1, 2],
+        )
+        self.assertEqual(
+            [
+                candidate["selected_rank"]
+                for candidate in telemetry["raw_candidates"]
+            ],
+            [2, 1],
+        )
 
     @patch(
         "docent.services.docent_discovery_service."
@@ -262,6 +283,12 @@ class DocentDiscoveryToolTest(unittest.TestCase):
             "current_reference": "painting:2",
             "retrieval_performed": True,
             "retrieval_timings": {"total_seconds": 0.01},
+            "telemetry": {
+                "query": "loose brushwork",
+                "scope": "collection",
+                "threshold": 0.49,
+                "raw_candidates": [],
+            },
             "candidates": [
                 {
                     "painting_index": 3,
@@ -308,6 +335,8 @@ class DocentDiscoveryToolTest(unittest.TestCase):
         self.assertEqual(result.sources[0].reference, "painting:3")
         self.assertNotIn("sources", result.model_payload())
         self.assertNotIn("dialogue_state", result.model_payload())
+        self.assertNotIn("telemetry", result.model_payload())
+        self.assertEqual(result.telemetry["threshold"], 0.49)
 
     def test_tool_is_registered_with_semantic_scopes(self) -> None:
         definition = next(

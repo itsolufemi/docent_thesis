@@ -124,16 +124,24 @@ class DocentPreferenceIntegrationTest(unittest.TestCase):
         )
         self.assertEqual(telemetry.call_count, 2)
         payload = telemetry.call_args.kwargs["payload"]
-        self.assertIn("before_interests", payload)
-        self.assertIn("interest_signals", payload)
-        self.assertIn("after_interests", payload)
-        self.assertIn("content_policy_mode", payload)
+        self.assertIn("preference_state_used", payload)
+        self.assertIn("evidence", payload)
+        self.assertIn("next_preference_state", payload)
+        self.assertIn("policy_used", payload)
         self.assertNotIn("analysis", payload)
         self.assertNotIn("technical_depth_changed", payload)
         self.assertNotIn("verbosity_changed", payload)
         self.assertEqual(
-            payload["dominant_interest"]["category"],
+            payload["policy_used"]["dominant_interest"]["category"],
             "technique",
+        )
+        self.assertEqual(
+            payload["preference_state_used"]["interests"]["technique"],
+            0.36,
+        )
+        self.assertLess(
+            payload["next_preference_state"]["interests"]["technique"],
+            0.36,
         )
 
     @patch("docent.services.docent_query_service.append_telemetry_log")

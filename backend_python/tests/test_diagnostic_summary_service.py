@@ -11,6 +11,9 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from conversation_core.schemas.context_schemas import QueryDebugInfo
+from conversation_core.api.routes_turn_buffer_stream import (
+    _tool_execution_summary,
+)
 from conversation_core.schemas.query_schemas import QueryResult
 from conversation_core.schemas.source_schemas import QuerySource
 from conversation_core.services.diagnostic_summary_service import (
@@ -129,6 +132,43 @@ class DiagnosticSummaryServiceTest(unittest.TestCase):
         self.assertNotIn("response", summary)
         self.assertNotIn("prompt", summary)
         self.assertNotIn("timings", summary)
+
+    def test_tool_telemetry_keeps_exact_call_and_discovery_ranking(self) -> None:
+        discovery = {
+            "query": "Rococo mythology",
+            "scope": "collection",
+            "threshold": 0.49,
+            "excluded_references": ["painting:118"],
+            "raw_candidates": [
+                {
+                    "rank": 1,
+                    "reference": "painting:117",
+                    "title": "the rape of europa",
+                    "semantic_score": 0.6037,
+                    "passed_threshold": True,
+                    "selected_rank": 1,
+                }
+            ],
+        }
+        summary = _tool_execution_summary(
+            tool_name="discover_docent_knowledge",
+            arguments={
+                "query": "Rococo mythology",
+                "scope": "collection",
+            },
+            result={
+                "success": True,
+                "message": "Found evidence.",
+                "retrieval_used": True,
+                "sources": [{}],
+                "telemetry": discovery,
+            },
+        )
+
+        self.assertEqual(summary["tool_name"], "discover_docent_knowledge")
+        self.assertEqual(summary["arguments"]["scope"], "collection")
+        self.assertEqual(summary["sources_count"], 1)
+        self.assertEqual(summary["discovery"], discovery)
 
     @patch(
         "docent.services.docent_query_service.verbose_diagnostics_enabled",

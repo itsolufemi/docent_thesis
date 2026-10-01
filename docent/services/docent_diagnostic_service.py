@@ -59,16 +59,25 @@ def build_preference_telemetry_summary(
     content_policy: dict,
     analysis: dict,
 ) -> dict[str, object]:
+    policy_used: dict[str, object] = {
+        "mode": content_policy.get("mode"),
+        "dominant_interest": content_policy.get("dominant_interest"),
+    }
     summary: dict[str, object] = {
         "analysis_seconds": analysis.get("analysis_seconds"),
-        "interest_signals": [
-            signal.model_dump(mode="json")
-            for signal in evidence.interest_signals
-        ],
-        "before_interests": dict(before.interests),
-        "after_interests": dict(after.interests),
-        "content_policy_mode": content_policy.get("mode"),
-        "dominant_interest": content_policy.get("dominant_interest"),
+        "preference_state_used": {
+            "interests": dict(before.interests),
+        },
+        "evidence": {
+            "interest_signals": [
+                signal.model_dump(mode="json")
+                for signal in evidence.interest_signals
+            ],
+        },
+        "next_preference_state": {
+            "interests": dict(after.interests),
+        },
+        "policy_used": policy_used,
     }
 
     if analysis.get("validation_error"):
@@ -76,6 +85,6 @@ def build_preference_telemetry_summary(
         summary["raw_response"] = analysis.get("raw_response")
     elif verbose_diagnostics_enabled():
         summary["analysis"] = analysis
-        summary["content_policy"] = content_policy
+        policy_used["full_policy_debug"] = content_policy
 
     return summary

@@ -9,6 +9,10 @@ from docent.config.discovery_config import (
     DISCOVERY_PROXIMITY_SCORE_BAND,
     DISCOVERY_RETRIEVAL_LIMIT,
 )
+from docent.schemas.discovery_schemas import (
+    DiscoveryRankedCandidate,
+    DiscoveryTelemetry,
+)
 from docent.services.artwork_service import get_painting_by_index
 from docent.services.docent_vector_retrieval_service import (
     retrieve_docent_chunks_by_vector_similarity,
@@ -80,11 +84,27 @@ def discover_docent_candidates(
         else None
     )
     exclusions = set(excluded_references or [])
+    allowed_chunk_types = (
+        {"description", "provenance"}
+        if scope == "current_artwork"
+        else {"description"}
+    )
 
     if scope == "collection" and current_reference:
         exclusions.add(current_reference)
 
     if scope == "current_artwork" and not current_reference:
+        telemetry = DiscoveryTelemetry(
+            query=query,
+            scope=scope,
+            current_reference=None,
+            excluded_references=[],
+            allowed_chunk_types=sorted(allowed_chunk_types),
+            threshold=DISCOVERY_MIN_CONFIDENCE,
+            retrieval_limit=DISCOVERY_RETRIEVAL_LIMIT,
+            retrieval_performed=False,
+            raw_candidate_count=0,
+        )
         return {
             "query": query,
             "scope": scope,
@@ -92,6 +112,7 @@ def discover_docent_candidates(
             "candidates": [],
             "retrieval_performed": False,
             "retrieval_timings": None,
+            "telemetry": telemetry.model_dump(mode="json"),
         }
 
     retrieval = retrieve_docent_chunks_by_vector_similarity(
@@ -99,17 +120,13 @@ def discover_docent_candidates(
         limit=DISCOVERY_RETRIEVAL_LIMIT,
         expand_parent_documents=False,
         use_hybrid_scoring=False,
-        apply_confidence_gate=True,
+        apply_confidence_gate=False,
         min_confidence_score=DISCOVERY_MIN_CONFIDENCE,
         allowed_references=allowed_references,
         excluded_references=(
             exclusions if scope == "collection" else None
         ),
-        allowed_chunk_types=(
-            {"description", "provenance"}
-            if scope == "current_artwork"
-            else {"description"}
-        ),
+        allowed_chunk_types=allowed_chunk_types,
     )
 
     current_artwork = None
@@ -127,7 +144,7 @@ def discover_docent_candidates(
         if reference:
             grouped.setdefault(reference, []).append(retrieved)
 
-    candidates: list[dict] = []
+    raw_candidates: list[dict] = []
     for reference, evidence_results in grouped.items():
         best = evidence_results[0]
         painting_index = _painting_index(reference, best.chunk.metadata)
@@ -149,7 +166,7 @@ def discover_docent_candidates(
             }
             for item in evidence_results[:DISCOVERY_EVIDENCE_PER_ARTWORK]
         ]
-        candidates.append(
+        raw_candidates.append(
             {
                 "painting_index": artwork.painting_index,
                 "reference": reference,
@@ -166,13 +183,77 @@ def discover_docent_candidates(
             }
         )
 
+    raw_candidates.sort(
+        key=lambda candidate: -candidate["semantic_score"]
+    )
+    for rank, candidate in enumerate(raw_candidates, start=1):
+        candidate["pre_gate_rank"] = rank
+
+    gated_candidates = [
+        candidate
+        for candidate in raw_candidates
+        if candidate["semantic_score"] >= DISCOVERY_MIN_CONFIDENCE
+    ]
+    selected_candidates = _rank_candidates(gated_candidates)[
+        :DISCOVERY_CANDIDATE_LIMIT
+    ]
+    selected_rank_by_reference = {
+        candidate["reference"]: rank
+        for rank, candidate in enumerate(selected_candidates, start=1)
+    }
+    telemetry_candidates = [
+        DiscoveryRankedCandidate(
+            rank=candidate["pre_gate_rank"],
+            reference=candidate["reference"],
+            title=candidate["title"],
+            semantic_score=candidate["semantic_score"],
+            passed_threshold=(
+                candidate["semantic_score"] >= DISCOVERY_MIN_CONFIDENCE
+            ),
+            selected_rank=selected_rank_by_reference.get(
+                candidate["reference"]
+            ),
+        )
+        for candidate in raw_candidates
+    ]
+    telemetry = DiscoveryTelemetry(
+        query=query,
+        scope=scope,
+        current_reference=current_reference,
+        excluded_references=sorted(
+            exclusions if scope == "collection" else []
+        ),
+        allowed_chunk_types=sorted(allowed_chunk_types),
+        threshold=DISCOVERY_MIN_CONFIDENCE,
+        retrieval_limit=DISCOVERY_RETRIEVAL_LIMIT,
+        retrieval_performed=True,
+        raw_candidate_count=len(telemetry_candidates),
+        raw_candidates=telemetry_candidates,
+        selected_candidates=sorted(
+            (
+                candidate
+                for candidate in telemetry_candidates
+                if candidate.selected_rank is not None
+            ),
+            key=lambda candidate: candidate.selected_rank or 0,
+        ),
+        retrieval_timings=retrieval.timings.model_dump(mode="json"),
+    )
+    model_candidates = [
+        {
+            key: value
+            for key, value in candidate.items()
+            if key != "pre_gate_rank"
+        }
+        for candidate in selected_candidates
+    ]
+
     return {
         "query": query,
         "scope": scope,
         "current_reference": current_reference,
-        "candidates": _rank_candidates(candidates)[
-            :DISCOVERY_CANDIDATE_LIMIT
-        ],
+        "candidates": model_candidates,
         "retrieval_performed": True,
         "retrieval_timings": retrieval.timings.model_dump(mode="json"),
+        "telemetry": telemetry.model_dump(mode="json"),
     }

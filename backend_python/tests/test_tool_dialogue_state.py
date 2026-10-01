@@ -55,6 +55,17 @@ class ToolDialogueStateTest(unittest.TestCase):
 
         self.assertIsNone(result.dialogue_state)
         self.assertEqual(result.sources, [])
+        self.assertEqual(result.telemetry, {})
+
+    def test_backend_telemetry_is_excluded_from_model_payload(self) -> None:
+        result = ToolExecutionResult(
+            tool_name="discovery",
+            success=True,
+            message="Done.",
+            telemetry={"raw_candidates": [{"rank": 1}]},
+        )
+
+        self.assertNotIn("telemetry", result.model_payload())
 
 
 if __name__ == "__main__":

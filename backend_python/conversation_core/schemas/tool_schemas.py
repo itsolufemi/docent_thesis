@@ -74,6 +74,10 @@ class ToolExecutionResult(BaseModel):
         default_factory=list
     )
 
+    telemetry: dict[str, Any] = Field(
+        default_factory=dict
+    )
+
     def model_payload(self) -> dict[str, Any]:
         """Return only the data needed by the model's next round."""
         return {

@@ -97,18 +97,20 @@ class DocentPromptProfileTest(unittest.TestCase):
     ) -> None:
         policy = " ".join(DOCENT_DISCOVERY_POLICY_RULES)
         self.assertIn(
-            "Answer the visitor's explicit request before pursuing a discovery",
+            "answer the visitor's explicit request before pursuing an optional discovery",
             policy,
         )
         self.assertIn(
-            "at least one complete visitor-facing sentence",
+            "at least one complete visitor-facing answer sentence",
             policy,
         )
-        self.assertIn("before mentioning it", policy)
         self.assertIn("Never mention or tease", policy)
         self.assertIn("at most one selective discovery", policy)
         self.assertIn("do not force a discovery suggestion", policy)
         self.assertIn("Do not run discovery on a routine first request", policy)
+        self.assertIn("delegates the choice", policy)
+        self.assertIn("select one concrete artwork", policy)
+        self.assertIn("rather than offering categories", policy)
         self.assertIn("ignore or decline", policy)
 
 

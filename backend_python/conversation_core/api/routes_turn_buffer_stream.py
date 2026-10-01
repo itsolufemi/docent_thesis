@@ -86,6 +86,23 @@ def _utterance_route_summary(
     }
 
 
+def _tool_execution_summary(
+    *,
+    tool_name: str,
+    arguments: dict,
+    result: dict,
+) -> dict[str, object]:
+    return {
+        "tool_name": tool_name,
+        "arguments": arguments,
+        "success": bool(result.get("success")),
+        "message": result.get("message"),
+        "retrieval_used": bool(result.get("retrieval_used")),
+        "sources_count": len(result.get("sources") or []),
+        "discovery": result.get("telemetry") or None,
+    }
+
+
 def _conversation_cookie_header(
     conversation_id: str,
 ) -> tuple[bytes, bytes]:
@@ -155,12 +172,17 @@ def build_stream_websocket_message(
         }
 
     if event.event_type == "tool_result":
+        client_result = {
+            key: value
+            for key, value in (event.tool_result or {}).items()
+            if key != "telemetry"
+        }
         return {
             "type": "tool_call_complete",
             "request_id": request_id,
             "payload": {
                 "tool_name": event.tool_name,
-                "result": event.tool_result,
+                "result": client_result,
             },
         }
 
@@ -376,6 +398,7 @@ async def process_streamed_turn_event(
         first_delta_sent = False
         cancellation_event_sent = False
         query_timing_events: list[dict] = []
+        pending_tool_calls: list[dict] = []
         query_task = asyncio.create_task(
             run_query()
         )
@@ -400,6 +423,37 @@ async def process_streamed_turn_event(
                         }
                     )
                     continue
+
+                if stream_event.event_type == "tool_call":
+                    pending_tool_calls.extend(stream_event.tool_calls)
+
+                if (
+                    stream_event.event_type == "tool_result"
+                    and stream_event.tool_result is not None
+                ):
+                    result_payload = stream_event.tool_result
+                    tool_name = (
+                        stream_event.tool_name
+                        or str(result_payload.get("tool_name", ""))
+                    )
+                    arguments: dict = {}
+                    for index in range(len(pending_tool_calls) - 1, -1, -1):
+                        pending = pending_tool_calls[index]
+                        if pending.get("name") == tool_name:
+                            arguments = dict(pending.get("arguments") or {})
+                            pending_tool_calls.pop(index)
+                            break
+
+                    append_telemetry_log(
+                        conversation_id=conversation_id,
+                        request_id=request_id,
+                        event_type="tool_execution",
+                        payload=_tool_execution_summary(
+                            tool_name=tool_name,
+                            arguments=arguments,
+                            result=result_payload,
+                        ),
+                    )
 
                 if (
                     stream_event.event_type
