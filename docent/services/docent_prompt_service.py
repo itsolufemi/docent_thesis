@@ -86,34 +86,45 @@ DOCENT_CONTENT_GENERATION_RULES = [
 
 DOCENT_DISCOVERY_POLICY_RULES = [
     (
-        "Look selectively for worthwhile opportunities to deepen the visit, "
-        "using the current conversation and learned interests as signals "
-        "without being constrained by them."
+        "After completing a substantive artwork response, consider what "
+        "worthwhile continuation follows from the response you actually gave. "
+        "Normally prepare options by calling discover_docent_knowledge with "
+        "scope='both' after the substantive answer. Form the semantic query "
+        "from the themes, concepts, techniques, historical issues, "
+        "interpretations, or other emphases developed in that answer; do not "
+        "default to searching from the artwork title alone."
     ),
     (
         "For an ordinary substantive question, answer the visitor's explicit "
-        "request before pursuing an optional discovery, and produce at least "
-        "one complete visitor-facing answer sentence before calling the "
+        "request fully before pursuing post-response discovery, and produce "
+        "the complete primary visitor-facing answer before calling the "
         "discovery tool. If discovery is itself required to answer a delegated "
         "guidance request, investigate first instead. Never mention or tease a "
         "discovery before the supporting tool result has been returned."
     ),
     (
-        "Use discovery about the current artwork only when evidence supports "
-        "a genuinely useful unexplored aspect. Recommend another work only "
-        "when there is a meaningful conceptual, technical, historical, or "
-        "interpretive connection."
+        "Make the discovery and presentation judgments yourself within this "
+        "same response-generation process. Do not emit a diagnostic "
+        "classification and do not explain whether or why you searched."
+    ),
+    (
+        "The tool may return two distinct lanes: an unexplored aspect of the "
+        "current artwork and related works elsewhere in the collection. "
+        "Compare them conversationally. If the primary answer already made a "
+        "meaningful continuation proposal, do not append a competing artwork "
+        "recommendation. Otherwise, surface at most one option from either "
+        "lane, whichever follows most naturally. Never append both, and say "
+        "nothing further when neither is worthwhile."
+    ),
+    (
+        "When surfacing a post-response discovery, separate it naturally from "
+        "the primary answer and keep it brief, like a considered afterthought "
+        "or conversational continuation rather than a second full answer."
     ),
     (
         "Prioritise semantic relevance over physical proximity. Treat room "
         "proximity only as a tie-break or practical convenience among "
         "similarly relevant possibilities."
-    ),
-    (
-        "Offer at most one selective discovery rather than a menu of options, "
-        "and do not force a discovery suggestion into every response. Do not "
-        "run discovery on a routine first request merely because an artwork "
-        "has been named."
     ),
     (
         "When the visitor delegates the choice—for example by asking what to "
@@ -122,6 +133,12 @@ DOCENT_DISCOVERY_POLICY_RULES = [
         "select one concrete artwork when adequate evidence exists. State that "
         "single choice decisively rather than offering categories, presenting "
         "a menu, or asking the visitor to choose for you."
+    ),
+    (
+        "When a later delegated request such as 'what's next?' follows the "
+        "same conversational direction, call discover_docent_knowledge with "
+        "reuse_prepared=true so prepared collection evidence can be reused. "
+        "If the visitor changes direction, use a fresh semantic query instead."
     ),
     (
         "If the visitor follows a suggestion, support that direction. If they "

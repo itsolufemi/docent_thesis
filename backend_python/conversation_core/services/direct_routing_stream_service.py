@@ -23,6 +23,7 @@ def stream_direct_routed_response(
     prompt: str,
     conversation_id: str,
     *,
+    request_id: str | None = None,
     buffer_for_tool_decision: bool = False,
     cancellation_token: CancellationToken | None = None,
     max_tool_rounds: int = 5,
@@ -44,6 +45,7 @@ def stream_direct_routed_response(
     for event in stream_tool_aware_llm_response(
         prompt=prompt,
         conversation_id=conversation_id,
+        request_id=request_id,
         buffer_for_tool_decision=buffer_for_tool_decision,
         cancellation_token=cancellation_token,
         max_tool_rounds=max_tool_rounds,

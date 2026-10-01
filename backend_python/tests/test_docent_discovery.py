@@ -20,7 +20,19 @@ from conversation_core.schemas.tool_schemas import (  # noqa: E402
     ToolCall,
     ToolExecutionContext,
 )
+from conversation_core.schemas.query_schemas import QueryResult  # noqa: E402
+from conversation_core.schemas.source_schemas import QuerySource  # noqa: E402
 from docent.schemas.artwork_schemas import Artwork  # noqa: E402
+from docent.schemas.discovery_schemas import (  # noqa: E402
+    PreparedDiscoveryState,
+)
+from docent.services.docent_discovery_store import (  # noqa: E402
+    docent_discovery_store,
+    mark_prepared_discovery_surfaced_from_response,
+)
+from docent.services.docent_query_service import (  # noqa: E402
+    DocentPreferenceQueryService,
+)
 from docent.services.docent_discovery_service import (  # noqa: E402
     discover_docent_candidates,
 )
@@ -256,10 +268,52 @@ class DocentDiscoveryServiceTest(unittest.TestCase):
         self.assertTrue(result["retrieval_performed"])
         self.assertEqual(result["candidates"], [])
 
+    @patch("docent.services.docent_discovery_service.get_painting_by_index")
+    @patch(
+        "docent.services.docent_discovery_service."
+        "retrieve_docent_chunks_by_vector_similarity"
+    )
+    def test_both_scope_keeps_current_and_collection_lanes_separate(
+        self,
+        retrieve,
+        get_artwork,
+    ) -> None:
+        retrieve.side_effect = [
+            VectorRetrievalResult(results=[retrieved(9, score=0.72)]),
+            VectorRetrievalResult(results=[retrieved(2, score=0.68)]),
+        ]
+        get_artwork.side_effect = {
+            2: artwork(2, 6),
+            9: artwork(9, 5),
+        }.get
+
+        result = discover_docent_candidates(
+            query="aestheticised violence and power",
+            scope="both",
+            current_reference="painting:9",
+            excluded_references={"painting:9"},
+        )
+
+        self.assertEqual(retrieve.call_count, 2)
+        self.assertEqual(
+            result["current_artwork_candidates"][0]["reference"],
+            "painting:9",
+        )
+        self.assertEqual(
+            result["collection_candidates"][0]["reference"],
+            "painting:2",
+        )
+        self.assertEqual(result["candidates"], [])
+        self.assertEqual(
+            set(result["telemetry"]["lanes"]),
+            {"current_artwork", "collection"},
+        )
+
 
 class DocentDiscoveryToolTest(unittest.TestCase):
     def setUp(self) -> None:
         conversations.clear()
+        docent_discovery_store.clear()
 
     @patch("docent.tools.discovery_tool.discover_docent_candidates")
     def test_collection_scope_excludes_visited_and_never_updates_dialogue(
@@ -308,6 +362,26 @@ class DocentDiscoveryToolTest(unittest.TestCase):
                     ],
                 }
             ],
+            "current_artwork_candidates": [],
+            "collection_candidates": [
+                {
+                    "painting_index": 3,
+                    "reference": "painting:3",
+                    "title": "Artwork 3",
+                    "artist": "Artist 3",
+                    "semantic_score": 0.73,
+                    "room_index": 4,
+                    "room_name": "Room 4",
+                    "room_distance": 2,
+                    "evidence": [
+                        {
+                            "text": "Loose brushwork evidence.",
+                            "score": 0.73,
+                            "url": "https://example.test/3",
+                        }
+                    ],
+                }
+            ],
         }
 
         result = docent_tool_registry.execute(
@@ -337,6 +411,65 @@ class DocentDiscoveryToolTest(unittest.TestCase):
         self.assertNotIn("dialogue_state", result.model_payload())
         self.assertNotIn("telemetry", result.model_payload())
         self.assertEqual(result.telemetry["threshold"], 0.49)
+        self.assertNotIn("candidates", result.model_payload()["data"])
+        self.assertNotIn("retrieval_timings", result.model_payload()["data"])
+
+    @patch("docent.tools.discovery_tool.discover_docent_candidates")
+    def test_reuses_prepared_candidates_without_vector_search(
+        self,
+        discover,
+    ) -> None:
+        conversation = create_conversation()
+        add_dialogue_turn(
+            conversation.conversation_id,
+            user="Tell me about this work.",
+            reference=["painting:9"],
+        )
+        candidate = {
+            "painting_index": 3,
+            "reference": "painting:3",
+            "title": "Artwork 3",
+            "artist": "Artist 3",
+            "semantic_score": 0.73,
+            "room_index": 4,
+            "room_name": "Room 4",
+            "room_distance": 1,
+            "evidence": [],
+        }
+        docent_discovery_store.set(
+            conversation.conversation_id,
+            PreparedDiscoveryState(
+                conversation_id=conversation.conversation_id,
+                query="aestheticised violence and power",
+                current_reference="painting:9",
+                collection_candidates=[candidate],
+            ),
+        )
+
+        result = docent_tool_registry.execute(
+            ToolCall(
+                name="discover_docent_knowledge",
+                arguments={
+                    "query": "what should we see next",
+                    "scope": "collection",
+                    "reuse_prepared": True,
+                },
+            ),
+            ToolExecutionContext(
+                conversation_id=conversation.conversation_id,
+                request_id="request-next",
+            ),
+        )
+
+        discover.assert_not_called()
+        self.assertFalse(result.retrieval_used)
+        self.assertTrue(result.data["prepared_reused"])
+        self.assertEqual(result.sources[0].reference, "painting:3")
+        refreshed = docent_discovery_store.get(
+            conversation.conversation_id
+        )
+        self.assertTrue(refreshed.prepared_reused)
+        self.assertEqual(refreshed.request_id, "request-next")
 
     def test_tool_is_registered_with_semantic_scopes(self) -> None:
         definition = next(
@@ -347,8 +480,97 @@ class DocentDiscoveryToolTest(unittest.TestCase):
         self.assertIn("conceptual semantic discovery", definition.description)
         self.assertEqual(
             definition.parameters["properties"]["scope"]["enum"],
-            ["current_artwork", "collection"],
+            ["current_artwork", "collection", "both"],
         )
+
+
+class DocentPreparedDiscoveryStateTest(unittest.TestCase):
+    def setUp(self) -> None:
+        docent_discovery_store.clear()
+
+    def test_only_continuation_text_marks_candidate_as_surfaced(self) -> None:
+        conversation_id = "conversation-prepared"
+        primary = "The Rape of Europa uses a polished Rococo surface."
+        docent_discovery_store.set(
+            conversation_id,
+            PreparedDiscoveryState(
+                conversation_id=conversation_id,
+                query="aestheticised violence and power",
+                source_response_text=primary,
+                current_artwork_candidates=[
+                    {
+                        "reference": "painting:9",
+                        "title": "The Rape of Europa",
+                    }
+                ],
+                collection_candidates=[
+                    {
+                        "reference": "painting:3",
+                        "title": "Artwork 3",
+                    }
+                ],
+            ),
+        )
+
+        unchanged = mark_prepared_discovery_surfaced_from_response(
+            conversation_id,
+            primary,
+        )
+        self.assertIsNone(unchanged.surfaced_reference)
+
+        surfaced = mark_prepared_discovery_surfaced_from_response(
+            conversation_id,
+            f"{primary} Actually, Artwork 3 takes that idea further.",
+        )
+        self.assertEqual(surfaced.surfaced_reference, "painting:3")
+
+    @patch("docent.services.docent_query_service.append_telemetry_log")
+    def test_query_outcome_logs_prepared_and_surfaced_state(
+        self,
+        append_log,
+    ) -> None:
+        conversation_id = "conversation-outcome"
+        docent_discovery_store.set(
+            conversation_id,
+            PreparedDiscoveryState(
+                conversation_id=conversation_id,
+                query="portrait technique",
+                source_response_text="Primary answer.",
+                collection_candidates=[
+                    {
+                        "reference": "painting:3",
+                        "title": "Artwork 3",
+                    }
+                ],
+                request_id="request-a",
+                discovery_trigger_phase="post_response",
+            ),
+        )
+        result = QueryResult(
+            request="Tell me about it.",
+            response="Primary answer. Actually, Artwork 3 is a useful contrast.",
+            conversation_id=conversation_id,
+            sources=[
+                QuerySource(
+                    source_type="discovery_evidence",
+                    reference="painting:3",
+                )
+            ],
+        )
+
+        DocentPreferenceQueryService._record_discovery_outcome(
+            result,
+            "request-a",
+        )
+
+        payload = append_log.call_args.kwargs["payload"]
+        self.assertEqual(payload["surfaced_reference"], "painting:3")
+        self.assertTrue(payload["continuation_emitted"])
+        self.assertEqual(
+            payload["discovery_trigger_phase"],
+            "post_response",
+        )
+        self.assertEqual(payload["prepared_candidates"]["collection"], 1)
 
 
 if __name__ == "__main__":

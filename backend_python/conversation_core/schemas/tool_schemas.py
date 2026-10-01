@@ -43,6 +43,8 @@ class ToolExecutionContext(BaseModel):
     """
 
     conversation_id: str
+    request_id: str | None = None
+    visitor_facing_text: str = ""
 
 
 class ToolDialogueStateUpdate(BaseModel):

@@ -165,6 +165,133 @@ class ToolRegistryInjectionTest(unittest.TestCase):
         self.assertNotIn("sources", model_payload)
         self.assertNotIn("retrieval_used", model_payload)
 
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_completion_accumulates_text_before_silent_tool_round(
+        self,
+        stream_request,
+    ) -> None:
+        stream_request.side_effect = [
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": "Primary answer.",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "sandbox_lookup",
+                                        "arguments": {},
+                                    }
+                                }
+                            ],
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {"content": ""},
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        events = list(
+            stream_tool_aware_llm_response(
+                prompt="Answer, then inspect.",
+                conversation_id="conversation-a",
+                request_id="request-a",
+                buffer_for_tool_decision=False,
+                tool_registry=self.registry,
+            )
+        )
+
+        completion = next(
+            event
+            for event in events
+            if event.event_type == "response_complete"
+        )
+        self.assertEqual(completion.text, "Primary answer.")
+        context = self.handler.call_args.args[0]
+        self.assertEqual(context.request_id, "request-a")
+        self.assertEqual(
+            context.visitor_facing_text,
+            "Primary answer.",
+        )
+
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_post_tool_continuation_is_separated_and_timed(
+        self,
+        stream_request,
+    ) -> None:
+        stream_request.side_effect = [
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": "Primary answer.",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "sandbox_lookup",
+                                        "arguments": {},
+                                    }
+                                }
+                            ],
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {"content": "Continuation."},
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        events = list(
+            stream_tool_aware_llm_response(
+                prompt="Answer, then inspect.",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=False,
+                tool_registry=self.registry,
+            )
+        )
+
+        completion = next(
+            event
+            for event in events
+            if event.event_type == "response_complete"
+        )
+        self.assertEqual(
+            completion.text,
+            "Primary answer.\n\nContinuation.",
+        )
+        timing_names = {
+            event.timing_name
+            for event in events
+            if event.event_type == "timing"
+        }
+        self.assertIn("last_content_to_tool_call_seconds", timing_names)
+        self.assertIn("tool_execution_seconds", timing_names)
+        self.assertIn(
+            "tool_result_to_first_content_seconds",
+            timing_names,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

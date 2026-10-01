@@ -40,6 +40,9 @@ from docent.services.docent_diagnostic_service import (
     build_preference_telemetry_summary,
     build_retrieval_debug_summary,
 )
+from docent.services.docent_discovery_store import (
+    mark_prepared_discovery_surfaced_from_response,
+)
 from docent.services.docent_preference_service import (
     update_docent_preferences,
     use_docent_preference_state,
@@ -402,6 +405,55 @@ class DocentPreferenceQueryService:
         return getattr(self.query_engine, name)
 
     @staticmethod
+    def _record_discovery_outcome(
+        result: QueryResult,
+        request_id: str | None,
+    ) -> None:
+        conversation_id = result.conversation_id
+        if conversation_id is None or not any(
+            source.source_type == "discovery_evidence"
+            for source in result.sources
+        ):
+            return
+
+        state = mark_prepared_discovery_surfaced_from_response(
+            conversation_id,
+            result.response,
+        )
+        if state is None:
+            return
+
+        continuation = result.response
+        if (
+            state.source_response_text
+            and result.response.startswith(state.source_response_text)
+        ):
+            continuation = result.response[len(state.source_response_text):]
+
+        append_telemetry_log(
+            conversation_id=conversation_id,
+            request_id=request_id,
+            event_type="docent_discovery_outcome",
+            payload={
+                "query": state.query,
+                "discovery_trigger_phase": (
+                    state.discovery_trigger_phase
+                ),
+                "prepared_reused": state.prepared_reused,
+                "prepared_candidates": {
+                    "current_artwork": len(
+                        state.current_artwork_candidates
+                    ),
+                    "collection": len(
+                        state.collection_candidates
+                    ),
+                },
+                "continuation_emitted": bool(continuation.strip()),
+                "surfaced_reference": state.surfaced_reference,
+            },
+        )
+
+    @staticmethod
     def _history_before_turn(
         conversation_id: str | None,
         override: list[DialogueTurn] | None = None,
@@ -495,6 +547,7 @@ class DocentPreferenceQueryService:
                 include_debug=include_debug,
             )
 
+        self._record_discovery_outcome(result, request_id)
         self._analyse_after_response(
             text=text,
             conversation_id=result.conversation_id,
@@ -539,6 +592,7 @@ class DocentPreferenceQueryService:
                 cancellation_token=cancellation_token,
             )
 
+        self._record_discovery_outcome(result, request_id)
         self._analyse_after_response(
             text=text,
             conversation_id=result.conversation_id,

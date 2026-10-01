@@ -768,6 +768,7 @@ class QueryEngine:
                 stream_direct_routed_response(
                     prompt=prompt,
                     conversation_id=conversation_id,
+                    request_id=request_id,
                     buffer_for_tool_decision=False,
                     cancellation_token=cancellation_token,
                     tool_registry=self.tool_registry,
