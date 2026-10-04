@@ -110,6 +110,7 @@ class DocentPromptProfileTest(unittest.TestCase):
         self.assertIn("Discovery is optional", policy)
         self.assertIn("Do not emit a diagnostic classification", policy)
         self.assertIn("delegates the choice", policy)
+        self.assertIn("purpose='delegated'", policy)
         self.assertIn("select one concrete artwork", policy)
         self.assertIn("rather than offering categories", policy)
         self.assertIn("ignore or decline", policy)

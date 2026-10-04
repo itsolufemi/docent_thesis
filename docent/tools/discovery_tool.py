@@ -22,10 +22,12 @@ class DocentDiscoveryArguments(BaseModel):
 
     query: str = Field(min_length=1)
     scope: Literal["current_artwork", "collection"]
+    purpose: Literal["proactive", "delegated"] = "proactive"
 
 
 DOCENT_DISCOVERY_TOOL = ToolDefinition(
     name="discover_docent_knowledge",
+    post_answer_probe=True,
     description=(
         "Semantically search Wallace Collection knowledge for a potentially "
         "worthwhile discovery connected to the visitor's conversation. For "
@@ -34,7 +36,8 @@ DOCENT_DISCOVERY_TOOL = ToolDefinition(
         "between ordinary artwork retrieval and the primary answer. If the "
         "visitor explicitly asks what to see next, asks for a recommendation, "
         "or otherwise delegates the choice, it may be called before answering. "
-        "Use "
+        "Use purpose=delegated only for that explicit delegated case; otherwise "
+        "use purpose=proactive. Use "
         "scope=current_artwork to investigate an unexplored aspect of the "
         "current work. Use scope=collection to find other artworks meaningfully "
         "connected to a concept, theme, technique, interpretation, period, or "
@@ -49,6 +52,11 @@ DOCENT_DISCOVERY_TOOL = ToolDefinition(
             "scope": {
                 "type": "string",
                 "enum": ["current_artwork", "collection"],
+            },
+            "purpose": {
+                "type": "string",
+                "enum": ["proactive", "delegated"],
+                "default": "proactive",
             },
         },
         "required": ["query", "scope"],
@@ -80,12 +88,8 @@ def discover_docent_knowledge(
     arguments: dict,
 ) -> ToolExecutionResult:
     validated = DocentDiscoveryArguments.model_validate(arguments)
-    ordinary_retrieval_used = (
-        "retrieve_docent_knowledge"
-        in context.executed_tool_names
-    )
     if (
-        ordinary_retrieval_used
+        validated.purpose == "proactive"
         and not context.visitor_sentence_emitted
     ):
         return ToolExecutionResult(

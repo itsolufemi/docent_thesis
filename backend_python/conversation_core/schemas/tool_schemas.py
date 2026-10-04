@@ -21,6 +21,7 @@ class ToolDefinition(BaseModel):
     parameters: dict[str, Any] = Field(
         default_factory=dict
     )
+    post_answer_probe: bool = False
 
 
 class ToolCall(BaseModel):

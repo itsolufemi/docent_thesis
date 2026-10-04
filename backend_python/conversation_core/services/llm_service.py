@@ -33,6 +33,20 @@ LLMTimingCallback = Callable[
     None,
 ]
 
+POST_ANSWER_PROBE_INSTRUCTION = (
+    "The visitor's primary answer has already been delivered. Do not repeat "
+    "or continue that answer yet. Decide whether one worthwhile optional tool "
+    "discovery would naturally extend it. If so, call the single available "
+    "tool with purpose='proactive'. Otherwise produce no text and finish."
+)
+
+POST_DISCOVERY_CONTINUATION_INSTRUCTION = (
+    "The primary answer has already been delivered. Use the discovery result "
+    "only if it adds something worthwhile. Add at most one short natural "
+    "continuation. Do not repeat the primary answer. You may produce no "
+    "additional text."
+)
+
 
 def _contains_complete_sentence(text: str) -> bool:
     return bool(
@@ -352,10 +366,28 @@ def stream_tool_aware_llm_response(
     tools = build_ollama_tool_definitions(
         active_tool_registry
     )
+    probe_tool_names = {
+        definition.name
+        for definition in active_tool_registry.get_definitions()
+        if definition.post_answer_probe
+    }
+    probe_tools = [
+        tool
+        for tool in tools
+        if tool.get("function", {}).get("name") in probe_tool_names
+    ]
+    tools_without_probe = [
+        tool
+        for tool in tools
+        if tool.get("function", {}).get("name") not in probe_tool_names
+    ]
     execution_context = ToolExecutionContext(
         conversation_id=conversation_id
     )
     tool_has_executed = False
+    probe_tool_has_executed = False
+    post_answer_probe_active = False
+    continuation_round_active = False
 
     if (
         cancellation_token is not None
@@ -387,9 +419,25 @@ def stream_tool_aware_llm_response(
             round_content_parts: list[str] = []
             round_tool_calls: list[ToolCall] = []
             buffer_current_round = (
-                buffer_for_tool_decision
-                and not tool_has_executed
+                post_answer_probe_active
+                or (
+                    buffer_for_tool_decision
+                    and not tool_has_executed
+                )
             )
+            round_tools = (
+                None
+                if continuation_round_active
+                else probe_tools
+                if post_answer_probe_active
+                else tools_without_probe
+                if probe_tool_has_executed
+                else tools
+            )
+            allowed_round_tool_names = {
+                tool.get("function", {}).get("name")
+                for tool in (round_tools or [])
+            }
 
             pending_timing_events: list[
                 LLMStreamEvent
@@ -416,7 +464,7 @@ def stream_tool_aware_llm_response(
 
             for chunk in stream_ollama_chat_request(
                 messages=messages,
-                tools=tools,
+                tools=round_tools,
                 cancellation_token=(
                     cancellation_token
                 ),
@@ -471,12 +519,21 @@ def stream_tool_aware_llm_response(
                             event_type="content_delta",
                             text=content_delta,
                         )
+                        if (
+                            not execution_context.visitor_sentence_emitted
+                            and _contains_complete_sentence(
+                                "".join(round_content_parts)
+                            )
+                        ):
+                            execution_context.visitor_sentence_emitted = True
 
                 if raw_tool_calls:
                     round_tool_calls.extend(
-                        parse_ollama_tool_calls(
+                        tool_call
+                        for tool_call in parse_ollama_tool_calls(
                             response_message
                         )
+                        if tool_call.name in allowed_round_tool_names
                     )
 
                 if chunk.get("done"):
@@ -498,14 +555,6 @@ def stream_tool_aware_llm_response(
             complete_round_content = "".join(
                 round_content_parts
             ).strip()
-
-            if (
-                not buffer_current_round
-                and _contains_complete_sentence(
-                    complete_round_content
-                )
-            ):
-                execution_context.visitor_sentence_emitted = True
 
             if round_tool_calls:
                 messages.append(
@@ -563,6 +612,20 @@ def stream_tool_aware_llm_response(
                     execution_context.executed_tool_names.append(
                         tool_call.name
                     )
+                    if (
+                        tool_call.name in probe_tool_names
+                        and execution_result.success
+                    ):
+                        probe_tool_has_executed = True
+                        post_answer_probe_active = False
+                        if (
+                            tool_call.arguments.get(
+                                "purpose",
+                                "proactive",
+                            )
+                            == "proactive"
+                        ):
+                            continuation_round_active = True
 
                     if (
                         cancellation_token is not None
@@ -603,17 +666,63 @@ def stream_tool_aware_llm_response(
                         tool_result=result_payload,
                     )
 
+                if continuation_round_active:
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": (
+                                POST_DISCOVERY_CONTINUATION_INSTRUCTION
+                            ),
+                        }
+                    )
                 tool_has_executed = True
                 continue
 
             if (
                 complete_round_content
                 and buffer_current_round
+                and not post_answer_probe_active
             ):
                 yield LLMStreamEvent(
                     event_type="content_delta",
                     text=complete_round_content,
                 )
+                if (
+                    not execution_context.visitor_sentence_emitted
+                    and _contains_complete_sentence(
+                        complete_round_content
+                    )
+                ):
+                    execution_context.visitor_sentence_emitted = True
+
+            if post_answer_probe_active:
+                yield LLMStreamEvent(
+                    event_type="response_complete",
+                    text="",
+                    done=True,
+                )
+                return
+
+            if (
+                probe_tools
+                and execution_context.visitor_sentence_emitted
+                and not probe_tool_has_executed
+                and not continuation_round_active
+            ):
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": complete_round_content,
+                    }
+                )
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": POST_ANSWER_PROBE_INSTRUCTION,
+                    }
+                )
+                post_answer_probe_active = True
+                continue
 
             yield LLMStreamEvent(
                 event_type="response_complete",

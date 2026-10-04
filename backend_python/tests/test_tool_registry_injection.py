@@ -72,6 +72,28 @@ class ToolRegistryInjectionTest(unittest.TestCase):
             "sandbox_lookup",
         )
 
+    @staticmethod
+    def _discovery_registry(handler) -> ToolRegistry:
+        registry = ToolRegistry()
+        registry.register(
+            ToolDefinition(
+                name="discover_docent_knowledge",
+                description="Discover one optional continuation.",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                        "scope": {"type": "string"},
+                        "purpose": {"type": "string"},
+                    },
+                    "required": ["query", "scope"],
+                },
+                post_answer_probe=True,
+            ),
+            handler,
+        )
+        return registry
+
     @patch(
         "conversation_core.services.llm_service."
         "stream_ollama_chat_request"
@@ -344,6 +366,231 @@ class ToolRegistryInjectionTest(unittest.TestCase):
             captured_contexts[1].executed_tool_names,
             ["sandbox_lookup"],
         )
+
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_no_discovery_probe_finishes_without_streaming_probe_text(
+        self,
+        stream_request,
+    ) -> None:
+        handler = Mock()
+        registry = self._discovery_registry(handler)
+        stream_request.side_effect = [
+            iter(
+                [
+                    {
+                        "message": {"content": "Primary answer."},
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {"content": "No discovery needed."},
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        events = list(
+            stream_tool_aware_llm_response(
+                prompt="Give a short factual answer.",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=False,
+                tool_registry=registry,
+            )
+        )
+
+        emitted = "".join(
+            event.text
+            for event in events
+            if event.event_type == "content_delta"
+        )
+        self.assertEqual(emitted, "Primary answer.")
+        self.assertEqual(events[-1].event_type, "response_complete")
+        self.assertEqual(events[-1].text, "")
+        handler.assert_not_called()
+        probe_call = stream_request.call_args_list[1]
+        self.assertEqual(
+            [tool["function"]["name"] for tool in probe_call.kwargs["tools"]],
+            ["discover_docent_knowledge"],
+        )
+
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_post_answer_discovery_emits_one_continuation_without_duplication(
+        self,
+        stream_request,
+    ) -> None:
+        captured_contexts = []
+
+        def discover(context, _arguments):
+            captured_contexts.append(context.model_copy(deep=True))
+            return ToolExecutionResult(
+                tool_name="discover_docent_knowledge",
+                success=True,
+                message="Discovery found.",
+                data={"candidates": []},
+            )
+
+        registry = self._discovery_registry(discover)
+        stream_request.side_effect = [
+            iter(
+                [
+                    {
+                        "message": {"content": "Primary answer."},
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "discover_docent_knowledge",
+                                        "arguments": {
+                                            "query": "an idea from the answer",
+                                            "scope": "collection",
+                                            "purpose": "proactive",
+                                        },
+                                    }
+                                }
+                            ],
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": "One short continuation.",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "discover_docent_knowledge",
+                                        "arguments": {
+                                            "query": "try again",
+                                            "scope": "collection",
+                                            "purpose": "proactive",
+                                        },
+                                    }
+                                }
+                            ],
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        events = list(
+            stream_tool_aware_llm_response(
+                prompt="Tell me about the artwork.",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=False,
+                tool_registry=registry,
+            )
+        )
+
+        emitted_parts = [
+            event.text
+            for event in events
+            if event.event_type == "content_delta"
+        ]
+        self.assertEqual(
+            emitted_parts,
+            ["Primary answer.", "One short continuation."],
+        )
+        self.assertEqual(emitted_parts.count("Primary answer."), 1)
+        self.assertTrue(captured_contexts[0].visitor_sentence_emitted)
+        self.assertEqual(len(captured_contexts), 1)
+        self.assertIsNone(stream_request.call_args_list[2].kwargs["tools"])
+        self.assertIn(
+            "at most one short natural continuation",
+            stream_request.call_args_list[2].kwargs["messages"][-1]["content"],
+        )
+
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_delegated_discovery_remains_available_before_answer(
+        self,
+        stream_request,
+    ) -> None:
+        captured_contexts = []
+
+        def discover(context, _arguments):
+            captured_contexts.append(context.model_copy(deep=True))
+            return ToolExecutionResult(
+                tool_name="discover_docent_knowledge",
+                success=True,
+                message="Recommendation found.",
+            )
+
+        registry = self._discovery_registry(discover)
+        stream_request.side_effect = [
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "discover_docent_knowledge",
+                                        "arguments": {
+                                            "query": "what to see next",
+                                            "scope": "collection",
+                                            "purpose": "delegated",
+                                        },
+                                    }
+                                }
+                            ],
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {"content": "See The Swing next."},
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        events = list(
+            stream_tool_aware_llm_response(
+                prompt="Which one is next?",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=False,
+                tool_registry=registry,
+            )
+        )
+
+        emitted = "".join(
+            event.text
+            for event in events
+            if event.event_type == "content_delta"
+        )
+        self.assertEqual(emitted, "See The Swing next.")
+        self.assertFalse(captured_contexts[0].visitor_sentence_emitted)
+        self.assertEqual(len(stream_request.call_args_list), 2)
 
 
 if __name__ == "__main__":

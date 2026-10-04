@@ -134,6 +134,7 @@ DOCENT_DISCOVERY_POLICY_RULES = [
         "When the visitor delegates the choice—for example by asking what to "
         "see next, asking you to choose, accepting any option, or naming only "
         "a broad style, period, or theme—actively use collection discovery and "
+        "set purpose='delegated', then "
         "select one concrete artwork when adequate evidence exists. State that "
         "single choice decisively rather than offering categories, presenting "
         "a menu, or asking the visitor to choose for you."

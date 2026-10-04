@@ -279,7 +279,7 @@ class DocentDiscoveryToolTest(unittest.TestCase):
         }
 
     @patch("docent.tools.discovery_tool.discover_docent_candidates")
-    def test_discovery_blocked_after_retrieval_before_answer(
+    def test_proactive_discovery_blocked_before_answer_without_retrieval(
         self,
         discover,
     ) -> None:
@@ -291,12 +291,13 @@ class DocentDiscoveryToolTest(unittest.TestCase):
                 arguments={
                     "query": "unexplored meaning",
                     "scope": "current_artwork",
+                    "purpose": "proactive",
                 },
             ),
             ToolExecutionContext(
                 conversation_id=conversation.conversation_id,
                 visitor_sentence_emitted=False,
-                executed_tool_names=["retrieve_docent_knowledge"],
+                executed_tool_names=[],
             ),
         )
 
@@ -319,6 +320,7 @@ class DocentDiscoveryToolTest(unittest.TestCase):
                 arguments={
                     "query": "unexplored meaning",
                     "scope": "current_artwork",
+                    "purpose": "proactive",
                 },
             ),
             ToolExecutionContext(
@@ -346,6 +348,7 @@ class DocentDiscoveryToolTest(unittest.TestCase):
                 arguments={
                     "query": "what to see next",
                     "scope": "collection",
+                    "purpose": "delegated",
                 },
             ),
             ToolExecutionContext(
@@ -416,7 +419,8 @@ class DocentDiscoveryToolTest(unittest.TestCase):
                 },
             ),
             ToolExecutionContext(
-                conversation_id=conversation.conversation_id
+                conversation_id=conversation.conversation_id,
+                visitor_sentence_emitted=True,
             ),
         )
 
@@ -447,6 +451,10 @@ class DocentDiscoveryToolTest(unittest.TestCase):
         self.assertEqual(
             definition.parameters["properties"]["scope"]["enum"],
             ["current_artwork", "collection"],
+        )
+        self.assertEqual(
+            definition.parameters["properties"]["purpose"]["enum"],
+            ["proactive", "delegated"],
         )
 
 
