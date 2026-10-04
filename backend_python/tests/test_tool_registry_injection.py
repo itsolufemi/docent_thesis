@@ -165,6 +165,186 @@ class ToolRegistryInjectionTest(unittest.TestCase):
         self.assertNotIn("sources", model_payload)
         self.assertNotIn("retrieval_used", model_payload)
 
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_complete_unbuffered_sentence_unlocks_later_tool(
+        self,
+        stream_request,
+    ) -> None:
+        captured_contexts = []
+
+        def capture_context(context, _arguments):
+            captured_contexts.append(context.model_copy(deep=True))
+            return ToolExecutionResult(
+                tool_name="sandbox_lookup",
+                success=True,
+                message="Lookup complete.",
+            )
+
+        self.handler.side_effect = capture_context
+        stream_request.side_effect = [
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": "A complete visitor answer.",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "sandbox_lookup",
+                                        "arguments": {},
+                                    }
+                                }
+                            ],
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {"content": "Finished."},
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        list(
+            stream_tool_aware_llm_response(
+                prompt="Answer, then use the tool.",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=False,
+                tool_registry=self.registry,
+            )
+        )
+
+        self.assertTrue(captured_contexts[0].visitor_sentence_emitted)
+        self.assertEqual(captured_contexts[0].executed_tool_names, [])
+
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_buffered_sentence_does_not_unlock_tool(
+        self,
+        stream_request,
+    ) -> None:
+        captured_contexts = []
+
+        def capture_context(context, _arguments):
+            captured_contexts.append(context.model_copy(deep=True))
+            return ToolExecutionResult(
+                tool_name="sandbox_lookup",
+                success=True,
+                message="Lookup complete.",
+            )
+
+        self.handler.side_effect = capture_context
+        stream_request.side_effect = [
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": "A buffered internal sentence.",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "sandbox_lookup",
+                                        "arguments": {},
+                                    }
+                                }
+                            ],
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {"content": "Finished."},
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        list(
+            stream_tool_aware_llm_response(
+                prompt="Use the tool.",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=True,
+                tool_registry=self.registry,
+            )
+        )
+
+        self.assertFalse(captured_contexts[0].visitor_sentence_emitted)
+
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_executed_tool_names_reach_later_tool_calls(
+        self,
+        stream_request,
+    ) -> None:
+        captured_contexts = []
+
+        def capture_context(context, _arguments):
+            captured_contexts.append(context.model_copy(deep=True))
+            return ToolExecutionResult(
+                tool_name="sandbox_lookup",
+                success=True,
+                message="Lookup complete.",
+            )
+
+        self.handler.side_effect = capture_context
+        tool_round = {
+            "message": {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "sandbox_lookup",
+                            "arguments": {},
+                        }
+                    }
+                ],
+            },
+            "done": True,
+        }
+        stream_request.side_effect = [
+            iter([tool_round]),
+            iter([tool_round]),
+            iter(
+                [
+                    {
+                        "message": {"content": "Finished."},
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        list(
+            stream_tool_aware_llm_response(
+                prompt="Use the tool twice.",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=False,
+                tool_registry=self.registry,
+            )
+        )
+
+        self.assertEqual(captured_contexts[0].executed_tool_names, [])
+        self.assertEqual(
+            captured_contexts[1].executed_tool_names,
+            ["sandbox_lookup"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

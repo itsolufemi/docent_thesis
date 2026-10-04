@@ -28,7 +28,13 @@ DOCENT_DISCOVERY_TOOL = ToolDefinition(
     name="discover_docent_knowledge",
     description=(
         "Semantically search Wallace Collection knowledge for a potentially "
-        "worthwhile discovery connected to the visitor's conversation. Use "
+        "worthwhile discovery connected to the visitor's conversation. For "
+        "proactive discovery during an ordinary artwork response, use this "
+        "tool only after producing the visitor-facing answer. Do not call it "
+        "between ordinary artwork retrieval and the primary answer. If the "
+        "visitor explicitly asks what to see next, asks for a recommendation, "
+        "or otherwise delegates the choice, it may be called before answering. "
+        "Use "
         "scope=current_artwork to investigate an unexplored aspect of the "
         "current work. Use scope=collection to find other artworks meaningfully "
         "connected to a concept, theme, technique, interpretation, period, or "
@@ -74,6 +80,28 @@ def discover_docent_knowledge(
     arguments: dict,
 ) -> ToolExecutionResult:
     validated = DocentDiscoveryArguments.model_validate(arguments)
+    ordinary_retrieval_used = (
+        "retrieve_docent_knowledge"
+        in context.executed_tool_names
+    )
+    if (
+        ordinary_retrieval_used
+        and not context.visitor_sentence_emitted
+    ):
+        return ToolExecutionResult(
+            tool_name=DOCENT_DISCOVERY_TOOL.name,
+            success=False,
+            message=(
+                "Discovery is not available yet. "
+                "Answer the visitor's current request first, "
+                "then call discovery if a worthwhile continuation remains."
+            ),
+            retrieval_used=False,
+            data={},
+            dialogue_state=None,
+            sources=[],
+        )
+
     current_reference, visited_references = (
         _conversation_artwork_references(context.conversation_id)
     )

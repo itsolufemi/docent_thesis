@@ -43,6 +43,10 @@ class ToolExecutionContext(BaseModel):
     """
 
     conversation_id: str
+    visitor_sentence_emitted: bool = False
+    executed_tool_names: list[str] = Field(
+        default_factory=list
+    )
 
 
 class ToolDialogueStateUpdate(BaseModel):

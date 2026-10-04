@@ -97,6 +97,7 @@ class DocentPromptProfileTest(unittest.TestCase):
     ) -> None:
         policy = " ".join(DOCENT_DISCOVERY_POLICY_RULES)
         self.assertIn("finish the full primary answer", policy)
+        self.assertIn("Never place discovery", policy)
         self.assertIn("scope='current_artwork'", policy)
         self.assertIn("scope='collection'", policy)
         self.assertIn("answer you just gave", policy)

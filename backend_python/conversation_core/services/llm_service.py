@@ -1,5 +1,6 @@
 import httpx
 import json
+import re
 
 from collections.abc import Callable, Iterator
 from time import perf_counter
@@ -31,6 +32,12 @@ LLMTimingCallback = Callable[
     [str, float, dict[str, Any]],
     None,
 ]
+
+
+def _contains_complete_sentence(text: str) -> bool:
+    return bool(
+        re.search(r'[.!?](?:["\')\]]*)?(?:\s|$)', text)
+    )
 
 def check_llm_status() -> dict:
     try:
@@ -492,6 +499,14 @@ def stream_tool_aware_llm_response(
                 round_content_parts
             ).strip()
 
+            if (
+                not buffer_current_round
+                and _contains_complete_sentence(
+                    complete_round_content
+                )
+            ):
+                execution_context.visitor_sentence_emitted = True
+
             if round_tool_calls:
                 messages.append(
                     {
@@ -544,6 +559,9 @@ def stream_tool_aware_llm_response(
                             tool_call=tool_call,
                             context=execution_context,
                         )
+                    )
+                    execution_context.executed_tool_names.append(
+                        tool_call.name
                     )
 
                     if (

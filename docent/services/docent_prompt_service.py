@@ -95,7 +95,8 @@ DOCENT_DISCOVERY_POLICY_RULES = [
     ),
     (
         "For an ordinary substantive artwork response, finish the full primary "
-        "answer before making an optional discovery call. If an unexplored "
+        "answer before making an optional discovery call. Never place discovery "
+        "between ordinary artwork retrieval and that primary answer. If an unexplored "
         "aspect of the current work is the better continuation, use "
         "scope='current_artwork'. If another work is the better continuation, "
         "use scope='collection'. If discovery is required to answer a delegated "

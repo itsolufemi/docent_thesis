@@ -261,6 +261,103 @@ class DocentDiscoveryToolTest(unittest.TestCase):
     def setUp(self) -> None:
         conversations.clear()
 
+    @staticmethod
+    def _empty_discovery(scope: str) -> dict:
+        return {
+            "query": "unexplored meaning",
+            "scope": scope,
+            "current_reference": None,
+            "retrieval_performed": True,
+            "retrieval_timings": {"total_seconds": 0.01},
+            "telemetry": {
+                "query": "unexplored meaning",
+                "scope": scope,
+                "threshold": 0.49,
+                "raw_candidates": [],
+            },
+            "candidates": [],
+        }
+
+    @patch("docent.tools.discovery_tool.discover_docent_candidates")
+    def test_discovery_blocked_after_retrieval_before_answer(
+        self,
+        discover,
+    ) -> None:
+        conversation = create_conversation()
+
+        result = docent_tool_registry.execute(
+            ToolCall(
+                name="discover_docent_knowledge",
+                arguments={
+                    "query": "unexplored meaning",
+                    "scope": "current_artwork",
+                },
+            ),
+            ToolExecutionContext(
+                conversation_id=conversation.conversation_id,
+                visitor_sentence_emitted=False,
+                executed_tool_names=["retrieve_docent_knowledge"],
+            ),
+        )
+
+        discover.assert_not_called()
+        self.assertFalse(result.success)
+        self.assertFalse(result.retrieval_used)
+        self.assertIn("Answer the visitor", result.message)
+
+    @patch("docent.tools.discovery_tool.discover_docent_candidates")
+    def test_discovery_allowed_after_answer(
+        self,
+        discover,
+    ) -> None:
+        conversation = create_conversation()
+        discover.return_value = self._empty_discovery("current_artwork")
+
+        result = docent_tool_registry.execute(
+            ToolCall(
+                name="discover_docent_knowledge",
+                arguments={
+                    "query": "unexplored meaning",
+                    "scope": "current_artwork",
+                },
+            ),
+            ToolExecutionContext(
+                conversation_id=conversation.conversation_id,
+                visitor_sentence_emitted=True,
+                executed_tool_names=["retrieve_docent_knowledge"],
+            ),
+        )
+
+        discover.assert_called_once()
+        self.assertTrue(result.success)
+        self.assertTrue(result.retrieval_used)
+
+    @patch("docent.tools.discovery_tool.discover_docent_candidates")
+    def test_delegated_discovery_allowed_before_answer(
+        self,
+        discover,
+    ) -> None:
+        conversation = create_conversation()
+        discover.return_value = self._empty_discovery("collection")
+
+        result = docent_tool_registry.execute(
+            ToolCall(
+                name="discover_docent_knowledge",
+                arguments={
+                    "query": "what to see next",
+                    "scope": "collection",
+                },
+            ),
+            ToolExecutionContext(
+                conversation_id=conversation.conversation_id,
+                visitor_sentence_emitted=False,
+                executed_tool_names=[],
+            ),
+        )
+
+        discover.assert_called_once()
+        self.assertTrue(result.success)
+
     @patch("docent.tools.discovery_tool.discover_docent_candidates")
     def test_collection_scope_excludes_visited_and_never_updates_dialogue(
         self,
@@ -345,6 +442,8 @@ class DocentDiscoveryToolTest(unittest.TestCase):
             if definition.name == "discover_docent_knowledge"
         )
         self.assertIn("conceptual semantic discovery", definition.description)
+        self.assertIn("only after producing", definition.description)
+        self.assertIn("delegates the choice", definition.description)
         self.assertEqual(
             definition.parameters["properties"]["scope"]["enum"],
             ["current_artwork", "collection"],
