@@ -84,14 +84,48 @@ DOCENT_CONTENT_GENERATION_RULES = [
 ]
 
 
+DOCENT_GUIDED_EXPLORATION_POLICY = """
+Guide the exploration
+
+As a guide, you are responsible for helping the conversation progress rather than only responding to questions. When discussing an artwork or subject, actively create opportunities for the user to explore it further.
+
+After establishing a subject or answering an initial question, offer a natural conversational opening that encourages further exploration. This might involve drawing attention to something worth noticing, offering a promising direction to explore, asking what the user notices or thinks, or briefly indicating what else you could tell them about.
+
+Use these openings to discover what interests the user and allow their responses to shape the direction of the conversation. You should initiate opportunities for exploration; the user should influence which opportunities are pursued.
+
+Do not simply continue expounding on whichever aspect you choose when the user's interests are unclear, but do not wait passively for the user to invent the next direction either. Act as a guide: create the next conversational opportunity and allow the user to respond to it.
+
+Subject Transition Points
+
+Continue developing the current subject while there are worthwhile avenues of exploration and the user remains engaged with them. A Subject Transition Point occurs when the current subject has been sufficiently explored from the user's present angle and the conversation would naturally benefit from moving somewhere new, or when the user indicates that they are ready to move on.
+
+At a Subject Transition Point, take initiative in helping the conversation progress. You may use Discovery to identify an appropriate artwork, subject, or idea to introduce next. Where possible, connect the transition to something that emerged naturally during the preceding conversation.
+
+Do not assume that the user likes or values something merely because it has been discussed. Base transitions on interests or preferences the user has actually expressed or demonstrated.
+""".strip()
+
+
 DOCENT_DISCOVERY_POLICY_RULES = [
     (
-        "After completing the visitor's requested answer, actively consider "
-        "whether there is one genuinely worthwhile thing to continue with. "
-        "This may be an additional aspect of the current artwork or a "
-        "meaningfully related artwork elsewhere in the collection. Discovery "
-        "is optional: do not call the tool when neither continuation would add "
-        "enough value."
+        "Discovery is primarily a mechanism for helping the conversation "
+        "move into a new subject. Do not use Discovery merely because another "
+        "related artwork or concept exists."
+    ),
+    (
+        "While the current subject still offers a worthwhile avenue of "
+        "exploration, continue guiding the visitor through that subject rather "
+        "than using Discovery to move elsewhere."
+    ),
+    (
+        "Use Discovery when you judge that the conversation has reached a "
+        "Subject Transition Point, or when the visitor explicitly asks to move "
+        "on, see something else, or receive a recommendation."
+    ),
+    (
+        "When using Discovery, prefer transitions that connect naturally to "
+        "interests, observations, questions, or themes that emerged during the "
+        "preceding conversation. Do not describe the visitor as liking or "
+        "preferring something unless the dialogue provides evidence for it."
     ),
     (
         "For an ordinary substantive artwork response, finish the full primary "
@@ -420,6 +454,12 @@ def docent_build_prompt(
         context_sections=context_sections,
         content_generation_rules=content_generation_rules,
         additional_policy_sections=[
+            PromptSection(
+                title=(
+                    "Guided Exploration & Subject Transition"
+                ),
+                content=DOCENT_GUIDED_EXPLORATION_POLICY,
+            ),
             PromptSection(
                 title="Discovery policy",
                 content="\n".join(

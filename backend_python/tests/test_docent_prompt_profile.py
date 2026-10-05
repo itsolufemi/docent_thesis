@@ -23,6 +23,7 @@ from docent.services.docent_prompt_service import (  # noqa: E402
     DOCENT_BEHAVIOURAL_RULES,
     DOCENT_CONTENT_GENERATION_RULES,
     DOCENT_DISCOVERY_POLICY_RULES,
+    DOCENT_GUIDED_EXPLORATION_POLICY,
     DOCENT_PROMPT_PROFILE,
     docent_build_prompt,
 )
@@ -70,10 +71,26 @@ class DocentPromptProfileTest(unittest.TestCase):
         )
         self.assertIn("Behavioural policy:", prompt)
         self.assertIn("Content-generation policy:", prompt)
+        self.assertIn(
+            "Guided Exploration & Subject Transition:",
+            prompt,
+        )
+        self.assertIn(
+            DOCENT_GUIDED_EXPLORATION_POLICY,
+            prompt,
+        )
         self.assertIn("Discovery policy:", prompt)
         self.assertIn(DOCENT_DISCOVERY_POLICY_RULES[0], prompt)
         self.assertLess(
             prompt.index("Content-generation policy:"),
+            prompt.index(
+                "Guided Exploration & Subject Transition:"
+            ),
+        )
+        self.assertLess(
+            prompt.index(
+                "Guided Exploration & Subject Transition:"
+            ),
             prompt.index("Discovery policy:"),
         )
         self.assertLess(
@@ -96,6 +113,13 @@ class DocentPromptProfileTest(unittest.TestCase):
         self,
     ) -> None:
         policy = " ".join(DOCENT_DISCOVERY_POLICY_RULES)
+        self.assertIn("primarily a mechanism", policy)
+        self.assertIn("Do not use Discovery merely because", policy)
+        self.assertIn("worthwhile avenue of exploration", policy)
+        self.assertIn("Subject Transition Point", policy)
+        self.assertIn("explicitly asks to move on", policy)
+        self.assertIn("connect naturally", policy)
+        self.assertIn("provides evidence", policy)
         self.assertIn("finish the full primary answer", policy)
         self.assertIn("Never place discovery", policy)
         self.assertIn("scope='current_artwork'", policy)
@@ -107,13 +131,31 @@ class DocentPromptProfileTest(unittest.TestCase):
         self.assertIn("end without further text", policy)
         self.assertIn("do not subsequently recommend another artwork", policy)
         self.assertIn("Never append competing suggestions", policy)
-        self.assertIn("Discovery is optional", policy)
         self.assertIn("Do not emit a diagnostic classification", policy)
         self.assertIn("delegates the choice", policy)
         self.assertIn("purpose='delegated'", policy)
         self.assertIn("select one concrete artwork", policy)
         self.assertIn("rather than offering categories", policy)
         self.assertIn("ignore or decline", policy)
+
+    def test_guided_exploration_policy_leads_without_forcing_questions(
+        self,
+    ) -> None:
+        policy = DOCENT_GUIDED_EXPLORATION_POLICY
+
+        self.assertIn("actively create opportunities", policy)
+        self.assertIn("offer a natural conversational opening", policy)
+        self.assertIn(
+            "You should initiate opportunities for exploration; "
+            "the user should influence which opportunities are pursued.",
+            policy,
+        )
+        self.assertIn("do not wait passively", policy)
+        self.assertIn("Subject Transition Point occurs", policy)
+        self.assertIn("user indicates that they are ready to move on", policy)
+        self.assertIn("You may use Discovery", policy)
+        self.assertIn("actually expressed or demonstrated", policy)
+        self.assertNotIn("Always end with a question", policy)
 
 
 if __name__ == "__main__":

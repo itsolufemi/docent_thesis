@@ -448,7 +448,8 @@ class DocentDiscoveryToolTest(unittest.TestCase):
             if definition.name == "discover_docent_knowledge"
         )
         self.assertIn("conceptual semantic discovery", definition.description)
-        self.assertIn("only after producing", definition.description)
+        self.assertIn("Subject Transition Point", definition.description)
+        self.assertIn("transitioning prematurely", definition.description)
         self.assertIn("delegates the choice", definition.description)
         self.assertEqual(
             definition.allowed_phases,

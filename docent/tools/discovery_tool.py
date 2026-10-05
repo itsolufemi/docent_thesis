@@ -32,21 +32,27 @@ DOCENT_DISCOVERY_TOOL = ToolDefinition(
         "post_answer",
     },
     description=(
-        "Semantically search Wallace Collection knowledge for a potentially "
-        "worthwhile discovery connected to the visitor's conversation. For "
-        "proactive discovery during an ordinary artwork response, use this "
-        "tool only after producing the visitor-facing answer. Do not call it "
-        "between ordinary artwork retrieval and the primary answer. If the "
-        "visitor explicitly asks what to see next, asks for a recommendation, "
-        "or otherwise delegates the choice, it may be called before answering. "
+        "Semantically search Wallace Collection knowledge to help move the "
+        "conversation into an appropriate new artwork, subject, or idea. Do "
+        "not use this tool merely because a related artwork or concept exists. "
+        "For proactive discovery, use it only after the primary answer and only "
+        "when the conversation has reached a Subject Transition Point. Continue "
+        "guiding worthwhile exploration of the current subject instead of "
+        "transitioning prematurely. Do not call discovery between ordinary "
+        "artwork retrieval and the primary answer. If the visitor explicitly "
+        "asks to move on, asks what to see next, requests a recommendation, or "
+        "otherwise delegates the choice, it may be called before answering. "
         "Use purpose=delegated only for that explicit delegated case; otherwise "
         "use purpose=proactive. Use "
         "scope=current_artwork to investigate an unexplored aspect of the "
         "current work. Use scope=collection to find other artworks meaningfully "
         "connected to a concept, theme, technique, interpretation, period, or "
         "historical context. This is conceptual semantic discovery, not exact-"
-        "title retrieval. Do not mention or tease a possible discovery until "
-        "this tool has returned evidence supporting it."
+        "title retrieval. Prefer transitions grounded in interests, observations, "
+        "questions, or themes that emerged in the dialogue, without claiming "
+        "that the visitor likes something merely because it was discussed. Do "
+        "not mention or tease a possible discovery until this tool has returned "
+        "evidence supporting it."
     ),
     parameters={
         "type": "object",
