@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import Recorder from './Recorder';
 import AudioPlayer from './AudioPlayer';
-import { setCaptionFunctionsinServer } from './utils/server_functions';
 
 export default function MainApp({
   recording,
@@ -43,11 +42,6 @@ export default function MainApp({
 }) {
   const [questionTranscript, setQuestionTranscript] = useState('');
   const [caption, setCaption] = useState('');
-
-  setCaptionFunctionsinServer({
-    handleSetCaption: setCaption,
-    handleSetQuestion_trans: setQuestionTranscript,
-  });
 
   React.useEffect(() => {
     if (!latestTurnResult) {

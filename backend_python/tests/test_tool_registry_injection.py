@@ -511,7 +511,7 @@ class ToolRegistryInjectionTest(unittest.TestCase):
         ]
         self.assertEqual(
             emitted_parts,
-            ["Primary answer.", "One short continuation."],
+            ["Primary answer.", " One short continuation."],
         )
         self.assertEqual(emitted_parts.count("Primary answer."), 1)
         self.assertTrue(captured_contexts[0].visitor_sentence_emitted)
@@ -521,6 +521,85 @@ class ToolRegistryInjectionTest(unittest.TestCase):
             "at most one short natural continuation",
             stream_request.call_args_list[2].kwargs["messages"][-1]["content"],
         )
+        self.assertIn(
+            "return an empty response",
+            stream_request.call_args_list[2].kwargs["messages"][-1]["content"],
+        )
+
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_post_discovery_literal_no_additional_text_is_not_emitted(
+        self,
+        stream_request,
+    ) -> None:
+        registry = self._discovery_registry(
+            lambda _context, _arguments: ToolExecutionResult(
+                tool_name="discover_docent_knowledge",
+                success=True,
+                message="Discovery found.",
+                data={"candidates": []},
+            )
+        )
+        stream_request.side_effect = [
+            iter(
+                [
+                    {
+                        "message": {"content": "Primary answer."},
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "discover_docent_knowledge",
+                                        "arguments": {
+                                            "query": "related work",
+                                            "scope": "collection",
+                                            "purpose": "proactive",
+                                        },
+                                    }
+                                }
+                            ],
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {"content": "No additional text."},
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        events = list(
+            stream_tool_aware_llm_response(
+                prompt="Tell me about the artwork.",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=False,
+                tool_registry=registry,
+            )
+        )
+
+        emitted = "".join(
+            event.text
+            for event in events
+            if event.event_type == "content_delta"
+        )
+        self.assertEqual(emitted, "Primary answer.")
+        self.assertEqual(events[-1].event_type, "response_complete")
+        self.assertEqual(events[-1].text, "")
 
     @patch(
         "conversation_core.services.llm_service."

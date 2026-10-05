@@ -43,9 +43,15 @@ POST_ANSWER_PROBE_INSTRUCTION = (
 POST_DISCOVERY_CONTINUATION_INSTRUCTION = (
     "The primary answer has already been delivered. Use the discovery result "
     "only if it adds something worthwhile. Add at most one short natural "
-    "continuation. Do not repeat the primary answer. You may produce no "
-    "additional text."
+    "continuation. Do not repeat the primary answer. If no worthwhile "
+    "continuation exists, return an empty response. Never say 'No additional "
+    "text', 'Nothing to add', or describe this decision."
 )
+
+EMPTY_CONTINUATION_RESPONSES = {
+    "no additional text",
+    "no additional text.",
+}
 
 
 def _contains_complete_sentence(text: str) -> bool:
@@ -388,6 +394,7 @@ def stream_tool_aware_llm_response(
     probe_tool_has_executed = False
     post_answer_probe_active = False
     continuation_round_active = False
+    visitor_text_emitted = False
 
     if (
         cancellation_token is not None
@@ -419,7 +426,8 @@ def stream_tool_aware_llm_response(
             round_content_parts: list[str] = []
             round_tool_calls: list[ToolCall] = []
             buffer_current_round = (
-                post_answer_probe_active
+                continuation_round_active
+                or post_answer_probe_active
                 or (
                     buffer_for_tool_decision
                     and not tool_has_executed
@@ -519,6 +527,7 @@ def stream_tool_aware_llm_response(
                             event_type="content_delta",
                             text=content_delta,
                         )
+                        visitor_text_emitted = True
                         if (
                             not execution_context.visitor_sentence_emitted
                             and _contains_complete_sentence(
@@ -555,6 +564,22 @@ def stream_tool_aware_llm_response(
             complete_round_content = "".join(
                 round_content_parts
             ).strip()
+
+            if (
+                continuation_round_active
+                and complete_round_content.casefold()
+                in EMPTY_CONTINUATION_RESPONSES
+            ):
+                complete_round_content = ""
+
+            if (
+                continuation_round_active
+                and visitor_text_emitted
+                and complete_round_content
+            ):
+                complete_round_content = (
+                    f" {complete_round_content}"
+                )
 
             if round_tool_calls:
                 messages.append(
@@ -687,6 +712,7 @@ def stream_tool_aware_llm_response(
                     event_type="content_delta",
                     text=complete_round_content,
                 )
+                visitor_text_emitted = True
                 if (
                     not execution_context.visitor_sentence_emitted
                     and _contains_complete_sentence(

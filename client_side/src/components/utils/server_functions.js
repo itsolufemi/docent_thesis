@@ -3,17 +3,11 @@ const server = `ws://${ipv4}:8080`; // use the local ip address to connect to th
 //console.log('1. server address:', server); // Log the server address
 let server_ws = null; // WebSocket client variable
 let setters = null;
-let shouldResetCaption = false; // Flag to indicate if the caption should be reset
 let audioFunctions = {} // to hold audio functions from the audio player component
-let captionFunctions = {} // to hold caption functions from the text panel component
 
 //#region utility functions
 const setAudioFunctionsinServer = (functions) => { // function to set the audio functions in the server
     audioFunctions = functions; // set the audio functions in the server   
-};
-
-const setCaptionFunctionsinServer = (functions) => { // function to set the caption functions in the server
-    captionFunctions = functions; // set the caption functions in the server
 };
 
 const sendtoServer = (type, message) => {
@@ -40,7 +34,6 @@ const cancel_res = () => {
     console.log('stop response');
     //setters.handleSetAsstResponding(false); // set assistant responding to false
     setters.setAudioQueue([]); // clear the audio queue
-    //captionFunctions.handleSetCaption(''); // reset the caption
     audioFunctions.stopAudio?.(); // stop legacy audio if configured
     sendtoServer('cancel', {}); // Send cancel request to server
 }
@@ -84,29 +77,11 @@ const connectToServer = (import_setters) => { // 1. connection to server and han
                     setters.handleSetLoading(false); // Set loading to false  */
                     break;
 
-                case 'question_transcript':
-                    captionFunctions.handleSetQuestion_trans(payload.transcript); // set the question transcript
-                    break;
-
-                case 'response_transcript':  
-                    if (shouldResetCaption) { // new response
-                        shouldResetCaption = false; // deactivate the caption gate to  append next text chunks
-                        captionFunctions.handleSetCaption(payload.transcript); // set the caption with the new text
-                    } else { // ongoing response
-                        captionFunctions.handleSetCaption((prev) => prev + payload.transcript); // append to the caption
-                    }
-                    break; 
-                
                 case 'audio_stream_complete': // server message indicating that all audio chunks have been streamed to client
                     console.log('server message: audio stream complete');
                     audioFunctions.msg_audioStreamComplete?.(); // notify legacy audio if configured
                     break;
                 
-                case 'reset_caption': // server indicates to reset the caption for new response
-                    shouldResetCaption = true; // set the flag to reset the caption
-                    console.log('caption will be reset for next response');
-                    break;
-
                 case 'tour_itinerary': // itenerary for requested tour, lists the artworks to be covered in the tour
                     setters.handleSetTour_itinerary(payload.itinerary);
                     console.log('itinerary recieved', /*payload.itinerary*/);
@@ -136,7 +111,6 @@ const connectToServer = (import_setters) => { // 1. connection to server and han
 const makeServerRequest = async (type, payload = null,) => { // 2. handle different outgoing server requests (client --> server)
     if(type !== 'chunk'){
         setters.setAudioQueue([]); // Clear the audio queue
-        shouldResetCaption = true; // Set the flag to reset the caption
     }
 
     switch (type) {
@@ -201,4 +175,4 @@ const makeServerRequest = async (type, payload = null,) => { // 2. handle differ
     }
 }
 
-export { connectToServer, makeServerRequest, setAudioFunctionsinServer, setCaptionFunctionsinServer };
+export { connectToServer, makeServerRequest, setAudioFunctionsinServer };

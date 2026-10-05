@@ -1559,7 +1559,6 @@ export default function MainApplication() {
           playbackComplete: true,
           cancelled: false,
         };
-        setStreamedAssistantResponse('');
       },
 
       onResponseFirstDelta: ({
