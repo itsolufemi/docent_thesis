@@ -1727,8 +1727,9 @@ export default function MainApplication() {
             requestId,
           ) ?? '';
         const completedText =
-          payload.response ??
-          streamedText;
+          streamedText ||
+          payload.response ||
+          '';
 
         streamedResponsesRef.current.set(
           requestId,
