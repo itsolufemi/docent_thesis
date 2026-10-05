@@ -605,6 +605,91 @@ class ToolRegistryInjectionTest(unittest.TestCase):
         "conversation_core.services.llm_service."
         "stream_ollama_chat_request"
     )
+    def test_post_discovery_control_block_is_not_emitted(
+        self,
+        stream_request,
+    ) -> None:
+        registry = self._discovery_registry(
+            lambda _context, _arguments: ToolExecutionResult(
+                tool_name="discover_docent_knowledge",
+                success=True,
+                message="Discovery found.",
+                data={"candidates": []},
+            )
+        )
+        stream_request.side_effect = [
+            iter(
+                [
+                    {
+                        "message": {"content": "Primary answer."},
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "discover_docent_knowledge",
+                                        "arguments": {
+                                            "query": "related work",
+                                            "scope": "collection",
+                                            "purpose": "proactive",
+                                        },
+                                    }
+                                }
+                            ],
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": (
+                                '<control>{"route_type":"response"}'
+                                "</control> Actually, you might..."
+                            )
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        events = list(
+            stream_tool_aware_llm_response(
+                prompt="Tell me about the artwork.",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=False,
+                tool_registry=registry,
+            )
+        )
+
+        emitted_parts = [
+            event.text
+            for event in events
+            if event.event_type == "content_delta"
+        ]
+        self.assertEqual(
+            emitted_parts,
+            ["Primary answer.", " Actually, you might..."],
+        )
+        self.assertNotIn(
+            "<control>",
+            "".join(emitted_parts),
+        )
+
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
     def test_delegated_discovery_remains_available_before_answer(
         self,
         stream_request,

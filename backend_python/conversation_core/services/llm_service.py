@@ -45,13 +45,20 @@ POST_DISCOVERY_CONTINUATION_INSTRUCTION = (
     "only if it adds something worthwhile. Add at most one short natural "
     "continuation. Do not repeat the primary answer. If no worthwhile "
     "continuation exists, return an empty response. Never say 'No additional "
-    "text', 'Nothing to add', or describe this decision."
+    "text', 'Nothing to add', or describe this decision. Do not emit control "
+    "tags, routing metadata, tool calls, or diagnostic text. Return only the "
+    "optional visitor-facing continuation, or an empty response."
 )
 
 EMPTY_CONTINUATION_RESPONSES = {
     "no additional text",
     "no additional text.",
 }
+
+CONTROL_BLOCK_PATTERN = re.compile(
+    r"<control>.*?</control>\s*",
+    flags=re.DOTALL,
+)
 
 
 def _contains_complete_sentence(text: str) -> bool:
@@ -564,6 +571,14 @@ def stream_tool_aware_llm_response(
             complete_round_content = "".join(
                 round_content_parts
             ).strip()
+
+            if continuation_round_active:
+                complete_round_content = (
+                    CONTROL_BLOCK_PATTERN.sub(
+                        "",
+                        complete_round_content,
+                    ).strip()
+                )
 
             if (
                 continuation_round_active
