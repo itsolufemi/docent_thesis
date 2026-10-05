@@ -64,7 +64,7 @@ CONTROL_BLOCK_PATTERN = re.compile(
 DUPLICATE_TOOL_CALL_INSTRUCTION = (
     "The requested tool call has already been executed with the same "
     "arguments during this response phase. Do not call it again. Use the "
-    "evidence already available and continue the response."
+    "existing tool result and continue the response."
 )
 
 
@@ -437,6 +437,7 @@ def stream_tool_aware_llm_response(
         conversation_id=conversation_id
     )
     phase = ToolResponsePhase.PRIMARY
+    post_answer_probe_needed = True
     visitor_text_emitted = False
     executed_call_signatures: dict[
         ToolResponsePhase,
@@ -751,6 +752,12 @@ def stream_tool_aware_llm_response(
                         and execution_result.success
                     ):
                         post_answer_tool_succeeded = True
+                    if (
+                        phase == ToolResponsePhase.PRIMARY
+                        and execution_result.success
+                        and tool_call.name in post_answer_tool_names
+                    ):
+                        post_answer_probe_needed = False
 
                     if (
                         cancellation_token is not None
@@ -859,7 +866,11 @@ def stream_tool_aware_llm_response(
                     ):
                         execution_context.visitor_sentence_emitted = True
 
-                if complete_round_content and post_answer_tools:
+                if (
+                    complete_round_content
+                    and post_answer_tools
+                    and post_answer_probe_needed
+                ):
                     messages.append(
                         {
                             "role": "assistant",

@@ -923,14 +923,6 @@ class ToolRegistryInjectionTest(unittest.TestCase):
                     }
                 ]
             ),
-            iter(
-                [
-                    {
-                        "message": {"content": ""},
-                        "done": True,
-                    }
-                ]
-            ),
         ]
 
         events = list(
@@ -953,14 +945,7 @@ class ToolRegistryInjectionTest(unittest.TestCase):
             captured_contexts[0].response_phase,
             "primary",
         )
-        self.assertEqual(len(stream_request.call_args_list), 3)
-        self.assertEqual(
-            [
-                tool["function"]["name"]
-                for tool in stream_request.call_args_list[2].kwargs["tools"]
-            ],
-            ["discover_docent_knowledge"],
-        )
+        self.assertEqual(len(stream_request.call_args_list), 2)
 
 
 if __name__ == "__main__":
