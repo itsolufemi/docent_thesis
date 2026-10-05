@@ -91,10 +91,19 @@ def _tool_execution_summary(
     tool_name: str,
     arguments: dict,
     result: dict,
+    orchestration: dict | None = None,
 ) -> dict[str, object]:
     return {
         "tool_name": tool_name,
         "arguments": arguments,
+        "response_phase": (orchestration or {}).get(
+            "response_phase"
+        ),
+        "call_signature": (orchestration or {}).get(
+            "call_signature"
+        ),
+        "duplicate": False,
+        "purpose": (orchestration or {}).get("purpose"),
         "success": bool(result.get("success")),
         "message": result.get("message"),
         "retrieval_used": bool(result.get("retrieval_used")),
@@ -206,6 +215,13 @@ def build_stream_websocket_message(
             "payload": {
                 "tool_calls": event.tool_calls,
             },
+        }
+
+    if event.event_type == "tool_call_suppressed":
+        return {
+            "type": "tool_call_suppressed",
+            "request_id": request_id,
+            "payload": event.tool_telemetry,
         }
 
     if event.event_type == "tool_result":
@@ -469,6 +485,9 @@ async def process_streamed_turn_event(
                         pending_tool_calls.append(
                             {
                                 "call": tool_call,
+                                "orchestration": dict(
+                                    stream_event.tool_telemetry
+                                ),
                                 "called_at": called_at,
                                 "primary_text_to_call_seconds": (
                                     round(called_at - last_content_at, 4)
@@ -477,6 +496,20 @@ async def process_streamed_turn_event(
                                 ),
                             }
                         )
+
+                if (
+                    stream_event.event_type
+                    == "tool_call_suppressed"
+                ):
+                    append_telemetry_log(
+                        conversation_id=conversation_id,
+                        request_id=request_id,
+                        event_type="tool_call_suppressed",
+                        payload=dict(
+                            stream_event.tool_telemetry
+                        ),
+                    )
+                    continue
 
                 if (
                     stream_event.event_type == "tool_result"
@@ -506,6 +539,11 @@ async def process_streamed_turn_event(
                             tool_name=tool_name,
                             arguments=arguments,
                             result=result_payload,
+                            orchestration=(
+                                matched_call.get("orchestration")
+                                if matched_call is not None
+                                else stream_event.tool_telemetry
+                            ),
                         ),
                     )
 

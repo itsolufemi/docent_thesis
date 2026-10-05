@@ -3,6 +3,7 @@ import json
 import re
 
 from collections.abc import Callable, Iterator
+from enum import Enum
 from time import perf_counter
 from typing import Any
 
@@ -35,14 +36,14 @@ LLMTimingCallback = Callable[
 
 POST_ANSWER_PROBE_INSTRUCTION = (
     "The visitor's primary answer has already been delivered. Do not repeat "
-    "or continue that answer yet. Decide whether one worthwhile optional tool "
-    "discovery would naturally extend it. If so, call the single available "
-    "tool with purpose='proactive'. Otherwise produce no text and finish."
+    "or continue that answer yet. Decide whether one worthwhile optional "
+    "post-answer tool action would naturally extend it. If so, call an "
+    "available post-answer tool. Otherwise produce no text and finish."
 )
 
 POST_DISCOVERY_CONTINUATION_INSTRUCTION = (
-    "The primary answer has already been delivered. Use the discovery result "
-    "only if it adds something worthwhile. Add at most one short natural "
+    "The primary answer has already been delivered. Use the post-answer tool "
+    "result only if it adds something worthwhile. Add at most one short natural "
     "continuation. Do not repeat the primary answer. If no worthwhile "
     "continuation exists, return an empty response. Never say 'No additional "
     "text', 'Nothing to add', or describe this decision. Do not emit control "
@@ -59,6 +60,28 @@ CONTROL_BLOCK_PATTERN = re.compile(
     r"<control>.*?</control>\s*",
     flags=re.DOTALL,
 )
+
+DUPLICATE_TOOL_CALL_INSTRUCTION = (
+    "The requested tool call has already been executed with the same "
+    "arguments during this response phase. Do not call it again. Use the "
+    "evidence already available and continue the response."
+)
+
+
+class ToolResponsePhase(str, Enum):
+    PRIMARY = "primary"
+    POST_ANSWER_PROBE = "post_answer"
+    CONTINUATION = "continuation"
+
+
+def tool_call_signature(tool_call: ToolCall) -> str:
+    arguments_json = json.dumps(
+        tool_call.arguments,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return f"{tool_call.name}:{arguments_json}"
 
 
 def _contains_complete_sentence(text: str) -> bool:
@@ -376,32 +399,59 @@ def stream_tool_aware_llm_response(
         }
     ]
     active_tool_registry = tool_registry or core_tool_registry
-    tools = build_ollama_tool_definitions(
+    definitions = active_tool_registry.get_definitions()
+    tool_definitions = build_ollama_tool_definitions(
         active_tool_registry
     )
-    probe_tool_names = {
+    primary_tool_names = {
         definition.name
-        for definition in active_tool_registry.get_definitions()
-        if definition.post_answer_probe
+        for definition in definitions
+        if "primary" in definition.allowed_phases
     }
-    probe_tools = [
+    post_answer_tool_names = {
+        definition.name
+        for definition in definitions
+        if "post_answer" in definition.allowed_phases
+    }
+    primary_tools = [
         tool
-        for tool in tools
-        if tool.get("function", {}).get("name") in probe_tool_names
+        for tool in tool_definitions
+        if tool.get("function", {}).get("name") in primary_tool_names
     ]
-    tools_without_probe = [
+    post_answer_tools = [
         tool
-        for tool in tools
-        if tool.get("function", {}).get("name") not in probe_tool_names
+        for tool in tool_definitions
+        if tool.get("function", {}).get("name") in post_answer_tool_names
     ]
+
+    def tools_for_phase(
+        response_phase: ToolResponsePhase,
+    ) -> list[dict[str, Any]] | None:
+        if response_phase == ToolResponsePhase.PRIMARY:
+            return primary_tools
+        if response_phase == ToolResponsePhase.POST_ANSWER_PROBE:
+            return post_answer_tools
+        return None
+
     execution_context = ToolExecutionContext(
         conversation_id=conversation_id
     )
-    tool_has_executed = False
-    probe_tool_has_executed = False
-    post_answer_probe_active = False
-    continuation_round_active = False
+    phase = ToolResponsePhase.PRIMARY
     visitor_text_emitted = False
+    executed_call_signatures: dict[
+        ToolResponsePhase,
+        set[str],
+    ] = {
+        response_phase: set()
+        for response_phase in ToolResponsePhase
+    }
+    duplicate_recovery_attempted: dict[
+        ToolResponsePhase,
+        bool,
+    ] = {
+        response_phase: False
+        for response_phase in ToolResponsePhase
+    }
 
     if (
         cancellation_token is not None
@@ -433,22 +483,13 @@ def stream_tool_aware_llm_response(
             round_content_parts: list[str] = []
             round_tool_calls: list[ToolCall] = []
             buffer_current_round = (
-                continuation_round_active
-                or post_answer_probe_active
+                phase != ToolResponsePhase.PRIMARY
                 or (
                     buffer_for_tool_decision
-                    and not tool_has_executed
+                    and not execution_context.executed_tool_names
                 )
             )
-            round_tools = (
-                None
-                if continuation_round_active
-                else probe_tools
-                if post_answer_probe_active
-                else tools_without_probe
-                if probe_tool_has_executed
-                else tools
-            )
+            round_tools = tools_for_phase(phase)
             allowed_round_tool_names = {
                 tool.get("function", {}).get("name")
                 for tool in (round_tools or [])
@@ -572,7 +613,7 @@ def stream_tool_aware_llm_response(
                 round_content_parts
             ).strip()
 
-            if continuation_round_active:
+            if phase == ToolResponsePhase.CONTINUATION:
                 complete_round_content = (
                     CONTROL_BLOCK_PATTERN.sub(
                         "",
@@ -581,14 +622,14 @@ def stream_tool_aware_llm_response(
                 )
 
             if (
-                continuation_round_active
+                phase == ToolResponsePhase.CONTINUATION
                 and complete_round_content.casefold()
                 in EMPTY_CONTINUATION_RESPONSES
             ):
                 complete_round_content = ""
 
             if (
-                continuation_round_active
+                phase == ToolResponsePhase.CONTINUATION
                 and visitor_text_emitted
                 and complete_round_content
             ):
@@ -596,7 +637,43 @@ def stream_tool_aware_llm_response(
                     f" {complete_round_content}"
                 )
 
-            if round_tool_calls:
+            accepted_tool_calls: list[
+                tuple[ToolCall, str]
+            ] = []
+            duplicate_tool_calls: list[
+                tuple[ToolCall, str]
+            ] = []
+            for tool_call in round_tool_calls:
+                signature = tool_call_signature(tool_call)
+                if (
+                    signature
+                    in executed_call_signatures[phase]
+                ):
+                    duplicate_tool_calls.append(
+                        (tool_call, signature)
+                    )
+                else:
+                    accepted_tool_calls.append(
+                        (tool_call, signature)
+                    )
+
+            for tool_call, signature in duplicate_tool_calls:
+                yield LLMStreamEvent(
+                    event_type="tool_call_suppressed",
+                    tool_name=tool_call.name,
+                    tool_calls=[
+                        tool_call.model_dump(mode="json")
+                    ],
+                    tool_telemetry={
+                        "tool_name": tool_call.name,
+                        "response_phase": phase.value,
+                        "call_signature": signature,
+                        "duplicate": True,
+                        "reason": "duplicate_call_same_phase",
+                    },
+                )
+
+            if accepted_tool_calls:
                 messages.append(
                     {
                         "role": "assistant",
@@ -615,13 +692,14 @@ def stream_tool_aware_llm_response(
                                     ),
                                 },
                             }
-                            for tool_call
-                            in round_tool_calls
+                            for tool_call, _signature
+                            in accepted_tool_calls
                         ],
                     }
                 )
 
-                for tool_call in round_tool_calls:
+                post_answer_tool_succeeded = False
+                for tool_call, signature in accepted_tool_calls:
                     if (
                         cancellation_token is not None
                         and cancellation_token.is_cancelled
@@ -641,8 +719,23 @@ def stream_tool_aware_llm_response(
                                 mode="json"
                             )
                         ],
+                        tool_telemetry={
+                            "tool_name": tool_call.name,
+                            "response_phase": phase.value,
+                            "call_signature": signature,
+                            "duplicate": False,
+                            "purpose": tool_call.arguments.get(
+                                "purpose"
+                            ),
+                        },
                     )
 
+                    executed_call_signatures[phase].add(
+                        signature
+                    )
+                    execution_context.response_phase = (
+                        phase.value
+                    )
                     execution_result = (
                         active_tool_registry.execute(
                             tool_call=tool_call,
@@ -653,19 +746,11 @@ def stream_tool_aware_llm_response(
                         tool_call.name
                     )
                     if (
-                        tool_call.name in probe_tool_names
+                        phase
+                        == ToolResponsePhase.POST_ANSWER_PROBE
                         and execution_result.success
                     ):
-                        probe_tool_has_executed = True
-                        post_answer_probe_active = False
-                        if (
-                            tool_call.arguments.get(
-                                "purpose",
-                                "proactive",
-                            )
-                            == "proactive"
-                        ):
-                            continuation_round_active = True
+                        post_answer_tool_succeeded = True
 
                     if (
                         cancellation_token is not None
@@ -704,9 +789,19 @@ def stream_tool_aware_llm_response(
                         event_type="tool_result",
                         tool_name=tool_call.name,
                         tool_result=result_payload,
+                        tool_telemetry={
+                            "tool_name": tool_call.name,
+                            "response_phase": phase.value,
+                            "call_signature": signature,
+                            "duplicate": False,
+                            "purpose": tool_call.arguments.get(
+                                "purpose"
+                            ),
+                        },
                     )
 
-                if continuation_round_active:
+                if post_answer_tool_succeeded:
+                    phase = ToolResponsePhase.CONTINUATION
                     messages.append(
                         {
                             "role": "system",
@@ -715,28 +810,79 @@ def stream_tool_aware_llm_response(
                             ),
                         }
                     )
-                tool_has_executed = True
                 continue
 
-            if (
-                complete_round_content
-                and buffer_current_round
-                and not post_answer_probe_active
-            ):
-                yield LLMStreamEvent(
-                    event_type="content_delta",
-                    text=complete_round_content,
-                )
-                visitor_text_emitted = True
-                if (
-                    not execution_context.visitor_sentence_emitted
-                    and _contains_complete_sentence(
-                        complete_round_content
-                    )
-                ):
-                    execution_context.visitor_sentence_emitted = True
+            if round_tool_calls and not accepted_tool_calls:
+                if duplicate_recovery_attempted[phase]:
+                    if visitor_text_emitted:
+                        yield LLMStreamEvent(
+                            event_type="response_complete",
+                            text="",
+                            done=True,
+                        )
+                    else:
+                        recovery_failure = (
+                            "I'm sorry, I couldn't complete that response."
+                        )
+                        yield LLMStreamEvent(
+                            event_type="content_delta",
+                            text=recovery_failure,
+                        )
+                        yield LLMStreamEvent(
+                            event_type="response_complete",
+                            text=recovery_failure,
+                            done=True,
+                        )
+                    return
 
-            if post_answer_probe_active:
+                duplicate_recovery_attempted[phase] = True
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": DUPLICATE_TOOL_CALL_INSTRUCTION,
+                    }
+                )
+                continue
+
+            if phase == ToolResponsePhase.PRIMARY:
+                if complete_round_content and buffer_current_round:
+                    yield LLMStreamEvent(
+                        event_type="content_delta",
+                        text=complete_round_content,
+                    )
+                    visitor_text_emitted = True
+                    if (
+                        not execution_context.visitor_sentence_emitted
+                        and _contains_complete_sentence(
+                            complete_round_content
+                        )
+                    ):
+                        execution_context.visitor_sentence_emitted = True
+
+                if complete_round_content and post_answer_tools:
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": complete_round_content,
+                        }
+                    )
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": POST_ANSWER_PROBE_INSTRUCTION,
+                        }
+                    )
+                    phase = ToolResponsePhase.POST_ANSWER_PROBE
+                    continue
+
+                yield LLMStreamEvent(
+                    event_type="response_complete",
+                    text=complete_round_content,
+                    done=True,
+                )
+                return
+
+            if phase == ToolResponsePhase.POST_ANSWER_PROBE:
                 yield LLMStreamEvent(
                     event_type="response_complete",
                     text="",
@@ -744,26 +890,12 @@ def stream_tool_aware_llm_response(
                 )
                 return
 
-            if (
-                probe_tools
-                and execution_context.visitor_sentence_emitted
-                and not probe_tool_has_executed
-                and not continuation_round_active
-            ):
-                messages.append(
-                    {
-                        "role": "assistant",
-                        "content": complete_round_content,
-                    }
+            if complete_round_content:
+                yield LLMStreamEvent(
+                    event_type="content_delta",
+                    text=complete_round_content,
                 )
-                messages.append(
-                    {
-                        "role": "system",
-                        "content": POST_ANSWER_PROBE_INSTRUCTION,
-                    }
-                )
-                post_answer_probe_active = True
-                continue
+                visitor_text_emitted = True
 
             yield LLMStreamEvent(
                 event_type="response_complete",

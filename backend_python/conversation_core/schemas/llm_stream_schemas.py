@@ -13,6 +13,7 @@ LLMStreamEventType = Literal[
     "control_signal",
     "content_delta",
     "tool_call",
+    "tool_call_suppressed",
     "tool_result",
     "timing",
     "response_complete",
@@ -28,6 +29,9 @@ class LLMStreamEvent(BaseModel):
     )
     tool_name: str | None = None
     tool_result: dict[str, Any] | None = None
+    tool_telemetry: dict[str, Any] = Field(
+        default_factory=dict
+    )
     route_assessment: dict[str, Any] | None = None
     control_signal: ControlSignal | None = None
     timing_name: str | None = None

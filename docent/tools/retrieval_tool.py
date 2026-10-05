@@ -27,6 +27,7 @@ class DocentRetrievalArguments(BaseModel):
 
 DOCENT_RETRIEVAL_TOOL = ToolDefinition(
     name="retrieve_docent_knowledge",
+    allowed_phases={"primary"},
     description=(
         "Retrieve Wallace Collection knowledge needed to answer the "
         "visitor. Use resolved subject names from the current "

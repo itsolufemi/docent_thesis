@@ -27,7 +27,10 @@ class DocentDiscoveryArguments(BaseModel):
 
 DOCENT_DISCOVERY_TOOL = ToolDefinition(
     name="discover_docent_knowledge",
-    post_answer_probe=True,
+    allowed_phases={
+        "primary",
+        "post_answer",
+    },
     description=(
         "Semantically search Wallace Collection knowledge for a potentially "
         "worthwhile discovery connected to the visitor's conversation. For "
@@ -90,15 +93,14 @@ def discover_docent_knowledge(
     validated = DocentDiscoveryArguments.model_validate(arguments)
     if (
         validated.purpose == "proactive"
-        and not context.visitor_sentence_emitted
+        and context.response_phase != "post_answer"
     ):
         return ToolExecutionResult(
             tool_name=DOCENT_DISCOVERY_TOOL.name,
             success=False,
             message=(
-                "Discovery is not available yet. "
-                "Answer the visitor's current request first, "
-                "then call discovery if a worthwhile continuation remains."
+                "Proactive discovery is only available during "
+                "the post-answer discovery phase."
             ),
             retrieval_used=False,
             data={},

@@ -304,7 +304,7 @@ class DocentDiscoveryToolTest(unittest.TestCase):
         discover.assert_not_called()
         self.assertFalse(result.success)
         self.assertFalse(result.retrieval_used)
-        self.assertIn("Answer the visitor", result.message)
+        self.assertIn("post-answer discovery phase", result.message)
 
     @patch("docent.tools.discovery_tool.discover_docent_candidates")
     def test_discovery_allowed_after_answer(
@@ -326,6 +326,7 @@ class DocentDiscoveryToolTest(unittest.TestCase):
             ToolExecutionContext(
                 conversation_id=conversation.conversation_id,
                 visitor_sentence_emitted=True,
+                response_phase="post_answer",
                 executed_tool_names=["retrieve_docent_knowledge"],
             ),
         )
@@ -421,6 +422,7 @@ class DocentDiscoveryToolTest(unittest.TestCase):
             ToolExecutionContext(
                 conversation_id=conversation.conversation_id,
                 visitor_sentence_emitted=True,
+                response_phase="post_answer",
             ),
         )
 
@@ -448,6 +450,10 @@ class DocentDiscoveryToolTest(unittest.TestCase):
         self.assertIn("conceptual semantic discovery", definition.description)
         self.assertIn("only after producing", definition.description)
         self.assertIn("delegates the choice", definition.description)
+        self.assertEqual(
+            definition.allowed_phases,
+            {"primary", "post_answer"},
+        )
         self.assertEqual(
             definition.parameters["properties"]["scope"]["enum"],
             ["current_artwork", "collection"],

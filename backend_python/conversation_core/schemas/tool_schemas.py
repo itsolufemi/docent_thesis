@@ -1,10 +1,22 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 from conversation_core.schemas.source_schemas import (
     QuerySource,
 )
+
+
+ToolPhase = Literal[
+    "primary",
+    "post_answer",
+]
+
+ToolExecutionPhase = Literal[
+    "primary",
+    "post_answer",
+    "continuation",
+]
 
 
 class ToolDefinition(BaseModel):
@@ -21,7 +33,9 @@ class ToolDefinition(BaseModel):
     parameters: dict[str, Any] = Field(
         default_factory=dict
     )
-    post_answer_probe: bool = False
+    allowed_phases: set[ToolPhase] = Field(
+        default_factory=lambda: {"primary"}
+    )
 
 
 class ToolCall(BaseModel):
@@ -45,6 +59,7 @@ class ToolExecutionContext(BaseModel):
 
     conversation_id: str
     visitor_sentence_emitted: bool = False
+    response_phase: ToolExecutionPhase = "primary"
     executed_tool_names: list[str] = Field(
         default_factory=list
     )

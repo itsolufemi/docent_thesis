@@ -88,7 +88,10 @@ class ToolRegistryInjectionTest(unittest.TestCase):
                     },
                     "required": ["query", "scope"],
                 },
-                post_answer_probe=True,
+                allowed_phases={
+                    "primary",
+                    "post_answer",
+                },
             ),
             handler,
         )
@@ -325,23 +328,24 @@ class ToolRegistryInjectionTest(unittest.TestCase):
             )
 
         self.handler.side_effect = capture_context
-        tool_round = {
-            "message": {
-                "content": "",
-                "tool_calls": [
-                    {
-                        "function": {
-                            "name": "sandbox_lookup",
-                            "arguments": {},
+        def tool_round(arguments):
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "sandbox_lookup",
+                                "arguments": arguments,
+                            }
                         }
-                    }
-                ],
-            },
-            "done": True,
-        }
+                    ],
+                },
+                "done": True,
+            }
         stream_request.side_effect = [
-            iter([tool_round]),
-            iter([tool_round]),
+            iter([tool_round({"subject": "The Swing"})]),
+            iter([tool_round({"subject": "Boucher"})]),
             iter(
                 [
                     {
@@ -366,6 +370,185 @@ class ToolRegistryInjectionTest(unittest.TestCase):
             captured_contexts[1].executed_tool_names,
             ["sandbox_lookup"],
         )
+        self.assertEqual(self.handler.call_count, 2)
+
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_exact_duplicate_tool_call_is_suppressed_and_recovered(
+        self,
+        stream_request,
+    ) -> None:
+        duplicate_round = {
+            "message": {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "sandbox_lookup",
+                            "arguments": {"subject": "p487"},
+                        }
+                    }
+                ],
+            },
+            "done": True,
+        }
+        stream_request.side_effect = [
+            iter([duplicate_round]),
+            iter([duplicate_round]),
+            iter(
+                [
+                    {
+                        "message": {"content": "Finished from evidence."},
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        events = list(
+            stream_tool_aware_llm_response(
+                prompt="Use the same evidence once.",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=False,
+                tool_registry=self.registry,
+            )
+        )
+
+        self.handler.assert_called_once()
+        suppressed = next(
+            event
+            for event in events
+            if event.event_type == "tool_call_suppressed"
+        )
+        self.assertEqual(
+            suppressed.tool_telemetry["response_phase"],
+            "primary",
+        )
+        self.assertTrue(
+            suppressed.tool_telemetry["duplicate"]
+        )
+        self.assertEqual(
+            suppressed.tool_telemetry["reason"],
+            "duplicate_call_same_phase",
+        )
+        self.assertIn(
+            'sandbox_lookup:{"subject":"p487"}',
+            suppressed.tool_telemetry["call_signature"],
+        )
+        self.assertIn(
+            "already been executed",
+            stream_request.call_args_list[2].kwargs["messages"][-1]["content"],
+        )
+        emitted = "".join(
+            event.text
+            for event in events
+            if event.event_type == "content_delta"
+        )
+        self.assertEqual(emitted, "Finished from evidence.")
+
+    @patch(
+        "conversation_core.services.llm_service."
+        "stream_ollama_chat_request"
+    )
+    def test_post_answer_phase_exposes_discovery_but_not_primary_tool(
+        self,
+        stream_request,
+    ) -> None:
+        discovery_handler = Mock(
+            return_value=ToolExecutionResult(
+                tool_name="discover_docent_knowledge",
+                success=True,
+                message="Discovery complete.",
+            )
+        )
+        self.registry.register(
+            ToolDefinition(
+                name="discover_docent_knowledge",
+                description="Discover an optional continuation.",
+                allowed_phases={"primary", "post_answer"},
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                },
+            ),
+            discovery_handler,
+        )
+        stream_request.side_effect = [
+            iter(
+                [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "sandbox_lookup",
+                                        "arguments": {"subject": "The Swing"},
+                                    }
+                                }
+                            ],
+                        },
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {"content": "Primary answer."},
+                        "done": True,
+                    }
+                ]
+            ),
+            iter(
+                [
+                    {
+                        "message": {"content": ""},
+                        "done": True,
+                    }
+                ]
+            ),
+        ]
+
+        events = list(
+            stream_tool_aware_llm_response(
+                prompt="Tell me about The Swing.",
+                conversation_id="conversation-a",
+                buffer_for_tool_decision=False,
+                tool_registry=self.registry,
+            )
+        )
+
+        self.handler.assert_called_once()
+        discovery_handler.assert_not_called()
+        primary_names = {
+            tool["function"]["name"]
+            for tool in stream_request.call_args_list[0].kwargs["tools"]
+        }
+        self.assertEqual(
+            primary_names,
+            {"sandbox_lookup", "discover_docent_knowledge"},
+        )
+        post_answer_names = {
+            tool["function"]["name"]
+            for tool in stream_request.call_args_list[2].kwargs["tools"]
+        }
+        self.assertEqual(
+            post_answer_names,
+            {"discover_docent_knowledge"},
+        )
+        tool_call = next(
+            event
+            for event in events
+            if event.event_type == "tool_call"
+        )
+        self.assertEqual(
+            tool_call.tool_telemetry["response_phase"],
+            "primary",
+        )
+        self.assertFalse(tool_call.tool_telemetry["duplicate"])
 
     @patch(
         "conversation_core.services.llm_service."
@@ -515,6 +698,10 @@ class ToolRegistryInjectionTest(unittest.TestCase):
         )
         self.assertEqual(emitted_parts.count("Primary answer."), 1)
         self.assertTrue(captured_contexts[0].visitor_sentence_emitted)
+        self.assertEqual(
+            captured_contexts[0].response_phase,
+            "post_answer",
+        )
         self.assertEqual(len(captured_contexts), 1)
         self.assertIsNone(stream_request.call_args_list[2].kwargs["tools"])
         self.assertIn(
@@ -736,6 +923,14 @@ class ToolRegistryInjectionTest(unittest.TestCase):
                     }
                 ]
             ),
+            iter(
+                [
+                    {
+                        "message": {"content": ""},
+                        "done": True,
+                    }
+                ]
+            ),
         ]
 
         events = list(
@@ -754,7 +949,18 @@ class ToolRegistryInjectionTest(unittest.TestCase):
         )
         self.assertEqual(emitted, "See The Swing next.")
         self.assertFalse(captured_contexts[0].visitor_sentence_emitted)
-        self.assertEqual(len(stream_request.call_args_list), 2)
+        self.assertEqual(
+            captured_contexts[0].response_phase,
+            "primary",
+        )
+        self.assertEqual(len(stream_request.call_args_list), 3)
+        self.assertEqual(
+            [
+                tool["function"]["name"]
+                for tool in stream_request.call_args_list[2].kwargs["tools"]
+            ],
+            ["discover_docent_knowledge"],
+        )
 
 
 if __name__ == "__main__":
