@@ -30,8 +30,20 @@ DOCENT_RETRIEVAL_TOOL = ToolDefinition(
     allowed_phases={"primary"},
     description=(
         "Retrieve Wallace Collection knowledge needed to answer the "
-        "visitor. Use resolved subject names from the current "
-        "conversation as retrieval queries."
+        "visitor. Identify every independent subject whose knowledge is "
+        "currently needed and include all subjects already known in one "
+        "call. When retrieval returns useful knowledge for a subject, use "
+        "that result to answer rather than repeatedly reformulating and "
+        "retrieving the same information need. Make another retrieval call "
+        "only when the visitor's request contains another distinct subject "
+        "that still needs knowledge, or when the previous retrieval did not "
+        "provide enough information to answer. A subject discovered only "
+        "after the first result may therefore be retrieved in a later call. "
+        "Preferred example: for 'Compare The Swing and The Rape of Europa', "
+        "call once with subjects=['The Swing', 'The Rape of Europa']. Avoid "
+        "serial reformulations such as subjects=['p487'] followed by "
+        "subjects=['p487 Wallace Collection'] when the first result already "
+        "contains useful knowledge for P487."
     ),
     parameters={
         "type": "object",
@@ -42,6 +54,13 @@ DOCENT_RETRIEVAL_TOOL = ToolDefinition(
                     "type": "string",
                 },
                 "minItems": 1,
+                "description": (
+                    "All currently known artwork, artist, concept, or "
+                    "collection subjects whose knowledge is needed for this "
+                    "response. Include multiple independent subjects in the "
+                    "same call when they are already known. Do not invent a "
+                    "second subject merely to fill the list."
+                ),
             },
         },
         "required": ["subjects"],

@@ -25,9 +25,63 @@ from conversation_core.schemas.tool_schemas import (  # noqa: E402
 from docent.tools import (  # noqa: E402
     docent_tool_registry,
 )
+from docent.tools.retrieval_tool import (  # noqa: E402
+    DOCENT_RETRIEVAL_TOOL,
+)
 
 
 class DocentRetrievalToolTest(unittest.TestCase):
+    def test_tool_contract_encourages_batched_sufficient_retrieval(
+        self,
+    ) -> None:
+        description = DOCENT_RETRIEVAL_TOOL.description
+        subjects_schema = (
+            DOCENT_RETRIEVAL_TOOL.parameters[
+                "properties"
+            ]["subjects"]
+        )
+
+        self.assertIn(
+            "include all subjects already known in one call",
+            description,
+        )
+        self.assertIn(
+            "useful knowledge for a subject",
+            description,
+        )
+        self.assertIn(
+            "another distinct subject",
+            description,
+        )
+        self.assertIn(
+            "did not provide enough information",
+            description,
+        )
+        self.assertIn(
+            "subjects=['The Swing', 'The Rape of Europa']",
+            description,
+        )
+        self.assertIn(
+            "subjects=['p487 Wallace Collection']",
+            description,
+        )
+        self.assertEqual(
+            subjects_schema["type"],
+            "array",
+        )
+        self.assertEqual(
+            subjects_schema["minItems"],
+            1,
+        )
+        self.assertIn(
+            "multiple independent subjects",
+            subjects_schema["description"],
+        )
+        self.assertIn(
+            "Do not invent a second subject",
+            subjects_schema["description"],
+        )
+
     @patch(
         "docent.tools.retrieval_tool."
         "retrieve_docent_chunks_by_vector_similarity"
