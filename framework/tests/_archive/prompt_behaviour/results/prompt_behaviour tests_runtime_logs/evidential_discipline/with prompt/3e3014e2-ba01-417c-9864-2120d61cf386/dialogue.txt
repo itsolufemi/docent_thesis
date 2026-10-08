@@ -1,0 +1,20 @@
+
+========================================
+Timestamp: 2026-08-05T20:22:41.454296+00:00
+Role: user
+Previous subject: None
+Current subject: the arab tent
+Subject reference: painting:581
+Text:
+Why did Sir Richard Wallace pay so much for The Arab Tent?
+========================================
+
+========================================
+Timestamp: 2026-08-05T20:22:41.456459+00:00
+Role: assistant
+Previous subject: None
+Current subject: the arab tent
+Subject reference: painting:581
+Text:
+Well, it's a bit of a scandalous story, actually. Sir Richard bought it from the Prince of Wales for £6,300, which was a huge sum at the time. I think the Prince was habitually short on cash and likely took advantage of Richard's generosity, as well as his desire to move up in social circles.
+========================================

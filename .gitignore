@@ -1,39 +1,33 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# backend-python
-backend_python/.env
-backend_python/venv/
-backend_python/x_bin/
-backend_python/runtime_logs/
+# Framework and application runtime data
+framework/.env
+framework/venv/
+framework/tests/runtime_logs/
+apps/docent/runtime_logs/
 
 # Python generated files
 __pycache__/
 *.py[cod]
 
 # Generated Docent vector store
-docent/data/vector_store/*.npy
-docent/data/vector_store/*.json
+apps/docent/data/vector_store/*.npy
+apps/docent/data/vector_store/*.json
 
-# dependencies
+# Dependencies and local development output
 node_modules/
-/backend/.env 
-/backend/docent-app-447923-d892fe7dd066.json
+apps/docent/frontend/vite-dev*.log
 *.wav
-/components/utils/ipv4_module.js
 *.env
 .tmp.driveupload/
-
-# Local Smart Turn benchmark and human-recording archives
-ml_lab/**/*.zip
+.tmp.drivedownload/
+.agents/
 
 # Generated Ollama cold-start benchmark log
-backend_python/tests/03_ollama_startup.log
+framework/tests/_archive/benchmarks/results/03_ollama_startup.log
 
-# Expo
-.expo/
+# Build output
 dist/
-web-build/
-expo-env.d.ts
 
 # Native
 *.orig.*
@@ -42,9 +36,6 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
-
-# Metro
-.metro-health-check*
 
 # debug
 npm-debug.*
@@ -61,5 +52,5 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-#lib
-_lib/
+# Local research library
+__lib/

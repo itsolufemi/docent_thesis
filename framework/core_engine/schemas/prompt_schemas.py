@@ -1,0 +1,23 @@
+from pydantic import BaseModel, Field
+
+from core_engine.schemas.conversation_schemas import DialogueTurn
+
+
+class PromptSection(BaseModel):
+    title: str
+    content: str
+
+
+class PromptProfile(BaseModel):
+    assistant_name: str = "Assistant"
+    user_name: str = "User"
+    assistant_role: str
+    behavioural_rules: list[str] = Field(default_factory=list)
+    default_content_generation_rules: list[str] = Field(
+        default_factory=lambda: [
+            (
+                "Answer the user's current request directly using the "
+                "relevant information available to you."
+            )
+        ]
+    )

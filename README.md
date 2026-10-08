@@ -37,32 +37,31 @@ and subsequent requests reuse the cookie.
 
 ```text
 docent_thesis/
-├── backend_python/
-│   ├── conversation_core/   Provider-neutral conversation contracts,
+├── framework/
+│   ├── core_engine/   Provider-neutral conversation contracts,
 │   │                        routes, state and orchestration
 │   ├── extensions/          Generic retrieval/indexing implementation
 │   ├── models/              ASR, Smart Turn and TTS implementations/factories
-│   ├── scripts/             Benchmarks and diagnostic utilities
-│   ├── tests/               Backend unit and integration tests
+│   ├── tests/               Live test workspace and function-grouped archive
 │   ├── config.py            Environment-backed application settings
 │   ├── requirements.txt     Pinned Python dependencies
 │   └── server.py            FastAPI composition root
-├── docent/
-│   ├── api/                 Artwork and retrieval routes
-│   ├── config/              Docent-specific profiles
-│   ├── data/                Artwork corpus and generated vector store
-│   ├── schemas/             Museum-domain data contracts
-│   ├── scripts/             Docent vector-store builder
-│   └── services/            Prompt, context and retrieval services
-├── client_side/             React/Vite client and AudioWorklets
-├── ml_lab/                  Smart Turn benchmark workspace and reports
-├── archive/                 Reconstructable experimental implementations
-└── start_dev.ps1            Windows development launcher
+├── apps/
+│   └── docent/              Docent application package
+│       ├── api/             Artwork and retrieval routes
+│       ├── config/          Docent-specific profiles
+│       ├── data/            Artwork corpus and generated vector store
+│       ├── frontend/        React/Vite client and AudioWorklets
+│       ├── schemas/         Museum-domain data contracts
+│       ├── scripts/         Docent vector-store builder
+│       ├── services/        Prompt, context and retrieval services
+│       └── start.ps1        Windows development launcher
+├── _LAB/                    Smart Turn benchmark workspace and reports
 ```
 
-`conversation_core` describes what the conversational application needs.
-Concrete model/provider implementations live under `backend_python/models`.
-The root-level `docent` package supplies the museum-specific application built
+`core_engine` describes what the conversational application needs.
+Concrete model/provider implementations live under `framework/models`.
+The `apps/docent` package supplies the museum-specific application built
 on those capabilities.
 
 ## Prerequisites
@@ -102,10 +101,10 @@ Set-Location docent_thesis
 From the repository root:
 
 ```powershell
-py -3.14 -m venv backend_python\venv
-& .\backend_python\venv\Scripts\Activate.ps1
+py -3.14 -m venv framework\venv
+& .\framework\venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r .\backend_python\requirements.txt
+python -m pip install -r .\framework\requirements.txt
 ```
 
 If PowerShell blocks virtual-environment activation, enable scripts for the
@@ -118,11 +117,11 @@ Set-ExecutionPolicy -Scope Process Bypass
 ### 3. Install the client dependencies
 
 ```powershell
-npm ci --prefix client_side
+npm ci --prefix apps/docent/frontend
 ```
 
 The tracked `package-lock.json` makes `npm ci` the reproducible installation
-command. Use `npm install --prefix client_side` only when intentionally
+command. Use `npm install --prefix apps/docent/frontend` only when intentionally
 updating client dependencies.
 
 ### 4. Create the environment files
@@ -130,13 +129,13 @@ updating client dependencies.
 Copy the backend template:
 
 ```powershell
-Copy-Item .\backend_python\.env.example .\backend_python\.env
+Copy-Item .\framework\.env.example .\framework\.env
 ```
 
 Copy the client template:
 
 ```powershell
-Copy-Item .\client_side\.env.example .\client_side\.env
+Copy-Item .\apps\docent\frontend\.env.example .\apps\docent\frontend\.env
 ```
 
 The client should use:
@@ -174,15 +173,15 @@ Generated vector-index files are deliberately excluded from Git. Build them
 once after cloning, while Ollama and `nomic-embed-text` are available:
 
 ```powershell
-& .\backend_python\venv\Scripts\python.exe `
-    .\docent\scripts\build_docent_vector_store.py
+& .\framework\venv\Scripts\python.exe `
+    .\apps\docent\scripts\build_docent_vector_store.py
 ```
 
 The command creates:
 
 ```text
-docent/data/vector_store/docent_vector_index.json
-docent/data/vector_store/docent_vector_embeddings.npy
+apps/docent/data/vector_store/docent_vector_index.json
+apps/docent/data/vector_store/docent_vector_embeddings.npy
 ```
 
 Rebuild the index whenever the artwork corpus or embedding model changes.
@@ -194,7 +193,7 @@ Rebuild the index whenever the artwork corpus or embedding model changes.
 From the repository root:
 
 ```powershell
-.\start_dev.ps1
+.\apps\docent\start.ps1
 ```
 
 This opens separate PowerShell windows for:
@@ -202,8 +201,8 @@ This opens separate PowerShell windows for:
 - FastAPI at `http://localhost:8000`;
 - React/Vite at `http://localhost:5173`.
 
-The launcher sets the Python import path for the root-level `docent` package
-and configures Uvicorn to watch both `backend_python` and `docent`.
+The launcher sets the Python import path for the `apps.docent` package and
+configures Uvicorn to watch both `framework` and `apps/docent`.
 
 ### Manual startup
 
@@ -213,17 +212,16 @@ Backend terminal, from the repository root:
 
 ```powershell
 $env:PYTHONPATH = (Get-Location).Path
-Set-Location backend_python
-& .\venv\Scripts\Activate.ps1
-uvicorn server:app --reload `
+Set-Location framework
+& .\venv\Scripts\python.exe -m uvicorn server:app --reload `
     --reload-dir . `
-    --reload-dir ..\docent
+    --reload-dir ..\apps\docent
 ```
 
 Frontend terminal, from the repository root:
 
 ```powershell
-npm --prefix client_side run dev
+npm --prefix apps/docent/frontend run dev
 ```
 
 Open:
@@ -236,8 +234,8 @@ Allow microphone access when prompted by the browser.
 
 ## Configuration
 
-Backend configuration is read from `backend_python/.env`. The complete
-baseline is in `backend_python/.env.example`.
+Backend configuration is read from `framework/.env`. The complete
+baseline is in `framework/.env.example`.
 
 ### Language models and embeddings
 
@@ -269,7 +267,7 @@ The QMUL provider is institution-specific. It requires:
 - access to the configured QMUL JupyterHub account;
 - a running compatible Whisper server in that account;
 - `QMUL_JUPYTER_TOKEN` in
-  `backend_python/models/whisper_large_v3_qmul/.env`;
+  `framework/models/whisper_large_v3_qmul/.env`;
 - sufficient remote GPU memory.
 
 It should not be selected for a general installation. If the remote model
@@ -349,10 +347,27 @@ Conversation logging is configured with:
 
 ```dotenv
 CONVERSATION_LOGGING_ENABLED=true
-CONVERSATION_LOG_DIRECTORY=runtime_logs/conversations
+RUNTIME_LOG_APPLICATION=docent
+# Optional explicit override; otherwise the application selector chooses the path.
+# CONVERSATION_LOG_DIRECTORY=apps/docent/runtime_logs/conversations
 ```
 
 Runtime logs and optional Moonshine input recordings are excluded from Git.
+Use `RUNTIME_LOG_APPLICATION=core` for core-engine feature tests; those logs go
+to `framework/tests/runtime_logs/conversations`. The default `docent` context
+writes to `apps/docent/runtime_logs/conversations`.
+
+Moonshine input-audio capture is disabled by default:
+
+```dotenv
+MOONSHINE_AUDIO_LOGGING_ENABLED=false
+```
+
+When enabled, it follows `RUNTIME_LOG_APPLICATION`: core audio goes to
+`framework/tests/runtime_logs/moonshine_audio`, while Docent audio goes to
+`apps/docent/runtime_logs/moonshine_audio`. The directory is created automatically
+when Moonshine starts saving audio. `MOONSHINE_SAVE_INPUT_WAV_PATH` can still
+override that location.
 
 ## Browser interaction
 
@@ -375,21 +390,22 @@ same-site cookies.
 
 ### Backend
 
-Activate the backend environment and run a targeted module from
-`backend_python`:
+The long-term test library is grouped by function under
+`framework/tests/_archive`. New or actively revised tests belong in
+`framework/tests/live` until they are classified. Run a targeted archived
+test from `framework` by file path:
 
 ```powershell
-Set-Location backend_python
-& .\venv\Scripts\Activate.ps1
-python -m unittest tests.test_context_resolution -v
+Set-Location framework
+& .\venv\Scripts\python.exe .\tests\_archive\conversation\test_context_resolution.py
 ```
 
 Additional focused suites include:
 
 ```powershell
-python -m unittest tests.test_audio_stream_route -v
-python -m unittest tests.test_tts_stream_route -v
-python -m unittest tests.test_transcription_lifecycle -v
+& .\venv\Scripts\python.exe .\tests\_archive\api_routes\test_audio_stream_route.py
+& .\venv\Scripts\python.exe .\tests\_archive\api_routes\test_tts_stream_route.py
+& .\venv\Scripts\python.exe .\tests\_archive\streaming_and_audio\test_transcription_lifecycle.py
 ```
 
 Some explicitly named integration tests make real Ollama, Google or QMUL
@@ -401,30 +417,30 @@ test module before enabling its integration environment flag.
 From the repository root:
 
 ```powershell
-npm --prefix client_side run test:vad
-npm --prefix client_side run test:sentences
-npm --prefix client_side run test:tts-client
-npm --prefix client_side run test:turn-client
-npm --prefix client_side run test:audio-client
-npm --prefix client_side run build
+npm --prefix apps/docent/frontend run test:vad
+npm --prefix apps/docent/frontend run test:sentences
+npm --prefix apps/docent/frontend run test:tts-client
+npm --prefix apps/docent/frontend run test:turn-client
+npm --prefix apps/docent/frontend run test:audio-client
+npm --prefix apps/docent/frontend run build
 ```
 
 ## Troubleshooting
 
-### `ModuleNotFoundError: No module named 'docent'`
+### `ModuleNotFoundError: No module named 'apps'`
 
-Start through `start_dev.ps1`, or set the repository root before starting
+Start through `apps/docent/start.ps1`, or set the repository root before starting
 Uvicorn manually:
 
 ```powershell
 $env:PYTHONPATH = (Resolve-Path ..).Path
 ```
 
-when the current directory is `backend_python`.
+when the current directory is `framework`.
 
 ### Vector index is missing
 
-Confirm that both generated files exist in `docent/data/vector_store`, then
+Confirm that both generated files exist in `apps/docent/data/vector_store`, then
 rerun the vector-store build command while Ollama is running.
 
 ### Ollama request fails
@@ -467,8 +483,8 @@ Cookies are host-specific.
 A fresh clone contains source code, artwork data, the Smart Turn ONNX model,
 tests and experiment reports. It does **not** contain:
 
-- `backend_python/.env`;
-- `client_side/.env`;
+- `framework/.env`;
+- `apps/docent/frontend/.env`;
 - provider credentials or QMUL tokens;
 - generated Docent vector embeddings;
 - model caches downloaded by Whisper, Moonshine or Pocket TTS;

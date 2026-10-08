@@ -3,10 +3,10 @@
   "license": "0BSD",
   "version": "1.0.0",
   "scripts": {
-    "start": "npm --prefix client_side run dev",
-    "dev": "npm --prefix client_side run dev",
-    "build": "npm --prefix client_side run build",
-    "preview": "npm --prefix client_side run preview"
+    "start": "npm --prefix apps/docent/frontend run dev",
+    "dev": "npm --prefix apps/docent/frontend run dev",
+    "build": "npm --prefix apps/docent/frontend run build",
+    "preview": "npm --prefix apps/docent/frontend run preview"
   },
   "private": true
 }

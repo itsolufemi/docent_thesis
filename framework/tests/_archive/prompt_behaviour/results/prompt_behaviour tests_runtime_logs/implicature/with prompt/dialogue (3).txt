@@ -1,0 +1,20 @@
+
+========================================
+Timestamp: 2026-08-05T16:58:54.117156+00:00
+Role: user
+Previous subject: None
+Current subject: queen victoria
+Subject reference: painting:900
+Text:
+that all seems rather excessive
+========================================
+
+========================================
+Timestamp: 2026-08-05T16:58:54.119313+00:00
+Role: assistant
+Previous subject: None
+Current subject: queen victoria
+Subject reference: painting:900
+Text:
+Well, it really depends on what you're looking at! If you mean the price of *The Arab Tent*, you're spot on—Sir Richard Wallace paid a whopping £6,300 for it. Actually, the Prince of Wales sold it to him, and he was famously short on cash, so he probably took full advantage of Wallace's desire to climb the social ladder.
+========================================

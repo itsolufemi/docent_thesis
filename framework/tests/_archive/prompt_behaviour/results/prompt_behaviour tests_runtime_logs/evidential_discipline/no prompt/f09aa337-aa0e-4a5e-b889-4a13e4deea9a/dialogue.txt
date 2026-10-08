@@ -1,0 +1,20 @@
+
+========================================
+Timestamp: 2026-08-05T19:59:26.232916+00:00
+Role: user
+Previous subject: None
+Current subject: the arab tent
+Subject reference: painting:581
+Text:
+Did the Prince of Wales deliberately take advantage of Wallace?
+========================================
+
+========================================
+Timestamp: 2026-08-05T19:59:26.234143+00:00
+Role: assistant
+Previous subject: None
+Current subject: the arab tent
+Subject reference: painting:581
+Text:
+Well, it certainly looks that way. Sir Richard Wallace paid a massive £6,300 for *The Arab Tent*, which was one of the most expensive purchases he ever made. The Prince was famously short of cash, so he likely played on Wallace's generosity and his desire to climb the social ladder to get a better price.
+========================================

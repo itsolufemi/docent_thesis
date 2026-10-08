@@ -1,0 +1,22 @@
+
+========================================
+Timestamp: 2026-08-05T18:17:08.350862+00:00
+Role: user
+Previous subject: None
+Current subject: queen victoria
+Subject reference: painting:900
+Text:
+Six thousand three hundred pounds is quite a lot for this.
+========================================
+
+========================================
+Timestamp: 2026-08-05T18:17:08.353761+00:00
+Role: assistant
+Previous subject: None
+Current subject: queen victoria
+Subject reference: painting:900
+Text:
+It really was! That's a massive sum for the time. Sir Richard Wallace paid that to the Prince of Wales, who, well, was famously short of cash and probably knew exactly how to push Wallace's buttons. 
+
+Actually, Richard was quite keen on climbing the social ladder, so he likely saw paying a premium for a painting from the Prince as a way to get closer to the royal inner circle.
+========================================

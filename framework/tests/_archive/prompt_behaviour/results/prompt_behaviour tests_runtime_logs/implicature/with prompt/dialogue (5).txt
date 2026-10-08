@@ -1,0 +1,20 @@
+
+========================================
+Timestamp: 2026-08-05T17:09:35.808595+00:00
+Role: user
+Previous subject: None
+Current subject: queen victoria
+Subject reference: painting:900
+Text:
+£6300, is quite a lot for this
+========================================
+
+========================================
+Timestamp: 2026-08-05T17:09:35.810278+00:00
+Role: assistant
+Previous subject: None
+Current subject: queen victoria
+Subject reference: painting:900
+Text:
+Oh, it absolutely was! In the 1860s, that was a massive sum of money. It's actually a bit of a tell—Sir Richard Wallace bought it from the Prince of Wales, who was famously short on cash and probably knew he could push the price up. It shows just how much Wallace wanted to climb the social ladder by owning the kind of prestige pieces the royals favored.
+========================================

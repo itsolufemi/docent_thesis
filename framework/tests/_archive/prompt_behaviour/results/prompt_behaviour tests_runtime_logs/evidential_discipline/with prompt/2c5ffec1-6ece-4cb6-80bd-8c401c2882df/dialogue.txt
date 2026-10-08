@@ -1,0 +1,20 @@
+
+========================================
+Timestamp: 2026-08-05T20:22:45.121793+00:00
+Role: user
+Previous subject: None
+Current subject: the arab tent
+Subject reference: painting:581
+Text:
+Did the Prince of Wales deliberately take advantage of Wallace?
+========================================
+
+========================================
+Timestamp: 2026-08-05T20:22:45.124135+00:00
+Role: assistant
+Previous subject: None
+Current subject: the arab tent
+Subject reference: painting:581
+Text:
+Well, it's certainly possible. Sir Richard Wallace paid a huge sum—about £6,300—to buy this painting from the Prince of Wales, which was an eye-watering amount at the time. I think it's likely the Prince, who was often short of cash, saw an opportunity to take advantage of Wallace's generosity and his desire to climb the social ladder.
+========================================

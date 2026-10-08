@@ -1,0 +1,40 @@
+
+========================================
+Timestamp: 2026-08-06T10:19:38.617581+00:00
+Role: user
+Previous subject: None
+Current subject: the rising of the sun
+Subject reference: painting:118
+Text:
+Why are the monkeys placed at the top?
+========================================
+
+========================================
+Timestamp: 2026-08-06T10:19:38.620173+00:00
+Role: assistant
+Previous subject: None
+Current subject: the rising of the sun
+Subject reference: painting:118
+Text:
+I'm sorry, but I can't see any monkeys at the top of the paintings we're looking at. Are you perhaps looking at a different piece, or maybe there's a detail I've missed?
+========================================
+
+========================================
+Timestamp: 2026-08-06T10:19:39.936151+00:00
+Role: user
+Previous subject: the rising of the sun
+Current subject: sir richard wallace
+Subject reference: painting:902
+Text:
+Right.
+========================================
+
+========================================
+Timestamp: 2026-08-06T10:19:39.936997+00:00
+Role: assistant
+Previous subject: the rising of the sun
+Current subject: sir richard wallace
+Subject reference: painting:902
+Text:
+So, did you want to keep chatting about this one, or is there something else in the room that's caught your eye?
+========================================
