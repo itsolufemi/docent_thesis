@@ -39,17 +39,33 @@ class TranscriptionStack:
         return self.batch_service.warm_up()
 
     def close(self) -> None:
-        if self.streaming_service is None:
-            return
+        closed_service_ids: set[int] = set()
+        errors: list[Exception] = []
 
-        close_method = getattr(
+        for service in (
             self.streaming_service,
-            "close",
-            None,
-        )
+            self.fallback_service,
+            self.batch_service,
+        ):
+            if service is None or id(service) in closed_service_ids:
+                continue
 
-        if callable(close_method):
-            close_method()
+            closed_service_ids.add(id(service))
+            close_method = getattr(service, "close", None)
+
+            if not callable(close_method):
+                continue
+
+            try:
+                close_method()
+            except Exception as error:
+                errors.append(error)
+
+        if errors:
+            raise ExceptionGroup(
+                "One or more transcription services failed to close.",
+                errors,
+            )
 
 
 def create_transcription_stack(

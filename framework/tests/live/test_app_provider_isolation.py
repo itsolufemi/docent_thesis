@@ -39,6 +39,17 @@ class FakeStreamingTranscriptionService:
         self.close_count += 1
 
 
+class FailingClosableTranscriptionService:
+    provider_name = "failing"
+
+    def __init__(self) -> None:
+        self.close_count = 0
+
+    def close(self) -> None:
+        self.close_count += 1
+        raise RuntimeError("close failed")
+
+
 class FakeTextToSpeechService:
     provider_name = "fake_tts"
     default_voice_name = "test"
@@ -178,6 +189,51 @@ class ApplicationProviderIsolationTests(unittest.TestCase):
         self.assertTrue(app.state.owns_tts_service)
         self.assertEqual(streaming_service.close_count, 1)
         self.assertEqual(tts_service.close_count, 1)
+
+
+class TranscriptionStackCleanupTests(unittest.TestCase):
+    def test_all_distinct_closable_services_are_closed(self) -> None:
+        batch_service = FakeStreamingTranscriptionService()
+        streaming_service = FakeStreamingTranscriptionService()
+        fallback_service = FakeStreamingTranscriptionService()
+        stack = TranscriptionStack(
+            batch_service=batch_service,
+            streaming_service=streaming_service,
+            fallback_service=fallback_service,
+        )
+
+        stack.close()
+
+        self.assertEqual(batch_service.close_count, 1)
+        self.assertEqual(streaming_service.close_count, 1)
+        self.assertEqual(fallback_service.close_count, 1)
+
+    def test_service_used_in_multiple_roles_is_closed_once(self) -> None:
+        shared_service = FakeStreamingTranscriptionService()
+        stack = TranscriptionStack(
+            batch_service=shared_service,
+            streaming_service=shared_service,
+            fallback_service=shared_service,
+        )
+
+        stack.close()
+
+        self.assertEqual(shared_service.close_count, 1)
+
+    def test_cleanup_continues_after_a_service_fails(self) -> None:
+        failing_service = FailingClosableTranscriptionService()
+        remaining_service = FakeStreamingTranscriptionService()
+        stack = TranscriptionStack(
+            batch_service=remaining_service,
+            streaming_service=failing_service,
+        )
+
+        with self.assertRaises(ExceptionGroup) as raised:
+            stack.close()
+
+        self.assertEqual(failing_service.close_count, 1)
+        self.assertEqual(remaining_service.close_count, 1)
+        self.assertEqual(len(raised.exception.exceptions), 1)
 
 
 if __name__ == "__main__":
