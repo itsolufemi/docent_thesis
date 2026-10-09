@@ -3268,6 +3268,7 @@ export default function MainApplication() {
       testUtterance,
       {
         clearTypedInput: true,
+        turnCompletionConfirmed: true,
       },
     );
   };
