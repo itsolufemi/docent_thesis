@@ -13,6 +13,9 @@ from core_engine.api.routes_audio_stream import create_audio_stream_router
 from core_engine.api.routes_conversation import create_conversation_router
 from core_engine.api.routes_health import router as health_router
 from core_engine.api.routes_llm import router as llm_router
+from core_engine.api.routes_multimodal import create_multimodal_router
+from core_engine.services.multimodal_service import MultimodalService
+from models.ollama_multimodal_provider import OllamaMultimodalProvider
 from core_engine.api.routes_query import create_query_router
 from core_engine.api.routes_transcription import create_transcription_router
 from core_engine.api.routes_trp import router as trp_router
@@ -222,6 +225,7 @@ def create_framework_app(
         health_router,
         create_query_router(query_engine=query_engine),
         llm_router,
+        create_multimodal_router(MultimodalService(OllamaMultimodalProvider())),
         create_conversation_router(query_engine=query_engine),
         create_utterance_router(domain_profile=domain_profile),
         trp_router,
