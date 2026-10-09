@@ -110,10 +110,12 @@ def process_turn_event(
         conversation_id=event.conversation_id,
         limit=4,
     )
-    previous_turns = [
-        f"{turn.role}: {turn.content}"
-        for turn in recent_turns
-    ]
+    previous_turns: list[str] = []
+    for turn in recent_turns:
+        if turn.user:
+            previous_turns.append(f"user: {turn.user}")
+        if turn.assistant:
+            previous_turns.append(f"assistant: {turn.assistant}")
 
     detection = detect_turn_completion(
         partial_utterance=latest_transcript,
