@@ -9,7 +9,7 @@ from core_engine.services.transcription_service import (
     StreamingTranscriptionService,
 )
 from models.whisper_local.whisper_transcription_service import (
-    default_local_whisper_transcription_service,
+    LocalWhisperTranscriptionService,
 )
 
 
@@ -59,44 +59,46 @@ def create_transcription_stack(
         backend or settings.transcription_backend
     ).strip().lower()
 
+    local_whisper_service = LocalWhisperTranscriptionService(
+        model_name=settings.whisper_model,
+        device=settings.whisper_device,
+        compute_type=settings.whisper_compute_type,
+    )
+
     if selected_backend == "whisper":
         return TranscriptionStack(
-            batch_service=(
-                default_local_whisper_transcription_service
-            ),
+            batch_service=local_whisper_service,
         )
 
     if selected_backend == "moonshine":
         from models.moonshine.moonshine_transcription_service import (
-            default_moonshine_transcription_service,
+            MoonshineStreamingTranscriptionService,
         )
 
         return TranscriptionStack(
-            batch_service=(
-                default_local_whisper_transcription_service
-            ),
-            streaming_service=(
-                default_moonshine_transcription_service
+            batch_service=local_whisper_service,
+            streaming_service=MoonshineStreamingTranscriptionService(
+                language=settings.moonshine_language,
+                model_arch=settings.moonshine_model_arch,
+                update_interval=settings.moonshine_update_interval,
             ),
         )
 
     if selected_backend == "qmul_whisper":
         from models.moonshine.moonshine_transcription_service import (
-            default_moonshine_transcription_service,
+            MoonshineStreamingTranscriptionService,
         )
         from models.whisper_large_v3_qmul.qmul_whisper_transcription_service import (
-            default_qmul_whisper_transcription_service,
+            QmulWhisperStreamingTranscriptionService,
         )
 
         return TranscriptionStack(
-            batch_service=(
-                default_local_whisper_transcription_service
-            ),
-            streaming_service=(
-                default_qmul_whisper_transcription_service
-            ),
-            fallback_service=(
-                default_moonshine_transcription_service
+            batch_service=local_whisper_service,
+            streaming_service=QmulWhisperStreamingTranscriptionService(),
+            fallback_service=MoonshineStreamingTranscriptionService(
+                language=settings.moonshine_language,
+                model_arch=settings.moonshine_model_arch,
+                update_interval=settings.moonshine_update_interval,
             ),
         )
 
@@ -105,6 +107,3 @@ def create_transcription_stack(
         f"{selected_backend}. Expected moonshine, whisper, "
         "or qmul_whisper."
     )
-
-
-default_transcription_stack = create_transcription_stack()

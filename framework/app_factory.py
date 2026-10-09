@@ -30,11 +30,14 @@ from core_engine.schemas.classifier_domain_schemas import (
     ClassifierDomainProfile,
 )
 from core_engine.services.llm_service import warm_up_main_llm
-from core_engine.services.ollama_http_client import close_ollama_http_client
 from core_engine.services.query_service import QueryEngine
+from core_engine.services.tts_service import TextToSpeechService
 from models.smart_turn.smart_turn_model_service import OnnxSmartTurnService
-from models.transcription_factory import default_transcription_stack
-from models.tts_factory import default_tts_service
+from models.transcription_factory import (
+    TranscriptionStack,
+    create_transcription_stack,
+)
+from models.tts_factory import create_tts_service
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -81,11 +84,31 @@ def create_framework_app(
     title: str,
     query_engine: QueryEngine,
     domain_profile: ClassifierDomainProfile,
+    transcription_stack: TranscriptionStack | None = None,
+    tts_service: TextToSpeechService | None = None,
+    close_transcription_stack_on_shutdown: bool | None = None,
+    close_tts_service_on_shutdown: bool | None = None,
+    warm_up_transcription_on_startup: bool | None = None,
+    warm_up_tts_on_startup: bool | None = None,
     application_routers: Iterable[APIRouter] = (),
     application_warm_up_operations: Sequence[WarmUpOperation] = (),
     version: str = "0.1.0",
 ) -> FastAPI:
     """Compose the framework API with injected application capabilities."""
+    resolved_transcription_stack = (
+        transcription_stack or create_transcription_stack()
+    )
+    resolved_tts_service = tts_service or create_tts_service()
+    owns_transcription_stack = (
+        transcription_stack is None
+        if close_transcription_stack_on_shutdown is None
+        else close_transcription_stack_on_shutdown
+    )
+    owns_tts_service = (
+        tts_service is None
+        if close_tts_service_on_shutdown is None
+        else close_tts_service_on_shutdown
+    )
     smart_turn_service = (
         OnnxSmartTurnService(
             model_path=settings.smart_turn_model_path,
@@ -104,22 +127,24 @@ def create_framework_app(
         transcription_warm_up_settings = {
             "moonshine": settings.warm_up_moonshine_on_startup,
             "whisper": settings.warm_up_whisper_on_startup,
-            "qmul_whisper": settings.warm_up_qmul_whisper_on_startup,
+            "qmul_whisper_large_v3": (
+                settings.warm_up_qmul_whisper_on_startup
+            ),
         }
-        transcription_warm_up_enabled = transcription_warm_up_settings.get(
-            settings.transcription_backend
+        transcription_warm_up_enabled = (
+            warm_up_transcription_on_startup
+            if warm_up_transcription_on_startup is not None
+            else transcription_warm_up_settings.get(
+                resolved_transcription_stack.provider_name,
+                False,
+            )
         )
         if transcription_warm_up_enabled:
             warm_up_operations.append(
                 (
-                    default_transcription_stack.provider_name,
-                    default_transcription_stack.warm_up,
+                    resolved_transcription_stack.provider_name,
+                    resolved_transcription_stack.warm_up,
                 )
-            )
-        elif transcription_warm_up_enabled is None:
-            logger.warning(
-                "Unknown transcription backend configured: %s",
-                settings.transcription_backend,
             )
 
         if (
@@ -135,9 +160,14 @@ def create_framework_app(
         if settings.warm_up_llm_on_startup:
             warm_up_operations.append(("Main LLM", warm_up_main_llm))
 
-        if settings.warm_up_tts_on_startup:
+        should_warm_up_tts = (
+            warm_up_tts_on_startup
+            if warm_up_tts_on_startup is not None
+            else settings.warm_up_tts_on_startup
+        )
+        if should_warm_up_tts:
             warm_up_operations.append(
-                ("Selected streaming TTS", default_tts_service.warm_up)
+                ("Selected streaming TTS", resolved_tts_service.warm_up)
             )
 
         results = await asyncio.gather(
@@ -155,15 +185,20 @@ def create_framework_app(
         try:
             logger.info(
                 "Selected TTS backend: %s",
-                default_tts_service.provider_name,
+                resolved_tts_service.provider_name,
             )
             yield
         finally:
-            default_transcription_stack.close()
-            default_tts_service.close()
-            close_ollama_http_client()
+            if owns_transcription_stack:
+                resolved_transcription_stack.close()
+            if owns_tts_service:
+                resolved_tts_service.close()
 
     app = FastAPI(title=title, version=version, lifespan=lifespan)
+    app.state.transcription_stack = resolved_transcription_stack
+    app.state.tts_service = resolved_tts_service
+    app.state.owns_transcription_stack = owns_transcription_stack
+    app.state.owns_tts_service = owns_tts_service
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -200,19 +235,19 @@ def create_framework_app(
             utterance_classifier=None,
         ),
         create_transcription_router(
-            default_transcription_stack.batch_service
+            resolved_transcription_stack.batch_service
         ),
         create_audio_stream_router(
             transcription_service=(
-                default_transcription_stack.live_fallback_service
+                resolved_transcription_stack.live_fallback_service
             ),
             smart_turn_service=smart_turn_service,
             streaming_transcription_service=(
-                default_transcription_stack.streaming_service
+                resolved_transcription_stack.streaming_service
             ),
         ),
-        create_tts_router(default_tts_service),
-        create_tts_stream_router(default_tts_service),
+        create_tts_router(resolved_tts_service),
+        create_tts_stream_router(resolved_tts_service),
     ]
 
     for router in framework_routers:

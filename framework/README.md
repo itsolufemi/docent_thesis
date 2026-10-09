@@ -57,6 +57,19 @@ For the framework-only Swagger and API, replace the Uvicorn target with
 `apps.def_conv_app.server:app` and the application reload directory with
 `..\apps\def_conv_app`.
 
+## Application provider isolation
+
+`create_framework_app()` creates a fresh transcription stack and TTS service
+for each application by default. Applications may instead inject a
+`TranscriptionStack` and `TextToSpeechService`, including providers selected
+with `create_transcription_stack()` and `create_tts_service()`.
+
+Injected providers are treated as externally owned and are not closed when an
+application stops. Set `close_transcription_stack_on_shutdown=True` or
+`close_tts_service_on_shutdown=True` to transfer ownership to that application.
+This allows applications to use independent providers or deliberately share
+them without one application's shutdown invalidating another.
+
 ## Configuration
 
 Copy `framework/.env.example` to `framework/.env` and adjust provider settings

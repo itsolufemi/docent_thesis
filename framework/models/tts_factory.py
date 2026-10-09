@@ -15,16 +15,13 @@ def create_tts_service(
 
     if selected_backend == "google":
         from models.google_tts.google_tts_service import (
-            google_tts_service,
+            GoogleTextToSpeechService,
         )
 
-        google_tts_service.default_voice_name = (
-            settings.tts_voice
+        return GoogleTextToSpeechService(
+            default_voice_name=settings.tts_voice,
+            default_language_code=settings.tts_language_code,
         )
-        google_tts_service.default_language_code = (
-            settings.tts_language_code
-        )
-        return google_tts_service
 
     if selected_backend in {
         "kyutai",
@@ -32,16 +29,18 @@ def create_tts_service(
         "pocket_tts",
     }:
         from models.pocket_tts.pocket_tts_service import (
-            pocket_tts_service,
+            PocketTtsService,
         )
 
-        return pocket_tts_service
+        return PocketTtsService(
+            language=settings.tts_model,
+            default_voice_name=settings.tts_voice,
+            default_language_code=settings.tts_language_code,
+            quantize=settings.tts_quantize,
+        )
 
     raise ValueError(
         "Unsupported TTS backend: "
         f"{selected_backend}. Expected google or "
         "kyutai_pocket."
     )
-
-
-default_tts_service = create_tts_service()
