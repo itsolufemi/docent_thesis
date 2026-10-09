@@ -43,11 +43,12 @@ docent_thesis/
 │   ├── extensions/          Generic retrieval/indexing implementation
 │   ├── models/              ASR, Smart Turn and TTS implementations/factories
 │   ├── tests/               Live test workspace and function-grouped archive
+│   ├── app_factory.py       Reusable FastAPI composition factory
 │   ├── config.py            Environment-backed application settings
-│   ├── requirements.txt     Pinned Python dependencies
-│   └── server.py            FastAPI composition root
+│   └── requirements.txt     Pinned Python dependencies
 ├── apps/
-│   └── docent/              Docent application package
+│   ├── def_conv_app/        Domain-neutral default framework API
+│   └── docent/              Docent application package and API entry point
 │       ├── api/             Artwork and retrieval routes
 │       ├── config/          Docent-specific profiles
 │       ├── data/            Artwork corpus and generated vector store
@@ -213,7 +214,7 @@ Backend terminal, from the repository root:
 ```powershell
 $env:PYTHONPATH = (Get-Location).Path
 Set-Location framework
-& .\venv\Scripts\python.exe -m uvicorn server:app --reload `
+& .\venv\Scripts\python.exe -m uvicorn apps.docent.server:app --reload `
     --reload-dir . `
     --reload-dir ..\apps\docent
 ```
@@ -229,6 +230,10 @@ Open:
 - application: <http://localhost:5173>
 - FastAPI documentation: <http://localhost:8000/docs>
 - backend health check: <http://localhost:8000/api/health>
+
+To run only the domain-neutral framework application, use the same backend
+terminal setup with `apps.def_conv_app.server:app` as the Uvicorn target. Its
+Swagger schema excludes Docent artwork and retrieval endpoints.
 
 Allow microphone access when prompted by the browser.
 

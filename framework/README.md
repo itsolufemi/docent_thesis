@@ -22,9 +22,15 @@ composition.
   `core`.
 - `config.py` — environment-backed settings and application-specific runtime
   log path selection.
-- `server.py` — FastAPI composition root. It connects the framework to the
-  Docent application package.
+- `app_factory.py` — application-agnostic FastAPI composition factory.
 - `requirements.txt` — pinned Python dependencies.
+
+Application entry points live outside the framework:
+
+- `apps/docent/server.py` composes the framework with Docent services and
+  routes.
+- `apps/def_conv_app/server.py` composes only domain-neutral framework
+  capabilities for development and testing.
 
 ## Development startup
 
@@ -39,7 +45,7 @@ To start only the API manually:
 ```powershell
 $env:PYTHONPATH = (Get-Location).Path
 Set-Location framework
-& .\venv\Scripts\python.exe -m uvicorn server:app --reload `
+& .\venv\Scripts\python.exe -m uvicorn apps.docent.server:app --reload `
     --reload-dir . `
     --reload-dir ..\apps\docent
 ```
@@ -47,11 +53,15 @@ Set-Location framework
 The API is served at `http://localhost:8000`; its health endpoint is
 `GET /api/health`.
 
+For the framework-only Swagger and API, replace the Uvicorn target with
+`apps.def_conv_app.server:app` and the application reload directory with
+`..\apps\def_conv_app`.
+
 ## Configuration
 
 Copy `framework/.env.example` to `framework/.env` and adjust provider settings
 for the local machine. Runtime logs default to the Docent application context.
-Set `APPLICATION_CONTEXT=core` when a framework test should write conversation
+Set `RUNTIME_LOG_APPLICATION=core` when a framework test should write conversation
 or optional Moonshine audio logs beneath `framework/tests/runtime_logs`.
 
 ## Tests

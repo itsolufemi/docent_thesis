@@ -12,7 +12,7 @@ Write-Host "backend init..."
 Start-Process powershell -ArgumentList @(
     "-NoExit",
     "-Command",
-    "Set-Item Env:PYTHONPATH '$repoRoot'; Set-Location '$backendPath'; & '$pythonPath' -m uvicorn server:app --reload --reload-dir '$backendPath' --reload-dir '$docentPath'"
+    "Set-Item Env:PYTHONPATH '$repoRoot'; Set-Location '$backendPath'; & '$pythonPath' -m uvicorn apps.docent.server:app --reload --reload-dir '$backendPath' --reload-dir '$docentPath'"
 )
 
 Write-Host "waiting for backend initialisation..."
