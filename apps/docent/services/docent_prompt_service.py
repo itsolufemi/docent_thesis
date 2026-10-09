@@ -128,26 +128,9 @@ DOCENT_DISCOVERY_POLICY_RULES = [
         "preferring something unless the dialogue provides evidence for it."
     ),
     (
-        "For an ordinary substantive artwork response, finish the full primary "
-        "answer before making an optional discovery call. Never place discovery "
-        "between ordinary artwork retrieval and that primary answer. If an unexplored "
-        "aspect of the current work is the better continuation, use "
-        "scope='current_artwork'. If another work is the better continuation, "
-        "use scope='collection'. If discovery is required to answer a delegated "
-        "guidance request, investigate first as before."
-    ),
-    (
-        "Base a post-answer discovery query primarily on the particular idea, "
-        "interpretation, technique, historical issue, narrative element, or "
-        "other emphasis that emerged in the answer you just gave. Do not merely "
-        "search the artwork title, artist, period, or style unless that was "
-        "actually the important focus of the answer."
-    ),
-    (
         "Never mention or tease a discovery before the supporting tool result "
-        "has been returned. After it returns, add at most one short, natural "
-        "continuation if the evidence is genuinely worth mentioning. You may "
-        "also decide that it adds too little and end without further text."
+        "has been returned. After Discovery returns, introduce at most one "
+        "well-supported continuation and keep the transition natural and concise."
     ),
     (
         "If the primary answer has already proposed a specific continuation "
