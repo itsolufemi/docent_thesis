@@ -225,7 +225,6 @@ def create_framework_app(
         health_router,
         create_query_router(query_engine=query_engine),
         llm_router,
-        create_multimodal_router(MultimodalService(OllamaMultimodalProvider())),
         create_conversation_router(query_engine=query_engine),
         create_utterance_router(domain_profile=domain_profile),
         trp_router,
@@ -253,6 +252,13 @@ def create_framework_app(
         create_tts_router(resolved_tts_service),
         create_tts_stream_router(resolved_tts_service),
     ]
+
+    if settings.environment.lower() == "development":
+        framework_routers.append(
+            create_multimodal_router(
+                MultimodalService(OllamaMultimodalProvider())
+            )
+        )
 
     for router in framework_routers:
         app.include_router(router)
