@@ -5,6 +5,7 @@ framework/.env
 framework/venv/
 framework/tests/runtime_logs/
 apps/docent/runtime_logs/
+images/
 
 # Python generated files
 __pycache__/
