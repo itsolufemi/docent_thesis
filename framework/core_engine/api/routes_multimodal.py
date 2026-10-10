@@ -1,7 +1,9 @@
 """Experimental Swagger endpoint for provider-neutral text-and-image requests."""
 
 import logging
+from typing import Annotated
 
+from pydantic import WithJsonSchema
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
@@ -16,6 +18,14 @@ from core_engine.services.multimodal_service import MultimodalService
 logger = logging.getLogger(__name__)
 MAX_IMAGE_COUNT = 4
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+# Swagger UI currently recognises format=binary, not contentMediaType.
+# Keep the upload annotation non-nullable and use an empty default so
+# OpenAPI renders a proper multiple-file chooser while files stay optional.
+BinaryImageUpload = Annotated[
+    UploadFile,
+    WithJsonSchema({"type": "string", "format": "binary"}),
+]
 
 
 def detect_image_media_type(data: bytes) -> str | None:
@@ -45,7 +55,7 @@ def create_multimodal_router(service: MultimodalService) -> APIRouter:
     async def query_multimodal(
         question: str = Form(min_length=1, max_length=4000),
         context: str | None = Form(default=None, max_length=20000),
-        images: list[UploadFile] | None = File(default=None),
+        images: list[BinaryImageUpload] = File(default=[]),
     ) -> MultimodalQueryResponse:
         if not question.strip():
             raise HTTPException(status_code=422, detail="Question must not be blank.")
