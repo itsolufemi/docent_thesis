@@ -3,7 +3,7 @@ from apps.docent.tools.docent_tool_registry import (
 )
 from apps.docent.tools.retrieval_tool import (
     DOCENT_RETRIEVAL_TOOL,
-    retrieve_docent_knowledge,
+    retrieve_knowledge,
 )
 from apps.docent.tools.discovery_tool import (
     DOCENT_DISCOVERY_TOOL,
@@ -15,5 +15,5 @@ __all__ = [
     "DOCENT_RETRIEVAL_TOOL",
     "docent_tool_registry",
     "discover_docent_knowledge",
-    "retrieve_docent_knowledge",
+    "retrieve_knowledge",
 ]
