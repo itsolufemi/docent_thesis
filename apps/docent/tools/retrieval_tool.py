@@ -6,6 +6,7 @@ from apps.docent.services.docent_vector_retrieval_service import (
     retrieve_docent_chunks_by_vector_similarity,
 )
 from apps.docent.tools.docent_tool_registry import docent_tool_registry
+from apps.docent.services.docent_image_service import image_reference_for_painting
 
 
 DOCENT_RETRIEVAL_DESCRIPTION = (
@@ -33,7 +34,7 @@ DOCENT_RETRIEVAL_SUBJECTS_DESCRIPTION = (
 
 
 def docent_retriever(query: str) -> VectorRetrievalResult:
-    return retrieve_docent_chunks_by_vector_similarity(
+    result = retrieve_docent_chunks_by_vector_similarity(
         query=query,
         limit=4,
         expand_parent_documents=True,
@@ -41,6 +42,14 @@ def docent_retriever(query: str) -> VectorRetrievalResult:
         apply_confidence_gate=True,
         min_confidence_score=0.45,
     )
+    # Enrich the retrieved chunks even when a persisted vector index predates
+    # image support. The image path is metadata, not embedding text.
+    for item in result.results:
+        painting_index = item.chunk.metadata.get("painting_index")
+        image_reference = image_reference_for_painting(painting_index)
+        if image_reference:
+            item.chunk.metadata["image_reference"] = image_reference
+    return result
 
 
 DOCENT_RETRIEVAL_TOOL, retrieve_knowledge = create_retrieval_tool(

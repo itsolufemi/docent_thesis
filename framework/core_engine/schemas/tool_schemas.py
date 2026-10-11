@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from core_engine.schemas.source_schemas import (
     QuerySource,
 )
+from core_engine.schemas.multimodal_schemas import ImageInput
 
 
 ToolPhase = Literal[
@@ -96,6 +97,14 @@ class ToolExecutionResult(BaseModel):
 
     telemetry: dict[str, Any] = Field(
         default_factory=dict
+    )
+
+    # In-memory attachments for the next model request. Excluded from all
+    # model_dump/model_dump_json output, telemetry, and public tool results.
+    image_attachments: list[ImageInput] = Field(
+        default_factory=list,
+        exclude=True,
+        repr=False,
     )
 
     def model_payload(self) -> dict[str, Any]:

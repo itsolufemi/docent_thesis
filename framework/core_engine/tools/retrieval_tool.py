@@ -133,6 +133,12 @@ def create_retrieval_tool(
                 "reference": _reference_for(item),
                 "text": item.chunk.text,
                 "score": item.score,
+                **(
+                    {"image_reference": item.chunk.metadata["image_reference"]}
+                    if isinstance(item.chunk.metadata.get("image_reference"), str)
+                    and item.chunk.metadata["image_reference"]
+                    else {}
+                ),
             }
             for item in selected_results
         ]

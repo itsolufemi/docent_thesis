@@ -1,5 +1,6 @@
 from apps.docent.schemas.artwork_schemas import Artwork
 from apps.docent.services.artwork_service import get_all_artworks
+from apps.docent.services.docent_image_service import image_reference_for_painting
 
 from extensions.retrieval.schemas.chunk_schemas import RetrievalChunk
 from extensions.retrieval.schemas.document_schemas import RetrievalDocument
@@ -205,10 +206,15 @@ def artwork_to_retrieval_chunks(
         build_metadata_chunk(artwork),
     ]
 
-    return [
+    chunks = [
         chunk for chunk in possible_chunks
         if chunk is not None
     ]
+    image_reference = image_reference_for_painting(artwork.painting_index)
+    if image_reference:
+        for chunk in chunks:
+            chunk.metadata["image_reference"] = image_reference
+    return chunks
 
 
 def get_docent_retrieval_chunks() -> list[RetrievalChunk]:

@@ -28,6 +28,7 @@ from core_engine.tools.core_tool_registry import (
 from core_engine.tools.tool_registry import (
     ToolRegistry,
 )
+from models.ollama_image_message import build_ollama_image_followup
 
 LLMTimingCallback = Callable[
     [str, float, dict[str, Any]],
@@ -791,6 +792,14 @@ def stream_tool_aware_llm_response(
                             ),
                         }
                     )
+                    if execution_result.success and execution_result.image_attachments:
+                        # Binary tool output never enters JSON result logs. Ollama
+                        # receives a separate image-bearing message next round.
+                        messages.append(
+                            build_ollama_image_followup(
+                                execution_result.image_attachments
+                            )
+                        )
 
                     yield LLMStreamEvent(
                         event_type="tool_result",
