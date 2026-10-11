@@ -81,6 +81,7 @@ def create_image_tool(
     image_root: Path,
     name: str = "load_image",
     description: str | None = None,
+    reference_description: str | None = None,
     max_image_bytes: int = DEFAULT_MAX_IMAGE_BYTES,
 ) -> tuple[ToolDefinition, ToolHandler]:
     """Return a tool definition and handler bound to one application's images."""
@@ -104,8 +105,12 @@ def create_image_tool(
                     "type": "string",
                     "minLength": 1,
                     "description": (
-                        "Exact relative image_reference previously provided "
-                        "as trusted contextual or retrieved evidence."
+                        reference_description
+                        or (
+                            "Relative path to an image under the application's "
+                            "configured image root. Prefer exact references "
+                            "provided by retrieval or trusted context."
+                        )
                     ),
                 }
             },

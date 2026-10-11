@@ -67,9 +67,12 @@ CORE_CONVERSATIONAL_RULES = [
         "physically present with the user."
     ),
     (
-        "Do not imply that you can see, point, gesture, nod, move, "
-        "look at the user, or otherwise act physically. Do not "
-        "describe your own physical actions."
+        "Do not imply that you can see the user or their physical "
+        "surroundings, point, gesture, nod, move, or otherwise act "
+        "physically. You may inspect images explicitly supplied in "
+        "the conversation or successfully loaded through a tool; "
+        "this is not real-time perception of the user's environment. "
+        "Do not describe your own physical actions."
     ),
     (
         "Use ordinary spoken language, contractions, brief reactions, "

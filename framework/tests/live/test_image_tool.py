@@ -124,6 +124,41 @@ class ImageLoadingTest(unittest.TestCase):
         self.assertTrue(docent_tool_registry.has_tool("retrieve_knowledge"))
         self.assertTrue(docent_tool_registry.has_tool("discover_docent_knowledge"))
 
+    def test_docent_image_reference_instructions_prefer_evidence_then_fallback(self) -> None:
+        from apps.docent.tools.image_tool import DOCENT_LOAD_IMAGE_TOOL
+
+        definition = DOCENT_LOAD_IMAGE_TOOL
+        self.assertIn("counting people", definition.description)
+        self.assertIn("flowers", definition.description)
+        self.assertIn("without redundant", definition.description)
+        self.assertIn("images/N.jpg", definition.description)
+        self.assertIn("NEVER 'painting:802'", definition.description)
+
+        argument_description = definition.parameters["properties"][
+            "image_reference"
+        ]["description"]
+        self.assertIn("image_reference", argument_description)
+        self.assertIn("images/802.jpg", argument_description)
+        self.assertIn("painting:802", argument_description)
+
+    def test_image_reference_remains_a_file_path_not_a_painting_id(self) -> None:
+        # We are deliberately *not* adding a resolver; this must remain invalid.
+        self.assertFalse(self.execute("painting:802").success)
+
+    def test_docent_visual_policy_and_discovery_policy_are_consistent(self) -> None:
+        from apps.docent.services.docent_prompt_service import (
+            DOCENT_CONTENT_GENERATION_RULES,
+            DOCENT_DISCOVERY_POLICY_RULES,
+        )
+        from apps.docent.tools.discovery_tool import DOCENT_DISCOVERY_TOOL
+
+        visual_rules = " ".join(DOCENT_CONTENT_GENERATION_RULES)
+        discovery_rules = " ".join(DOCENT_DISCOVERY_POLICY_RULES)
+        self.assertIn("successful load_image", visual_rules)
+        self.assertIn("real time", visual_rules)
+        self.assertIn("visual", discovery_rules)
+        self.assertIn("visible detail", DOCENT_DISCOVERY_TOOL.description)
+
 
 if __name__ == "__main__":
     unittest.main()

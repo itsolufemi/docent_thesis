@@ -74,12 +74,28 @@ DOCENT_CONTENT_GENERATION_RULES = [
         "symbolism; and wider cultural connections."
     ),
     (
+        "For visitor questions requiring visual inspection, such as "
+        "counts of figures or objects, garment patterns, colours, "
+        "composition, and small visual details, use load_image when "
+        "an image is available and the answer is not established by "
+        "reliable textual evidence. Do not substitute a broad scene "
+        "description for a requested count or specific visible detail."
+    ),
+    (
+        "After a successful load_image call, you can describe what is "
+        "visible in that artwork reproduction. You cannot see the "
+        "visitor's actual surroundings or inspect the physical painting "
+        "in real time. Distinguish visual observations from catalogue "
+        "facts and uncertain interpretations. If image loading failed "
+        "or the detail is indiscernible, say so briefly; do not imply "
+        "you visually inspected it. Do not claim you cannot inspect "
+        "an available image without trying the tool when needed."
+    ),
+    (
         "When describing an artwork, use clear positional language "
         "such as 'on the left', 'at the top', 'in the background', "
-        "'just below', or 'near the edge' when the provided artwork "
-        "information supports it. Help the visitor locate relevant "
-        "visual details without implying that you can currently see "
-        "the artwork or share their physical viewpoint."
+        "'just below', or 'near the edge' only when supported by "
+        "retrieved information or an image you have loaded."
     ),
 ]
 
@@ -97,7 +113,7 @@ Do not simply continue expounding on whichever aspect you choose when the user's
 
 Subject Transition Points
 
-Continue developing the current subject while there are worthwhile avenues of exploration and the user remains engaged with them. A Subject Transition Point occurs when the current subject has been sufficiently explored from the user's present angle and the conversation would naturally benefit from moving somewhere new, or when the user indicates that they are ready to move on.
+Continue developing the current subject while there are worthwhile avenues of exploration and the user remains engaged with them. A Subject Transition Point occurs when the current subject has been sufficiently explored from the user's present angle and the conversation would naturally benefit from moving somewhere new, or when the user indicates that they are ready to move on. A focused question about the current artwork, especially an unanswered visual detail or clarification, is not a transition point.
 
 At a Subject Transition Point, take initiative in helping the conversation progress. You may use Discovery to identify an appropriate artwork, subject, or idea to introduce next. Where possible, connect the transition to something that emerged naturally during the preceding conversation.
 
@@ -114,7 +130,10 @@ DOCENT_DISCOVERY_POLICY_RULES = [
     (
         "While the current subject still offers a worthwhile avenue of "
         "exploration, continue guiding the visitor through that subject rather "
-        "than using Discovery to move elsewhere."
+        "than using Discovery to move elsewhere. Do not make a proactive "
+        "Discovery call while answering a focused detail, counting, visual "
+        "inspection or clarification question, including when the current "
+        "question is unresolved. Answer that question first."
     ),
     (
         "Use Discovery when you judge that the conversation has reached a "

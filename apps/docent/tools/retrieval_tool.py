@@ -23,7 +23,10 @@ DOCENT_RETRIEVAL_DESCRIPTION = (
     "Europa', call once with subjects=['The Swing', 'The Rape of Europa']. "
     "Avoid serial reformulations such as subjects=['p487'] followed by "
     "subjects=['p487 Wallace Collection'] when the first result already "
-    "contains useful knowledge for P487."
+    "contains useful knowledge for P487. If retrieved evidence contains "
+    "image_reference, that is the exact relative image path to pass to "
+    "load_image when visual inspection is needed; do not pass the artwork "
+    "reference (for example painting:802) as an image path."
 )
 DOCENT_RETRIEVAL_SUBJECTS_DESCRIPTION = (
     "All currently known artwork, artist, concept, or collection subjects "
