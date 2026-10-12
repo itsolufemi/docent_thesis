@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from config import settings
+
 from core_engine.memory.conversation_store import get_conversation
 from core_engine.schemas.source_schemas import QuerySource
 from core_engine.schemas.tool_schemas import (
@@ -25,6 +27,16 @@ class DocentDiscoveryArguments(BaseModel):
     purpose: Literal["proactive", "delegated"] = "proactive"
 
 
+PROACTIVE_DISCOVERY_PHASE_GUIDANCE = (
+    "When used proactively, call this tool only during the post-answer phase. "
+    if settings.post_answer_probe_enabled
+    else (
+        "When used proactively, call this tool while forming the response "
+        "that introduces the next artwork or subject. "
+    )
+)
+
+
 DOCENT_DISCOVERY_TOOL = ToolDefinition(
     name="discover_docent_knowledge",
     allowed_phases={
@@ -32,30 +44,26 @@ DOCENT_DISCOVERY_TOOL = ToolDefinition(
         "post_answer",
     },
     description=(
-        "Semantically search Wallace Collection knowledge to help move the "
-        "conversation into an appropriate new artwork, subject, or idea. Do "
-        "not use this tool merely because a related artwork or concept exists. "
-        "For proactive discovery, use this tool only when the conversation has "
-        "reached a Subject Transition Point. During ordinary exploration, "
-        "continue developing the current subject without calling Discovery. "
-        "A follow-up about a visible detail, object count, pattern, or an "
-        "unanswered question on the current artwork is not a Subject "
-        "Transition Point; do not call proactive Discovery in that case. "
-        "When used proactively, call it only during the post-answer phase. If "
-        "the visitor explicitly asks to move on, asks what to see next, requests "
-        "a recommendation, or otherwise delegates the choice, it may be called "
-        "before answering. Use purpose=delegated only for that explicit "
-        "delegated case; otherwise use purpose=proactive. Use scope=collection "
-        "to find other artworks meaningfully connected to a concept, theme, "
-        "technique, interpretation, period, or historical context. The "
-        "scope=current_artwork option remains available when a search must be "
-        "restricted to the current work, but it is not the default mechanism "
-        "for guided exploration. This is conceptual semantic discovery, not "
-        "exact-title retrieval. Prefer transitions grounded in interests, "
-        "observations, questions, or themes that emerged in the dialogue, "
-        "without claiming that the visitor likes something merely because it "
-        "was discussed. Do not mention or tease a possible discovery until this "
-        "tool has returned evidence supporting it."
+        "Semantically search Wallace Collection knowledge to identify an "
+        "appropriate new artwork, subject, or idea for the conversation "
+        "to explore. "
+        + PROACTIVE_DISCOVERY_PHASE_GUIDANCE
+        + "If the visitor explicitly asks to move on, asks what to see next, "
+        "requests a recommendation, or otherwise delegates the choice, "
+        "Discovery may be called before answering. Use purpose=delegated "
+        "only for that explicit delegated case; otherwise use "
+        "purpose=proactive. Use scope=collection to find other artworks "
+        "meaningfully connected to a concept, theme, technique, "
+        "interpretation, period, or historical context. The "
+        "scope=current_artwork option remains available when a search must "
+        "be restricted to the current work, but it is not the default "
+        "mechanism for guided exploration. This is conceptual semantic "
+        "discovery, not exact-title retrieval. Prefer discoveries grounded "
+        "in interests, observations, questions, or themes that emerged "
+        "in the dialogue, without claiming that the visitor likes "
+        "something merely because it was discussed. Do not mention or "
+        "tease a possible discovery until this tool has returned "
+        "evidence supporting it."
     ),
     parameters={
         "type": "object",
@@ -100,16 +108,19 @@ def discover_docent_knowledge(
     arguments: dict,
 ) -> ToolExecutionResult:
     validated = DocentDiscoveryArguments.model_validate(arguments)
+    proactive_phase = (
+        "post_answer" if settings.post_answer_probe_enabled else "primary"
+    )
     if (
         validated.purpose == "proactive"
-        and context.response_phase != "post_answer"
+        and context.response_phase != proactive_phase
     ):
         return ToolExecutionResult(
             tool_name=DOCENT_DISCOVERY_TOOL.name,
             success=False,
             message=(
                 "Proactive discovery is only available during "
-                "the post-answer discovery phase."
+                f"the {proactive_phase} phase."
             ),
             retrieval_used=False,
             data={},
