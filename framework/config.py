@@ -78,6 +78,13 @@ class Settings():
         )
     )
 
+    # A/B switch: off means Discovery may be called during primary generation.
+    # On restores the original post-answer probe and discovery phase.
+    post_answer_probe_enabled: bool = _read_bool(
+        "POST_ANSWER_PROBE_ENABLED",
+        False,
+    )
+
     whisper_model: str = os.getenv("WHISPER_MODEL", "base.en")
     whisper_device: str = os.getenv("WHISPER_DEVICE", "cpu")
     whisper_compute_type: str = os.getenv(
