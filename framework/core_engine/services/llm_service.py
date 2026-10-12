@@ -879,6 +879,7 @@ def stream_tool_aware_llm_response(
                     complete_round_content
                     and post_answer_tools
                     and post_answer_probe_needed
+                    and settings.post_answer_probe_enabled
                 ):
                     messages.append(
                         {
